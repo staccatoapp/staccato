@@ -1,0 +1,20 @@
+import { FastifyPluginAsync } from "fastify";
+import fp from "fastify-plugin";
+import { db } from "../db/index.js";
+import { users } from "../db/schema/users.js";
+import { eq } from "drizzle-orm";
+
+const defaultUserPlugin: FastifyPluginAsync = async (fastify) => {
+  const defaultUser = db
+    .select()
+    .from(users)
+    .where(eq(users.isAdmin, true))
+    .limit(1)
+    .get();
+  fastify.decorateRequest("userId", "");
+  fastify.addHook("onRequest", async (request) => {
+    request.userId = defaultUser?.id ?? "";
+  });
+};
+
+export default fp(defaultUserPlugin);

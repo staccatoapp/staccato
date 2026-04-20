@@ -36,3 +36,14 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
+
+# Vitepress
+**/.vitepress/cache
+**/vitepress/dist
+
+# Staccato-specific
+plans/
+apps/server/data/
+data/
+.claude/
+music/

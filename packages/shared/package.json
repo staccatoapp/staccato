@@ -1,5 +1,5 @@
 {
-  "name": "@staccato/typescript-config",
+  "name": "@staccato/shared",
   "version": "0.0.0",
   "private": true,
   "exports": {

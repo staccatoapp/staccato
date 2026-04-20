@@ -1,4 +1,12 @@
-import { nextJsConfig } from "@repo/eslint-config/next-js";
+import { config } from "@staccato/eslint-config/base";
+import { defineConfig, globalIgnores } from 'eslint/config'
+import markdown from "@eslint/markdown";
 
-/** @type {import("eslint").Linter.Config[]} */
-export default nextJsConfig;
+export default defineConfig([
+  globalIgnores(['dist', '.vitepress/cache', '.vitepress/dist']),
+  ...markdown.configs.recommended,
+  {
+    files: ['**/*.{ts,js}'],
+    extends: [config],
+  },
+])

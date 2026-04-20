@@ -1,0 +1,10 @@
+.git
+node_modules
+**/node_modules
+**/.turbo
+**/dist
+data/
+music/
+.env*
+apps/server/data/
+plans/

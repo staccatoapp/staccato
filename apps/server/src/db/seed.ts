@@ -1,0 +1,21 @@
+import { eq } from "drizzle-orm";
+import { db } from "./index.js";
+import { NewUserRow, users } from "./schema/users.js";
+
+export function seedDefaultUser() {
+  const existing = db
+    .select()
+    .from(users)
+    .where(eq(users.isAdmin, true))
+    .limit(1)
+    .get();
+  if (!existing) {
+    console.log("No admin user found, seeding default admin user...");
+    const admin: NewUserRow = {
+      username: "admin",
+      passwordHash: "hashed_password", // TODO - implement proper password hashing and salting before working on proper authentication flow
+      isAdmin: true,
+    };
+    db.insert(users).values(admin).run();
+  }
+}
