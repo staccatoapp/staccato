@@ -63,12 +63,8 @@
           "name": "albums_artist_id_artists_id_fk",
           "tableFrom": "albums",
           "tableTo": "artists",
-          "columnsFrom": [
-            "artist_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["artist_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -119,9 +115,7 @@
       "indexes": {
         "artists_musicbrainz_id_unique": {
           "name": "artists_musicbrainz_id_unique",
-          "columns": [
-            "musicbrainz_id"
-          ],
+          "columns": ["musicbrainz_id"],
           "isUnique": true
         }
       },
@@ -210,12 +204,8 @@
           "name": "download_requests_user_id_users_id_fk",
           "tableFrom": "download_requests",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -270,12 +260,8 @@
           "name": "listening_history_user_id_users_id_fk",
           "tableFrom": "listening_history",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -283,12 +269,8 @@
           "name": "listening_history_track_id_tracks_id_fk",
           "tableFrom": "listening_history",
           "tableTo": "tracks",
-          "columnsFrom": [
-            "track_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["track_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -342,12 +324,8 @@
           "name": "playlist_tracks_playlist_id_playlists_id_fk",
           "tableFrom": "playlist_tracks",
           "tableTo": "playlists",
-          "columnsFrom": [
-            "playlist_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["playlist_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -355,12 +333,8 @@
           "name": "playlist_tracks_track_id_tracks_id_fk",
           "tableFrom": "playlist_tracks",
           "tableTo": "tracks",
-          "columnsFrom": [
-            "track_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["track_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -421,12 +395,8 @@
           "name": "playlists_user_id_users_id_fk",
           "tableFrom": "playlists",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -534,9 +504,7 @@
       "indexes": {
         "tracks_file_path_unique": {
           "name": "tracks_file_path_unique",
-          "columns": [
-            "file_path"
-          ],
+          "columns": ["file_path"],
           "isUnique": true
         }
       },
@@ -545,12 +513,8 @@
           "name": "tracks_artist_id_artists_id_fk",
           "tableFrom": "tracks",
           "tableTo": "artists",
-          "columnsFrom": [
-            "artist_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["artist_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -558,12 +522,8 @@
           "name": "tracks_album_id_albums_id_fk",
           "tableFrom": "tracks",
           "tableTo": "albums",
-          "columnsFrom": [
-            "album_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["album_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -622,9 +582,7 @@
       "indexes": {
         "users_username_unique": {
           "name": "users_username_unique",
-          "columns": [
-            "username"
-          ],
+          "columns": ["username"],
           "isUnique": true
         }
       },

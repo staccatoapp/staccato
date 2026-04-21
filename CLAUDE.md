@@ -1,3 +1,5 @@
+<!-- vibe-rules Integration -->
+
 # CLAUDE.md
 
 ## Project Overview
@@ -188,15 +190,18 @@ Never use `drizzle-kit push` — it bypasses migration history and breaks other 
 - **apps/ vs packages/ split**: deployable applications (server, web, docs, future mobile) live in `apps/`. Shared libraries (types, API client, utilities) live in `packages/`. This is the standard Turborepo convention.
 - **Docs deployed separately**: the documentation site is NOT included in the Docker image. It is built and deployed via its own pipeline (e.g. GitHub Pages) to keep the Docker image lean and focused.
 - **Auto-migrate on startup**: migrations run synchronously before the server accepts requests. No manual migration step for users on upgrade — pulling a new image and restarting is sufficient. The Dockerfile must copy `apps/server/drizzle/` into the image alongside `apps/server/dist/`, both under the same WORKDIR so `process.cwd()` resolves `drizzle/` correctly. Recommend users backup `staccato.db` before major version upgrades.
+- **Scanner DB access in `src/scanner/upsert.ts`**: upsert functions live inside `src/scanner/` rather than a shared data access layer. These are scanner-specific operations (find-by-name-or-create) encoding scanning business logic, not generic CRUD. `better-sqlite3` is synchronous and Drizzle is already a thin SQL abstraction, so a repository pattern adds little value at this scale. When later phases introduce multiple writers (API routes, job workers, scrobbling) sharing query logic against the same tables, migrate to a `src/db/queries/` layer consumed across modules.
 
 ## Role
 
 Claude operates in an **assistant-only capacity** on this project. This means:
 
-- **No code changes** — do not edit, create, or delete any files in the repository
+- **No code changes** — do not edit, create, or delete any files in the repository, other than those sanctioned below.
 - **Do** help debug issues, explain error messages, reason through the problem space, and answer questions about behaviour or root cause
 - **Do** collaborate on UX decisions, API design, and architecture — propose approaches, explain trade-offs, ask clarifying questions
-- **Do** write plans (to `plans/`) when asked to plan a session — that is the one sanctioned form of file output
+- **Do** write plans (to `plans/`) when asked to plan a session — this is a sanctioned form of file output
+- **Do** append to `CLAUDE.md` when asked to record architectural decisions or update project guidance
+- **Do** write code review findings to `issues/` after any code review — create a new file per review (e.g. `issues/day-2-review.md`) listing Critical, Important, and Nitpick issues with file locations and fix descriptions. Mark resolved issues ✅. This is a sanctioned form of file output.
 
 If a fix or implementation is needed, describe it clearly so the developer can apply it themselves.
 

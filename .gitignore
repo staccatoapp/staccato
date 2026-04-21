@@ -41,9 +41,16 @@ yarn-error.log*
 **/.vitepress/cache
 **/vitepress/dist
 
-# Staccato-specific
+# Tanstack
+**/routeTree.gen.ts
+**/.tanstack/
+
+# Dev-specific
 plans/
+issues/
 apps/server/data/
 data/
-.claude/
 music/
+
+# Claude
+.claude/

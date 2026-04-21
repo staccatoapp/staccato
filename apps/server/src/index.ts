@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import dotenvFlow from "dotenv-flow";
 import defaultUserPlugin from "./plugins/default-user.js";
+import scanRoutes from "./routes/scan.js";
 import fastifyStatic from "@fastify/static";
 import { runMigrations } from "./db/migrate.js";
 import { seedDefaultUser } from "./db/seed.js";
@@ -9,6 +10,7 @@ import { users } from "./db/schema/users.js";
 import { eq } from "drizzle-orm";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import libraryRoutes from "./routes/library.js";
 
 if (process.env.STACCATO_ENV !== "production") {
   dotenvFlow.config({
@@ -19,6 +21,8 @@ if (process.env.STACCATO_ENV !== "production") {
 const app = Fastify({ logger: true });
 
 app.register(defaultUserPlugin);
+app.register(scanRoutes, { prefix: "/api/library" });
+app.register(libraryRoutes, { prefix: "/api/library" });
 
 app.get("/api/health", async () => {
   return { status: "ok" };
