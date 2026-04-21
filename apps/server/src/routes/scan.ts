@@ -10,9 +10,11 @@ const scanRoutes: FastifyPluginAsync = async (fastify) => {
     return reply.status(202).send({ message: "Scan started" });
   });
 
-  fastify.get("/scan/status", async () => {
-    return scanProgress;
-  });
+  fastify.get("/scan/status", async () => ({
+    ...scanProgress,
+    startedAt: scanProgress.startedAt?.toISOString() ?? null,
+    completedAt: scanProgress.completedAt?.toISOString() ?? null,
+  }));
 };
 
 export default scanRoutes;

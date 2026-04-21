@@ -13,7 +13,7 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      "/api": "http://localhost:8280", // TODO - fix port handling. PORT env should modify the port exposed for the static pages, NOT the API (the API is fully internal to the container)
+      "/api": "http://localhost:8280", // TODO - fix port handling. PORT env should modify the port exposed for the static pages, NOT the internal API (what was i thinking)
     },
   },
 });

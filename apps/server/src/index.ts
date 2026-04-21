@@ -2,6 +2,7 @@ import Fastify from "fastify";
 import dotenvFlow from "dotenv-flow";
 import defaultUserPlugin from "./plugins/default-user.js";
 import scanRoutes from "./routes/scan.js";
+import resolutionRoutes from "./routes/resolution.js";
 import fastifyStatic from "@fastify/static";
 import { runMigrations } from "./db/migrate.js";
 import { seedDefaultUser } from "./db/seed.js";
@@ -22,6 +23,7 @@ const app = Fastify({ logger: true });
 
 app.register(defaultUserPlugin);
 app.register(scanRoutes, { prefix: "/api/library" });
+app.register(resolutionRoutes, { prefix: "/api/library" });
 app.register(libraryRoutes, { prefix: "/api/library" });
 
 app.get("/api/health", async () => {

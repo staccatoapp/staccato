@@ -5,7 +5,6 @@ const AUDIO_EXTENSIONS = new Set([
   ".flac",
   ".mp3",
   ".m4a",
-  ".mp4",
   ".ogg",
   ".opus",
   ".wav",

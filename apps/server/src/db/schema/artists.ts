@@ -5,7 +5,7 @@ export const artists = sqliteTable("artists", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => createId()),
-  name: text("name").notNull(),
+  name: text("name").notNull().unique(),
   musicbrainzId: text("musicbrainz_id").unique(),
   imageUrl: text("image_url"),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(

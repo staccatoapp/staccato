@@ -1,24 +1,15 @@
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { artists, albums, tracks } from "../db/schema/index.js";
 import type { TrackTags } from "./tags.js";
 
 export function upsertArtist(name: string): string {
-  const existing = db
-    .select({ id: artists.id })
-    .from(artists)
-    .where(eq(artists.name, name))
-    .get();
-
-  if (existing) return existing.id;
-
-  const inserted = db
+  return db
     .insert(artists)
     .values({ name })
+    .onConflictDoUpdate({ target: artists.name, set: { name } })
     .returning({ id: artists.id })
-    .get();
-
-  return inserted.id;
+    .get()!.id;
 }
 
 export function upsertAlbum(
@@ -26,21 +17,15 @@ export function upsertAlbum(
   artistId: string,
   releaseYear: number | null,
 ): string {
-  const existing = db
-    .select({ id: albums.id })
-    .from(albums)
-    .where(and(eq(albums.title, title), eq(albums.artistId, artistId)))
-    .get();
-
-  if (existing) return existing.id;
-
-  const inserted = db
+  return db
     .insert(albums)
     .values({ title, artistId, releaseYear })
+    .onConflictDoUpdate({
+      target: [albums.title, albums.artistId],
+      set: { title },
+    })
     .returning({ id: albums.id })
-    .get();
-
-  return inserted.id;
+    .get()!.id;
 }
 
 export function upsertTrack(

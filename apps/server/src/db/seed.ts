@@ -13,7 +13,7 @@ export function seedDefaultUser() {
     console.log("No admin user found, seeding default admin user...");
     const admin: NewUserRow = {
       username: "admin",
-      passwordHash: "hashed_password", // TODO - implement proper password hashing and salting before working on proper authentication flow
+      passwordHash: "hashed_password", // TODO - password hashing before working on proper authentication flow
       isAdmin: true,
     };
     db.insert(users).values(admin).run();

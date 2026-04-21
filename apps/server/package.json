@@ -12,15 +12,16 @@
     "inspect-tags": "node tools/inspect-tags.js"
   },
   "dependencies": {
-    "@staccato/shared": "workspace:*",
     "@fastify/static": "^9.1.1",
     "@paralleldrive/cuid2": "^3.3.0",
+    "@staccato/shared": "workspace:*",
     "better-sqlite3": "^12.9.0",
     "dotenv-flow": "^4.1.0",
     "drizzle-orm": "^0.45.2",
     "fastify": "^5.8.5",
     "fastify-plugin": "^5.1.0",
     "music-metadata": "^11.12.3",
+    "p-throttle": "^8.1.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {

@@ -5,7 +5,3 @@ export const Route = createFileRoute("/")({
     throw redirect({ to: "/library" });
   },
 });
-
-// function RouteComponent() {
-//   return <div>Hello "/"!</div>;
-// }

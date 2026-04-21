@@ -49,5 +49,6 @@ export const PaginatedSchema = <T extends z.ZodTypeAny>(itemSchema: T) =>
 export type Artist = z.infer<typeof ArtistSchema>;
 export type AlbumListItem = z.infer<typeof AlbumListItemSchema>;
 export type TrackListItem = z.infer<typeof TrackListItemSchema>;
+export type AlbumTrack = z.infer<typeof AlbumTrackSchema>;
 export type AlbumDetail = z.infer<typeof AlbumDetailSchema>;
 export type Paginated<T> = { items: T[]; total: number };

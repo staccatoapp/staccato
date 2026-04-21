@@ -8,11 +8,11 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { Disc3, Library, ListMusic, RefreshCw, Settings } from "lucide-react";
+import { Disc3, Library, ListMusic, RefreshCw, Settings, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-import type { ScanProgress } from "@staccato/shared";
+import type { ResolutionProgress, ScanProgress } from "@staccato/shared";
 
 const queryClient = new QueryClient();
 
@@ -59,6 +59,7 @@ function ScanSection() {
     if (prevRunningRef.current && scanStatus && !scanStatus.running) {
       queryClient.invalidateQueries({ queryKey: ["albums"] });
       queryClient.invalidateQueries({ queryKey: ["tracks"] });
+      queryClient.invalidateQueries({ queryKey: ["album"] });
     }
     prevRunningRef.current = scanStatus?.running ?? false;
   }, [scanStatus?.running, queryClient]);
@@ -110,6 +111,87 @@ function ScanSection() {
   );
 }
 
+function ResolveSection() {
+  const queryClient = useQueryClient();
+  const prevRunningRef = useRef(false);
+
+  const { data: scanStatus } = useQuery({
+    queryKey: ["scan-status"],
+    queryFn: async (): Promise<ScanProgress> => {
+      const res = await fetch("/api/library/scan/status");
+      if (!res.ok) throw new Error("Failed to fetch scan status");
+      return res.json();
+    },
+    refetchInterval: false,
+  });
+
+  const { data: resolveStatus } = useQuery({
+    queryKey: ["resolve-status"],
+    queryFn: async (): Promise<ResolutionProgress> => {
+      const res = await fetch("/api/library/resolve/status");
+      if (!res.ok) throw new Error("Failed to fetch resolve status");
+      return res.json();
+    },
+    refetchInterval: (query) => (query.state.data?.running ? 2000 : false),
+  });
+
+  useEffect(() => {
+    if (prevRunningRef.current && resolveStatus && !resolveStatus.running) {
+      queryClient.invalidateQueries({ queryKey: ["albums"] });
+      queryClient.invalidateQueries({ queryKey: ["album"] });
+    }
+    prevRunningRef.current = resolveStatus?.running ?? false;
+  }, [resolveStatus?.running, queryClient]);
+
+  const { mutate: triggerResolve, isPending } = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/library/resolve", { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error ?? "Failed to start resolution");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["resolve-status"] });
+    },
+  });
+
+  if (scanStatus?.running) return null;
+
+  const isRunning = resolveStatus?.running ?? false;
+  const percent =
+    resolveStatus?.total && resolveStatus.total > 0
+      ? Math.round((resolveStatus.resolved / resolveStatus.total) * 100)
+      : 0;
+
+  if (isRunning) {
+    return (
+      <div className="space-y-2 px-1">
+        <div className="flex justify-between text-xs text-muted-foreground">
+          <span>Resolving metadata…</span>
+          <span>
+            {resolveStatus?.resolved ?? 0} / {resolveStatus?.total ?? "?"}
+          </span>
+        </div>
+        <Progress value={percent} className="h-1.5" />
+      </div>
+    );
+  }
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="w-full gap-2"
+      onClick={() => triggerResolve()}
+      disabled={isPending}
+    >
+      <Sparkles className={cn("w-3.5 h-3.5", isPending && "animate-spin")} />
+      Resolve Metadata
+    </Button>
+  );
+}
+
 function Sidebar() {
   return (
     <aside className="flex flex-col w-56 shrink-0 border-r border-border bg-sidebar h-screen sticky top-0 p-3 gap-2">
@@ -141,8 +223,9 @@ function Sidebar() {
         ))}
       </nav>
 
-      <div className="border-t border-border pt-3">
+      <div className="border-t border-border pt-3 space-y-2">
         <ScanSection />
+        <ResolveSection />
       </div>
     </aside>
   );

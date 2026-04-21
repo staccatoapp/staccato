@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `albums_title_artist_id_unique` ON `albums` (`title`,`artist_id`);

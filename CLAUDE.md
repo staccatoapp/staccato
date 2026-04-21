@@ -192,6 +192,10 @@ Never use `drizzle-kit push` — it bypasses migration history and breaks other 
 - **Auto-migrate on startup**: migrations run synchronously before the server accepts requests. No manual migration step for users on upgrade — pulling a new image and restarting is sufficient. The Dockerfile must copy `apps/server/drizzle/` into the image alongside `apps/server/dist/`, both under the same WORKDIR so `process.cwd()` resolves `drizzle/` correctly. Recommend users backup `staccato.db` before major version upgrades.
 - **Scanner DB access in `src/scanner/upsert.ts`**: upsert functions live inside `src/scanner/` rather than a shared data access layer. These are scanner-specific operations (find-by-name-or-create) encoding scanning business logic, not generic CRUD. `better-sqlite3` is synchronous and Drizzle is already a thin SQL abstraction, so a repository pattern adds little value at this scale. When later phases introduce multiple writers (API routes, job workers, scrobbling) sharing query logic against the same tables, migrate to a `src/db/queries/` layer consumed across modules.
 
+## TODOs
+
+- **Investigate: improve MusicBrainz recording ID resolution rate via sibling-track backfill.** After Pass 1 of the resolver, some tracks will have failed to match (score < 85 or no result). For any album where ≥1 sibling track has already resolved to a recording MBID (and therefore a release MBID), fetch the full release tracklist once via `GET /release/{mbid}?inc=recordings` and attempt to match remaining unresolved tracks by track number or fuzzy title. This avoids burning 1 req/sec per failed track on repeat search attempts, and improves the match rate for tracks with unusual or inconsistent tags. Implement as a Pass 1.5 between the existing Pass 1 (search) and Pass 2 (album fallback).
+
 ## Role
 
 Claude operates in an **assistant-only capacity** on this project. This means:
@@ -206,6 +210,8 @@ Claude operates in an **assistant-only capacity** on this project. This means:
 If a fix or implementation is needed, describe it clearly so the developer can apply it themselves.
 
 ## Working Practices
+
+At the end of each development day, before planning the next day, perform a full code review of all changes made during the day. Write findings to `issues/day-XX-review.md` (Critical, Important, Nitpick sections with file locations and fix descriptions). Do not proceed to next-day planning until the review is complete.
 
 When asked to plan a development session or day of work, produce a markdown file (not inline text) with:
 
