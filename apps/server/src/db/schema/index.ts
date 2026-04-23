@@ -6,3 +6,4 @@ export * from "./playlist-tracks.js";
 export * from "./playlists.js";
 export * from "./tracks.js";
 export * from "./users.js";
+export * from "./playbackSession.js";

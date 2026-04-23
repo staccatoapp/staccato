@@ -12,6 +12,8 @@ import { eq } from "drizzle-orm";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import libraryRoutes from "./routes/library.js";
+import playbackRoutes from "./routes/playback.js";
+import tracksRoutes from "./routes/tracks.js";
 
 if (process.env.STACCATO_ENV !== "production") {
   dotenvFlow.config({
@@ -25,6 +27,8 @@ app.register(defaultUserPlugin);
 app.register(scanRoutes, { prefix: "/api/library" });
 app.register(resolutionRoutes, { prefix: "/api/library" });
 app.register(libraryRoutes, { prefix: "/api/library" });
+app.register(playbackRoutes, { prefix: "/api/playback" });
+app.register(tracksRoutes, { prefix: "/api" });
 
 app.get("/api/health", async () => {
   return { status: "ok" };

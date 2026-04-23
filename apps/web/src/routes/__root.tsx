@@ -8,11 +8,19 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { Disc3, Library, ListMusic, RefreshCw, Settings, Sparkles } from "lucide-react";
+import {
+  Disc3,
+  Library,
+  ListMusic,
+  RefreshCw,
+  Settings,
+  Sparkles,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-import type { ResolutionProgress, ScanProgress } from "@staccato/shared";
+import type { PlaybackSession, ResolutionProgress, ScanProgress } from "@staccato/shared";
+import { PlayerBar } from "@/components/layout/playerBar";
 
 const queryClient = new QueryClient();
 
@@ -231,16 +239,36 @@ function Sidebar() {
   );
 }
 
-function RootComponent() {
+function LayoutContent() {
+  const { data: hasQueue } = useQuery({
+    queryKey: ["playback-session"],
+    queryFn: async (): Promise<PlaybackSession> => {
+      const res = await fetch("/api/playback/session");
+      if (!res.ok) throw new Error("Failed to fetch playback session");
+      const json = await res.json();
+      return json.session;
+    },
+    select: (d) => (d?.trackQueue?.length ?? 0) > 0,
+  });
+
   return (
-    <QueryClientProvider client={queryClient}>
+    <>
       <div className="flex h-screen">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto">
+        <main className={cn("flex-1 overflow-y-auto", hasQueue && "pb-20")}>
           <Outlet />
         </main>
       </div>
-      <TanStackRouterDevtools position="bottom-right" />
+      <PlayerBar />
+      <TanStackRouterDevtools position="top-right" />
+    </>
+  );
+}
+
+function RootComponent() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <LayoutContent />
     </QueryClientProvider>
   );
 }

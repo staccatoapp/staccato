@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ChevronLeft, Clock, Music2 } from "lucide-react";
+import { ChevronLeft, Clock, Music2, Play } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { AlbumDetail } from "@staccato/shared";
 import { generateAlbumGradient } from "@/lib/music";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -59,6 +60,22 @@ function AlbumDetailSkeleton() {
 
 function AlbumDetailPage() {
   const { albumId } = Route.useParams();
+  const queryClient = useQueryClient();
+
+  const playMutation = useMutation({
+    mutationFn: async ({ trackIds, startIndex }: { trackIds: string[]; startIndex: number }) => {
+      const res = await fetch("/api/playback/session/play", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trackIds, startIndex }),
+      });
+      if (!res.ok) throw new Error("Failed to start playback");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["playback-session"] });
+    },
+  });
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["album", albumId],
@@ -138,24 +155,35 @@ function AlbumDetailPage() {
                   </span>
                 )}
               </p>
+              <div className="mt-4">
+                <Button
+                  onClick={() => playMutation.mutate({ trackIds: tracks.map((t) => t.id), startIndex: 0 })}
+                  disabled={playMutation.isPending}
+                  className="gap-2"
+                >
+                  <Play className="w-4 h-4" />
+                  Play Album
+                </Button>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       <div className="px-6 pb-8">
-        <div className="grid grid-cols-[2rem_1fr_4rem] gap-3 px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-widest border-b border-border mb-1">
+        <div className="grid grid-cols-[2rem_1fr_4rem_2rem] gap-3 px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-widest border-b border-border mb-1">
           <span className="text-right">#</span>
           <span>Title</span>
           <span className="flex justify-end">
             <Clock className="w-3.5 h-3.5" />
           </span>
+          <span />
         </div>
 
-        {tracks.map((track) => (
+        {tracks.map((track, index) => (
           <div
             key={track.id}
-            className="grid grid-cols-[2rem_1fr_4rem] gap-3 px-3 py-2.5 rounded-md text-sm hover:bg-accent/50 transition-colors"
+            className="group grid grid-cols-[2rem_1fr_4rem_2rem] gap-3 px-3 py-2.5 rounded-md text-sm hover:bg-accent/50 transition-colors"
           >
             <span className="text-right text-muted-foreground tabular-nums self-center text-xs">
               {track.trackNumber ?? "—"}
@@ -168,6 +196,13 @@ function AlbumDetailPage() {
                 ? formatDuration(track.durationSeconds)
                 : "—"}
             </span>
+            <button
+              onClick={() => playMutation.mutate({ trackIds: tracks.map((t) => t.id), startIndex: index })}
+              className="opacity-0 group-hover:opacity-100 transition-opacity flex justify-end items-center"
+              aria-label={`Play ${track.title}`}
+            >
+              <Play className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
           </div>
         ))}
       </div>

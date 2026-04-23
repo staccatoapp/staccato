@@ -1,0 +1,1 @@
+ALTER TABLE `playback_session` ADD `is_playing` integer DEFAULT false NOT NULL;

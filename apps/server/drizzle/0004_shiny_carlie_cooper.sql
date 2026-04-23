@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `playback_session_user_id_unique` ON `playback_session` (`user_id`);

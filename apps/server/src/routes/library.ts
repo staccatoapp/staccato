@@ -6,12 +6,6 @@ import { artists, albums, tracks } from "../db/schema/index.js";
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 
-function parsePagination(query: { limit?: unknown; offset?: unknown }) {
-  const limit = Math.min(Number(query.limit) || DEFAULT_LIMIT, MAX_LIMIT);
-  const offset = Number(query.offset) || 0;
-  return { limit, offset };
-}
-
 const libraryRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/artists", async (request) => {
     const { limit, offset } = parsePagination(
@@ -141,5 +135,11 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
     return { items, total };
   });
 };
+
+function parsePagination(query: { limit?: unknown; offset?: unknown }) {
+  const limit = Math.min(Number(query.limit) || DEFAULT_LIMIT, MAX_LIMIT);
+  const offset = Number(query.offset) || 0;
+  return { limit, offset };
+}
 
 export default libraryRoutes;
