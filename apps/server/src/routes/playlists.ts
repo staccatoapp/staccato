@@ -126,9 +126,9 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
       .select({
         entryId: playlistTracks.id,
         trackId: tracks.id,
-        title: tracks.title,
-        artistName: artists.name,
-        albumTitle: albums.title,
+        title: sql<string>`COALESCE(${tracks.canonicalTitle}, ${tracks.title})`,
+        artistName: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
+        albumTitle: sql<string>`COALESCE(${albums.canonicalTitle}, ${albums.title})`,
         albumId: albums.id,
         coverArtUrl: albums.coverArtUrl,
         durationSeconds: tracks.durationSeconds,
@@ -245,10 +245,7 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
       .select()
       .from(playlistTracks)
       .where(
-        and(
-          eq(playlistTracks.id, entryId),
-          eq(playlistTracks.playlistId, id),
-        ),
+        and(eq(playlistTracks.id, entryId), eq(playlistTracks.playlistId, id)),
       )
       .get();
     if (!entry)

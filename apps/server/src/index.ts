@@ -8,6 +8,9 @@ import { runMigrations } from "./db/migrate.js";
 import { seedDefaultUser } from "./db/seed.js";
 import { db } from "./db/index.js";
 import { users } from "./db/schema/users.js";
+import { tracks } from "./db/schema/tracks.js";
+import { startScan } from "./scanner/index.js";
+import { startWatcher } from "./scanner/watcher.js";
 import { eq } from "drizzle-orm";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -70,8 +73,20 @@ if (process.env.STACCATO_ENV !== "development") {
 const start = async () => {
   runMigrations();
   seedDefaultUser();
+
+  const musicDir = process.env.MUSIC_DIR ?? "./music";
   const port = Number(process.env.PORT) || 8280;
   await app.listen({ port, host: "0.0.0.0" });
+
+  const hasTrack = db.select({ id: tracks.id }).from(tracks).limit(1).get();
+  if (!hasTrack) {
+    console.log("[startup] no tracks found, starting initial scan");
+    startScan(musicDir).catch((err) =>
+      console.error("[startup] initial scan error", err),
+    );
+  }
+
+  startWatcher(musicDir);
 };
 
 start().catch((err) => {

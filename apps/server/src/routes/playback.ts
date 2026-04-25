@@ -2,7 +2,7 @@ import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { db } from "../db/index.js";
 import { playbackSession } from "../db/schema/playback-session.js";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import {
   albums,
   artists,
@@ -161,10 +161,10 @@ async function getSessionWithTrackDetails(userId: string) {
       : db
           .select({
             id: tracks.id,
-            title: tracks.title,
+            title: sql<string>`COALESCE(${tracks.canonicalTitle}, ${tracks.title})`,
             trackNumber: tracks.trackNumber,
             discNumber: tracks.discNumber,
-            artistName: artists.name,
+            artistName: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
             coverArtUrl: albums.coverArtUrl,
             durationSeconds: tracks.durationSeconds,
           })
@@ -220,8 +220,8 @@ async function addListenEvent(userId: string, trackId: string) {
 
   const track = db
     .select({
-      title: tracks.title,
-      artistName: artists.name,
+      title: sql<string>`COALESCE(${tracks.canonicalTitle}, ${tracks.title})`,
+      artistName: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
       trackMbid: tracks.musicbrainzId,
     })
     .from(tracks)

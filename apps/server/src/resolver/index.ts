@@ -1,3 +1,5 @@
+// TODO - re-resolves are either leading to duplicates, or failing to resolve, for albums or artists with inconsistent naming (fuck you, Panic! At The Disco). it's driving me crazy
+
 import { and, eq, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { albums } from "../db/schema/albums.js";
@@ -121,7 +123,12 @@ async function runAlbumFirstPass(): Promise<void> {
 
       const albumResult = db
         .update(albums)
-        .set({ musicbrainzId: releaseMbid })
+        .set({
+          musicbrainzId: releaseMbid,
+          ...(details.releaseName
+            ? { canonicalTitle: details.releaseName }
+            : {}),
+        })
         .where(and(eq(albums.id, album.albumId), isNull(albums.musicbrainzId)))
         .run();
       if (albumResult.changes > 0) {
@@ -135,7 +142,10 @@ async function runAlbumFirstPass(): Promise<void> {
       for (const { localId, mbTrack } of matched) {
         if (mbTrack) {
           db.update(tracks)
-            .set({ musicbrainzId: mbTrack.recordingMbid })
+            .set({
+              musicbrainzId: mbTrack.recordingMbid,
+              canonicalTitle: mbTrack.title,
+            })
             .where(eq(tracks.id, localId))
             .run();
           resolutionProgress.resolved++;
@@ -215,7 +225,10 @@ async function runRecordingSearchFallback(): Promise<void> {
     const match = await searchRecording(track.artistName, track.title, hint);
     if (match) {
       db.update(tracks)
-        .set({ musicbrainzId: match.recordingMbid })
+        .set({
+          musicbrainzId: match.recordingMbid,
+          ...(match.mbTrackTitle ? { canonicalTitle: match.mbTrackTitle } : {}),
+        })
         .where(eq(tracks.id, track.trackId))
         .run();
       if (match.releaseMbid && track.albumId) {
@@ -319,30 +332,19 @@ function resolveArtistMbid(
       .run();
     db.delete(artists).where(eq(artists.id, localArtistId)).run();
     if (mbArtistName) {
-      try {
-        db.update(artists)
-          .set({ name: mbArtistName })
-          .where(eq(artists.id, canonical.id))
-          .run();
-      } catch {}
+      db.update(artists)
+        .set({ canonicalName: mbArtistName })
+        .where(eq(artists.id, canonical.id))
+        .run();
     }
   } else if (!canonical) {
-    try {
-      db.update(artists)
-        .set({
-          musicbrainzId: mbArtistId,
-          ...(mbArtistName ? { name: mbArtistName } : {}),
-        })
-        .where(eq(artists.id, localArtistId))
-        .run();
-    } catch {
-      try {
-        db.update(artists)
-          .set({ musicbrainzId: mbArtistId })
-          .where(eq(artists.id, localArtistId))
-          .run();
-      } catch {}
-    }
+    db.update(artists)
+      .set({
+        musicbrainzId: mbArtistId,
+        ...(mbArtistName ? { canonicalName: mbArtistName } : {}),
+      })
+      .where(eq(artists.id, localArtistId))
+      .run();
   }
 }
 

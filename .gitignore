@@ -55,3 +55,4 @@ music/
 # Claude
 .claude/
 .playwright-mcp/
+.claudeignore

@@ -99,6 +99,13 @@
       "when": 1777141736134,
       "tag": "0013_great_spitfire",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1777159388872,
+      "tag": "0014_rare_paladin",
+      "breakpoints": true
     }
   ]
 }

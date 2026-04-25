@@ -15,12 +15,12 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
     const items = db
       .select({
         id: artists.id,
-        name: artists.name,
+        name: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
         imageUrl: artists.imageUrl,
         createdAt: artists.createdAt,
       })
       .from(artists)
-      .orderBy(asc(artists.name))
+      .orderBy(asc(sql`COALESCE(${artists.canonicalName}, ${artists.name})`))
       .limit(limit)
       .offset(offset)
       .all();
@@ -41,16 +41,19 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
     const items = db
       .select({
         id: albums.id,
-        title: albums.title,
+        title: sql<string>`COALESCE(${albums.canonicalTitle}, ${albums.title})`,
         artistId: albums.artistId,
-        artistName: artists.name,
+        artistName: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
         releaseYear: albums.releaseYear,
         coverArtUrl: albums.coverArtUrl,
         createdAt: albums.createdAt,
       })
       .from(albums)
       .innerJoin(artists, eq(albums.artistId, artists.id))
-      .orderBy(asc(artists.name), asc(albums.title))
+      .orderBy(
+        asc(sql`COALESCE(${artists.canonicalName}, ${artists.name})`),
+        asc(sql`COALESCE(${albums.canonicalTitle}, ${albums.title})`),
+      )
       .limit(limit)
       .offset(offset)
       .all();
@@ -69,9 +72,9 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
     const album = db
       .select({
         id: albums.id,
-        title: albums.title,
+        title: sql<string>`COALESCE(${albums.canonicalTitle}, ${albums.title})`,
         artistId: albums.artistId,
-        artistName: artists.name,
+        artistName: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
         releaseYear: albums.releaseYear,
         coverArtUrl: albums.coverArtUrl,
         createdAt: albums.createdAt,
@@ -107,11 +110,11 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
     const items = db
       .select({
         id: tracks.id,
-        title: tracks.title,
+        title: sql<string>`COALESCE(${tracks.canonicalTitle}, ${tracks.title})`,
         artistId: tracks.artistId,
-        artistName: artists.name,
+        artistName: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
         albumId: tracks.albumId,
-        albumTitle: albums.title,
+        albumTitle: sql<string>`COALESCE(${albums.canonicalTitle}, ${albums.title})`,
         coverArtUrl: albums.coverArtUrl,
         durationSeconds: tracks.durationSeconds,
         fileFormat: tracks.fileFormat,
@@ -120,8 +123,8 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
       .innerJoin(artists, eq(tracks.artistId, artists.id))
       .leftJoin(albums, eq(tracks.albumId, albums.id))
       .orderBy(
-        asc(artists.name),
-        asc(albums.title),
+        asc(sql`COALESCE(${artists.canonicalName}, ${artists.name})`),
+        asc(sql`COALESCE(${albums.canonicalTitle}, ${albums.title})`),
         asc(tracks.discNumber),
         asc(tracks.trackNumber),
       )
@@ -148,28 +151,37 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
     const artistResults = db
       .select({
         id: artists.id,
-        name: artists.name,
+        name: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
         imageUrl: artists.imageUrl,
       })
       .from(artists)
-      .where(like(artists.name, pattern))
+      .where(
+        or(like(artists.name, pattern), like(artists.canonicalName, pattern)),
+      )
       .limit(5)
       .all();
 
-    // Albums — LIKE on album title or artist name
+    // Albums — LIKE on album title or artist name (tag and canonical)
     const albumResults = db
       .select({
         id: albums.id,
-        title: albums.title,
+        title: sql<string>`COALESCE(${albums.canonicalTitle}, ${albums.title})`,
         artistId: albums.artistId,
-        artistName: artists.name,
+        artistName: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
         releaseYear: albums.releaseYear,
         coverArtUrl: albums.coverArtUrl,
         createdAt: albums.createdAt,
       })
       .from(albums)
       .innerJoin(artists, eq(albums.artistId, artists.id))
-      .where(or(like(albums.title, pattern), like(artists.name, pattern)))
+      .where(
+        or(
+          like(albums.title, pattern),
+          like(albums.canonicalTitle, pattern),
+          like(artists.name, pattern),
+          like(artists.canonicalName, pattern),
+        ),
+      )
       .limit(8)
       .all();
 

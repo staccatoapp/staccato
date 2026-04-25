@@ -8,6 +8,7 @@ export interface RecordingMatch {
   score: number;
   mbArtistName: string | null;
   mbArtistId: string | null;
+  mbTrackTitle: string | null;
 }
 
 export interface ExternalRecordingResult {
@@ -46,6 +47,7 @@ export interface MBReleaseTrack {
 
 export interface MBReleaseDetails {
   tracks: MBReleaseTrack[];
+  releaseName: string | null;
   artistMbid: string | null;
   artistName: string | null;
   releaseGroupMbid: string | null;
@@ -61,6 +63,7 @@ interface MBRelease {
 
 interface MBRecording {
   id: string;
+  title?: string;
   score: number;
   releases?: MBRelease[];
   "artist-credit"?: Array<{ artist: { id: string; name: string } }>;
@@ -168,6 +171,7 @@ async function attemptRecordingSearch(
         score: recording.score,
         mbArtistName: recording["artist-credit"]?.[0]?.artist.name ?? null,
         mbArtistId: recording["artist-credit"]?.[0]?.artist.id ?? null,
+        mbTrackTitle: recording.title ?? null,
       };
     }
     return null;
@@ -303,6 +307,7 @@ export async function lookupReleaseDetails(
     );
     if (!response.ok) return null;
     const data = (await response.json()) as {
+      title?: string;
       "artist-credit"?: Array<{ artist: { id: string; name: string } }>;
       "release-group"?: { id: string };
       media: Array<{
@@ -323,6 +328,7 @@ export async function lookupReleaseDetails(
           title: t.title,
         })),
       ),
+      releaseName: data.title ?? null,
       artistMbid: data["artist-credit"]?.[0]?.artist.id ?? null,
       artistName: data["artist-credit"]?.[0]?.artist.name ?? null,
       releaseGroupMbid: data["release-group"]?.id ?? null,
