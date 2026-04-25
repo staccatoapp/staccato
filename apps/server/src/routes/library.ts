@@ -16,6 +16,7 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
       .select({
         id: artists.id,
         name: artists.name,
+        imageUrl: artists.imageUrl,
         createdAt: artists.createdAt,
       })
       .from(artists)
@@ -111,6 +112,7 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
         artistName: artists.name,
         albumId: tracks.albumId,
         albumTitle: albums.title,
+        coverArtUrl: albums.coverArtUrl,
         durationSeconds: tracks.durationSeconds,
         fileFormat: tracks.fileFormat,
       })
@@ -135,6 +137,7 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
     return { items, total };
   });
 
+  // TODO - breaks on certain searches (e.g. ",a")
   fastify.get("/search", async (request) => {
     const { q } = request.query as { q?: string };
     if (!q || q.trim().length < 2)
@@ -142,9 +145,12 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
     const term = q.trim();
     const pattern = `%${term}%`;
 
-    // Artists — LIKE on name
     const artistResults = db
-      .select({ id: artists.id, name: artists.name })
+      .select({
+        id: artists.id,
+        name: artists.name,
+        imageUrl: artists.imageUrl,
+      })
       .from(artists)
       .where(like(artists.name, pattern))
       .limit(5)

@@ -3,6 +3,7 @@ import { z } from "zod";
 export const ArtistSearchResultSchema = z.object({
   id: z.string(),
   name: z.string(),
+  imageUrl: z.string().nullable(),
 });
 export type ArtistSearchResult = z.infer<typeof ArtistSearchResultSchema>;
 

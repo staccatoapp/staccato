@@ -54,3 +54,4 @@ music/
 
 # Claude
 .claude/
+.playwright-mcp/

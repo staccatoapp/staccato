@@ -3,6 +3,7 @@ import { z } from "zod";
 export const ArtistSchema = z.object({
   id: z.string(),
   name: z.string(),
+  imageUrl: z.string().nullable(),
   createdAt: z.string().nullable(),
 });
 
@@ -23,6 +24,7 @@ export const TrackListItemSchema = z.object({
   artistName: z.string(),
   albumId: z.string().nullable(),
   albumTitle: z.string().nullable(),
+  coverArtUrl: z.string().nullable(),
   durationSeconds: z.number().nullable(),
   fileFormat: z.string().nullable(),
 });

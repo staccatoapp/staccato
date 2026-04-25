@@ -56,6 +56,7 @@ export async function startResolution(): Promise<void> {
     await runCoverArtRetryPass();
     await runFingerprintPass();
     dedupeArtists();
+    await runArtistImagePass();
     resolutionProgress.completedAt = new Date();
   } catch (err) {
     console.error("[resolver] fatal error", err);
@@ -404,6 +405,62 @@ async function runFingerprintPass(): Promise<void> {
         .where(eq(tracks.id, track.trackId))
         .run();
     }
+  }
+}
+
+async function runArtistImagePass(): Promise<void> {
+  const unresolved = db
+    .select({ id: artists.id, musicbrainzId: artists.musicbrainzId })
+    .from(artists)
+    .where(and(isNotNull(artists.musicbrainzId), isNull(artists.imageUrl)))
+    .all();
+
+  if (unresolved.length === 0) return;
+  console.log(`[resolver] artist image pass: ${unresolved.length} artists`);
+
+  for (const artist of unresolved) {
+    try {
+      const mbRes = await throttledFetch(
+        `https://musicbrainz.org/ws/2/artist/${artist.musicbrainzId}?inc=url-rels&fmt=json`,
+      );
+      if (!mbRes.ok) continue;
+      const mbData = (await mbRes.json()) as {
+        relations?: Array<{ type: string; url: { resource: string } }>;
+      };
+
+      const wikidataRel = mbData.relations?.find((r) => r.type === "wikidata");
+      if (!wikidataRel) continue;
+
+      const qid = wikidataRel.url.resource.split("/wiki/")[1];
+      if (!qid) continue;
+
+      const wdRes = await fetch(
+        `https://www.wikidata.org/wiki/Special:EntityData/${qid}.json`,
+      );
+      if (!wdRes.ok) continue;
+      const wdData = (await wdRes.json()) as {
+        entities: Record<
+          string,
+          {
+            claims?: {
+              P18?: Array<{
+                mainsnak: { datavalue?: { value: string } };
+              }>;
+            };
+          }
+        >;
+      };
+
+      const filename =
+        wdData.entities[qid]?.claims?.P18?.[0]?.mainsnak?.datavalue?.value;
+      if (!filename) continue;
+
+      const imageUrl = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(filename)}`;
+      db.update(artists)
+        .set({ imageUrl })
+        .where(eq(artists.id, artist.id))
+        .run();
+    } catch {}
   }
 }
 
