@@ -1,6 +1,23 @@
 import { z } from "zod";
 
-export const LibrarySearchResultSchema = z.object({
+export const ArtistSearchResultSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+});
+export type ArtistSearchResult = z.infer<typeof ArtistSearchResultSchema>;
+
+export const AlbumSearchResultSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  artistId: z.string(),
+  artistName: z.string(),
+  releaseYear: z.number().nullable(),
+  coverArtUrl: z.string().nullable(),
+  createdAt: z.string().nullable(),
+});
+export type AlbumSearchResult = z.infer<typeof AlbumSearchResultSchema>;
+
+export const TrackSearchResultSchema = z.object({
   id: z.string(),
   title: z.string(),
   artistName: z.string(),
@@ -9,7 +26,14 @@ export const LibrarySearchResultSchema = z.object({
   durationSeconds: z.number().nullable(),
   coverArtUrl: z.string().nullable(),
 });
-export type LibrarySearchResult = z.infer<typeof LibrarySearchResultSchema>;
+export type TrackSearchResult = z.infer<typeof TrackSearchResultSchema>;
+
+export const LibrarySearchResultsSchema = z.object({
+  artists: z.array(ArtistSearchResultSchema),
+  albums: z.array(AlbumSearchResultSchema),
+  tracks: z.array(TrackSearchResultSchema),
+});
+export type LibrarySearchResults = z.infer<typeof LibrarySearchResultsSchema>;
 
 export const ExternalRecordingSchema = z.object({
   recordingMbid: z.string(),
@@ -23,3 +47,28 @@ export const ExternalRecordingSchema = z.object({
   inLibrary: z.boolean(),
 });
 export type ExternalRecording = z.infer<typeof ExternalRecordingSchema>;
+
+export const ExternalArtistResultSchema = z.object({
+  artistMbid: z.string(),
+  name: z.string(),
+  disambiguation: z.string().nullable(),
+  type: z.string().nullable(),
+});
+export type ExternalArtistResult = z.infer<typeof ExternalArtistResultSchema>;
+
+export const ExternalReleaseResultSchema = z.object({
+  releaseMbid: z.string(),
+  title: z.string(),
+  artistName: z.string(),
+  artistMbid: z.string().nullable(),
+  releaseYear: z.number().nullable(),
+  releaseType: z.string().nullable(),
+});
+export type ExternalReleaseResult = z.infer<typeof ExternalReleaseResultSchema>;
+
+export const ExternalSearchResultsSchema = z.object({
+  recordings: z.array(ExternalRecordingSchema),
+  artists: z.array(ExternalArtistResultSchema),
+  releases: z.array(ExternalReleaseResultSchema),
+});
+export type ExternalSearchResults = z.infer<typeof ExternalSearchResultsSchema>;

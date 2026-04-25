@@ -1,5 +1,6 @@
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
+// todo - probably can use generic trackId instead of separate columns
 export const previewCache = sqliteTable("preview_cache", {
   musicbrainzRecordingId: text("musicbrainz_recording_id").primaryKey(),
   deezerTrackId: text("deezer_track_id"),

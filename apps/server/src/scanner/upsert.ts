@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { artists, albums, tracks } from "../db/schema/index.js";
 import type { TrackTags } from "./tags.js";
@@ -34,7 +34,8 @@ export function upsertTrack(
   artistId: string,
   albumId: string | null,
 ): void {
-  db.insert(tracks)
+  const insertedTrack = db
+    .insert(tracks)
     .values({
       title: tags.title,
       artistId,
@@ -59,5 +60,12 @@ export function upsertTrack(
         fileSizeBytes: tags.fileSizeBytes,
       },
     })
-    .run();
+    .returning({ id: tracks.id })
+    .get()!;
+
+  // drizzle doesn't support FTS yet so doing this with raw sql for now
+  db.run(sql`DELETE FROM tracks_fts WHERE track_id = ${insertedTrack.id}`);
+  db.run(sql`
+  INSERT INTO tracks_fts(track_id, title, artist_name, album_title)
+  VALUES (${insertedTrack.id}, ${tags.title}, ${tags.artistName}, ${tags.albumTitle})`);
 }

@@ -9,6 +9,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import {
+  Compass,
   Disc3,
   Library,
   ListMusic,
@@ -46,6 +47,7 @@ export const Route = createRootRoute({
 const NAV_ITEMS = [
   { to: "/library" as const, label: "Library", icon: Library },
   { to: "/playlists" as const, label: "Playlists", icon: ListMusic },
+  { to: "/explore" as const, label: "Explore", icon: Compass },
   { to: "/settings" as const, label: "Settings", icon: Settings },
 ] as const;
 

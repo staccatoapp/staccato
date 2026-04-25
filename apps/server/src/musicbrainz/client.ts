@@ -11,6 +11,33 @@ export interface ReleaseMatch {
   score: number;
 }
 
+export interface ExternalRecordingResult {
+  recordingMbid: string;
+  title: string;
+  artistName: string;
+  artistMbid: string | null;
+  releaseName: string | null;
+  releaseMbid: string | null;
+  releaseYear: number | null;
+  durationMs: number | null;
+}
+
+export interface ExternalArtistResult {
+  artistMbid: string;
+  name: string;
+  disambiguation: string | null;
+  type: string | null;
+}
+
+export interface ExternalReleaseResult {
+  releaseMbid: string;
+  title: string;
+  artistName: string;
+  artistMbid: string | null;
+  releaseYear: number | null;
+  releaseType: string | null;
+}
+
 interface MBRelease {
   id: string;
   title: string;
@@ -56,45 +83,6 @@ const TYPE_RANK: Record<string, number> = {
   Broadcast: 3,
   Other: 4,
 };
-
-function normalizeString(str: string): string {
-  return str
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, "")
-    .trim();
-}
-
-// TODO - just picking first release if no official release is present is horrible. might need to increase limit in the query
-function pickBestRelease(
-  releases: MBRelease[],
-  hint?: { albumTitle: string; releaseYear?: number },
-): string | null {
-  const officialRelease = releases.filter((r) => r.status === "Official");
-  if (officialRelease.length === 0) return releases[0]?.id ?? null;
-
-  if (hint) {
-    const albumTitle = normalizeString(hint.albumTitle);
-    const hintMatch = officialRelease.find((r) => {
-      if (normalizeString(r.title) !== albumTitle) return false;
-      if (hint.releaseYear && r.date) {
-        return r.date.startsWith(String(hint.releaseYear));
-      }
-      return true;
-    });
-    if (hintMatch) return hintMatch.id;
-  }
-
-  return (
-    [...officialRelease].sort((a, b) => {
-      const rankA =
-        TYPE_RANK[a["release-group"]?.["primary-type"] ?? "Other"] ?? 4;
-      const rankB =
-        TYPE_RANK[b["release-group"]?.["primary-type"] ?? "Other"] ?? 4;
-      if (rankA !== rankB) return rankA - rankB;
-      return (a.date ?? "9999") < (b.date ?? "9999") ? -1 : 1;
-    })[0]?.id ?? null
-  );
-}
 
 export async function searchRecording(
   artistName: string,
@@ -147,4 +135,161 @@ export async function searchRelease(
   } catch {
     return null;
   }
+}
+
+export async function searchRecordingsByQuery(
+  query: string,
+  limit = 10,
+): Promise<ExternalRecordingResult[]> {
+  try {
+    const params = new URLSearchParams({
+      query,
+      fmt: "json",
+      limit: String(limit),
+    });
+    const response = await throttledFetch(
+      `${MB_BASE}/recording?${params}&inc=releases+release-groups+artist-credits`,
+    );
+    if (!response.ok) return [];
+    const data = (await response.json()) as {
+      recordings: Array<{
+        id: string;
+        title: string;
+        length?: number;
+        "artist-credit"?: Array<{ artist: { id: string; name: string } }>;
+        releases?: MBRelease[];
+      }>;
+    };
+    return data.recordings.map((r) => {
+      const bestRelease = r.releases?.length
+        ? pickBestRelease(r.releases)
+        : null;
+      const releaseObj =
+        r.releases?.find((rel) => rel.id === bestRelease) ?? r.releases?.[0];
+      const year = releaseObj?.date
+        ? parseInt(releaseObj.date.slice(0, 4), 10)
+        : null;
+      return {
+        recordingMbid: r.id,
+        title: r.title,
+        artistName: r["artist-credit"]?.[0]?.artist.name ?? "Unknown Artist",
+        artistMbid: r["artist-credit"]?.[0]?.artist.id ?? null,
+        releaseName: releaseObj?.title ?? null,
+        releaseMbid: releaseObj?.id ?? null,
+        releaseYear: isNaN(year!) ? null : year,
+        durationMs: r.length ?? null,
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+export async function searchArtistsByQuery(
+  query: string,
+  limit = 5,
+): Promise<ExternalArtistResult[]> {
+  try {
+    const params = new URLSearchParams({
+      query,
+      fmt: "json",
+      limit: String(limit),
+    });
+    const response = await throttledFetch(`${MB_BASE}/artist?${params}`);
+    if (!response.ok) return [];
+    const data = (await response.json()) as {
+      artists: Array<{
+        id: string;
+        name: string;
+        disambiguation?: string;
+        type?: string;
+      }>;
+    };
+    return data.artists.map((a) => ({
+      artistMbid: a.id,
+      name: a.name,
+      disambiguation: a.disambiguation ?? null,
+      type: a.type ?? null,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function searchReleasesByQuery(
+  query: string,
+  limit = 8,
+): Promise<ExternalReleaseResult[]> {
+  try {
+    const params = new URLSearchParams({
+      query,
+      fmt: "json",
+      limit: String(limit),
+    });
+    const response = await throttledFetch(
+      `${MB_BASE}/release?${params}&inc=artist-credits+release-groups`,
+    );
+    if (!response.ok) return [];
+    const data = (await response.json()) as {
+      releases: Array<{
+        id: string;
+        title: string;
+        date?: string;
+        "artist-credit"?: Array<{ artist: { id: string; name: string } }>;
+        "release-group"?: { "primary-type"?: string };
+      }>;
+    };
+    return data.releases.map((r) => {
+      const year = r.date ? parseInt(r.date.slice(0, 4), 10) : null;
+      return {
+        releaseMbid: r.id,
+        title: r.title,
+        artistName: r["artist-credit"]?.[0]?.artist.name ?? "Unknown Artist",
+        artistMbid: r["artist-credit"]?.[0]?.artist.id ?? null,
+        releaseYear: isNaN(year!) ? null : year,
+        releaseType: r["release-group"]?.["primary-type"] ?? null,
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+function normalizeString(str: string): string {
+  return str
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")
+    .trim();
+}
+
+// TODO - just picking first release if no official release is present is horrible. might need to increase limit in the query
+function pickBestRelease(
+  releases: MBRelease[],
+  hint?: { albumTitle: string; releaseYear?: number },
+): string | null {
+  const officialRelease = releases.filter((r) => r.status === "Official");
+  if (officialRelease.length === 0) return releases[0]?.id ?? null;
+
+  if (hint) {
+    const albumTitle = normalizeString(hint.albumTitle);
+    const hintMatch = officialRelease.find((r) => {
+      if (normalizeString(r.title) !== albumTitle) return false;
+      if (hint.releaseYear && r.date) {
+        return r.date.startsWith(String(hint.releaseYear));
+      }
+      return true;
+    });
+    if (hintMatch) return hintMatch.id;
+  }
+
+  return (
+    [...officialRelease].sort((a, b) => {
+      const rankA =
+        TYPE_RANK[a["release-group"]?.["primary-type"] ?? "Other"] ?? 4;
+      const rankB =
+        TYPE_RANK[b["release-group"]?.["primary-type"] ?? "Other"] ?? 4;
+      if (rankA !== rankB) return rankA - rankB;
+      return (a.date ?? "9999") < (b.date ?? "9999") ? -1 : 1;
+    })[0]?.id ?? null
+  );
 }

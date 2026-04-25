@@ -5,12 +5,7 @@ import type { PlaybackSession } from "@staccato/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Music2, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-
-function formatTime(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
+import { formatTime } from "@/lib/music";
 
 function PlayerBar() {
   const queryClient = useQueryClient();
@@ -170,11 +165,19 @@ function PlayerBar() {
       });
     }, 5000);
 
+    const handlePreviewStart = () => {
+      if (audioRef.current && !audioRef.current.paused) {
+        audioRef.current.pause();
+      }
+    };
+    window.addEventListener("staccato:preview-start", handlePreviewStart);
+
     return () => {
       audio.removeEventListener("timeupdate", handleTimeUpdate);
       audio.removeEventListener("ended", handleEnded);
       audio.removeEventListener("pause", handlePause);
       clearInterval(interval);
+      window.removeEventListener("staccato:preview-start", handlePreviewStart);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

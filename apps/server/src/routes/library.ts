@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from "fastify";
-import { eq, asc, sql } from "drizzle-orm";
+import { eq, asc, sql, or, like } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { artists, albums, tracks } from "../db/schema/index.js";
 
@@ -133,6 +133,84 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
       .get()!;
 
     return { items, total };
+  });
+
+  fastify.get("/search", async (request) => {
+    const { q } = request.query as { q?: string };
+    if (!q || q.trim().length < 2)
+      return { artists: [], albums: [], tracks: [] };
+    const term = q.trim();
+    const pattern = `%${term}%`;
+
+    // Artists — LIKE on name
+    const artistResults = db
+      .select({ id: artists.id, name: artists.name })
+      .from(artists)
+      .where(like(artists.name, pattern))
+      .limit(5)
+      .all();
+
+    // Albums — LIKE on album title or artist name
+    const albumResults = db
+      .select({
+        id: albums.id,
+        title: albums.title,
+        artistId: albums.artistId,
+        artistName: artists.name,
+        releaseYear: albums.releaseYear,
+        coverArtUrl: albums.coverArtUrl,
+        createdAt: albums.createdAt,
+      })
+      .from(albums)
+      .innerJoin(artists, eq(albums.artistId, artists.id))
+      .where(or(like(albums.title, pattern), like(artists.name, pattern)))
+      .limit(8)
+      .all();
+
+    // Tracks — FTS5 prefix match (tokenisation + relevance ranking)
+    const ftsQuery = term.replace(/"/g, '""') + "*";
+    const trackRows = db.all(sql`
+    SELECT
+      t.id,
+      t.title,
+      ar.name       AS artist_name,
+      al.id         AS album_id,
+      al.title      AS album_title,
+      t.duration_seconds,
+      al.cover_art_url
+    FROM tracks_fts f
+    JOIN tracks  t  ON t.id  = f.track_id
+    JOIN artists ar ON ar.id = t.artist_id
+    LEFT JOIN albums al ON al.id = t.album_id
+    WHERE tracks_fts MATCH ${ftsQuery}
+    ORDER BY rank
+    LIMIT 20
+  `) as Array<{
+      id: string;
+      title: string;
+      artist_name: string;
+      album_id: string | null;
+      album_title: string | null;
+      duration_seconds: number | null;
+      cover_art_url: string | null;
+    }>;
+
+    return {
+      artists: artistResults,
+      albums: albumResults.map((r) => ({
+        ...r,
+        createdAt: r.createdAt?.toISOString() ?? null,
+      })),
+      tracks: trackRows.map((r) => ({
+        id: r.id,
+        title: r.title,
+        artistName: r.artist_name,
+        albumId: r.album_id,
+        albumTitle: r.album_title,
+        durationSeconds: r.duration_seconds,
+        coverArtUrl: r.cover_art_url,
+      })),
+    };
   });
 };
 

@@ -1,9 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Music2 } from "lucide-react";
-import type { AlbumListItem } from "@staccato/shared";
-import { generateAlbumGradient } from "@/lib/music";
+import type { AlbumListItem, LibrarySearchResults } from "@staccato/shared";
+import { formatTime, generateAlbumGradient } from "@/lib/music";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { useEffect, useState } from "react";
 
 export const Route = createFileRoute("/library/")({
   component: LibraryPage,
@@ -80,6 +82,8 @@ function AlbumCardSkeleton() {
 }
 
 function LibraryPage() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const { data, isLoading, isError } = useQuery({
     queryKey: ["albums"],
     queryFn: async () => {
@@ -89,30 +93,143 @@ function LibraryPage() {
     },
   });
 
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  const { data: searchResults, isFetching: isSearching } = useQuery({
+    queryKey: ["library-search", debouncedSearch],
+    queryFn: async (): Promise<LibrarySearchResults> => {
+      const res = await fetch(
+        `/api/library/search?q=${encodeURIComponent(debouncedSearch)}`,
+      );
+      if (!res.ok) throw new Error("Search failed");
+      return res.json();
+    },
+    enabled: debouncedSearch.length >= 2,
+    staleTime: 30_000,
+  });
+
+  const isSearchMode = debouncedSearch.length >= 2;
+  const hasResults =
+    searchResults &&
+    (searchResults.artists.length > 0 ||
+      searchResults.albums.length > 0 ||
+      searchResults.tracks.length > 0);
+
   return (
     <div className="p-6">
       <div className="flex items-baseline justify-between mb-6">
         <h1 className="text-2xl font-bold tracking-tight">Albums</h1>
-        {data && (
+        {!isSearchMode && data && (
           <span className="text-sm text-muted-foreground">
             {data.total} albums
           </span>
         )}
       </div>
 
-      {isError && (
-        <p className="text-sm text-destructive">Failed to load albums.</p>
-      )}
+      <Input
+        placeholder="Search library..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="max-w-sm mb-6"
+      />
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-4 gap-y-6">
-        {isLoading
-          ? Array.from({ length: 18 }).map((_, i) => (
-              <AlbumCardSkeleton key={i} />
-            ))
-          : data?.items.map((album) => (
-              <AlbumCard key={album.id} album={album} />
-            ))}
-      </div>
+      {isSearchMode ? (
+        isSearching ? (
+          <p className="text-sm text-muted-foreground">Searching…</p>
+        ) : !hasResults ? (
+          <p className="text-sm text-muted-foreground">
+            No results for "{debouncedSearch}"
+          </p>
+        ) : (
+          <div className="space-y-8">
+            {searchResults.artists.length > 0 && (
+              <section>
+                <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-3">
+                  Artists
+                </h2>
+                <div className="space-y-1">
+                  {searchResults.artists.map((artist) => (
+                    <div
+                      key={artist.id}
+                      className="px-3 py-2 rounded-md hover:bg-accent/50"
+                    >
+                      <p className="text-sm font-medium">{artist.name}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {searchResults.albums.length > 0 && (
+              <section>
+                <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-3">
+                  Albums
+                </h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-4 gap-y-6">
+                  {searchResults.albums.map((album) => (
+                    <AlbumCard key={album.id} album={album} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {searchResults.tracks.length > 0 && (
+              <section>
+                <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-3">
+                  Tracks
+                </h2>
+                <div className="space-y-1">
+                  {searchResults.tracks.map((track) => (
+                    <div
+                      key={track.id}
+                      className="grid grid-cols-[2rem_1fr_1fr_4rem] items-center gap-3 px-3 py-2 rounded-md hover:bg-accent/50"
+                    >
+                      {track.coverArtUrl ? (
+                        <img
+                          src={track.coverArtUrl}
+                          className="w-6 h-6 rounded"
+                          alt=""
+                        />
+                      ) : (
+                        <Music2 className="w-4 h-4 text-muted-foreground" />
+                      )}
+                      <p className="text-sm font-medium truncate">
+                        {track.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {track.albumTitle ?? track.artistName}
+                      </p>
+                      <p className="text-xs text-muted-foreground tabular-nums">
+                        {track.durationSeconds
+                          ? formatTime(track.durationSeconds)
+                          : "—"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+          </div>
+        )
+      ) : (
+        <>
+          {isError && (
+            <p className="text-sm text-destructive">Failed to load albums.</p>
+          )}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-4 gap-y-6">
+            {isLoading
+              ? Array.from({ length: 18 }).map((_, i) => (
+                  <AlbumCardSkeleton key={i} />
+                ))
+              : data?.items.map((album) => (
+                  <AlbumCard key={album.id} album={album} />
+                ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
