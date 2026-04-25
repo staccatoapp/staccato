@@ -1,6 +1,7 @@
 import { walkAudioFiles } from "./walk.js";
 import { extractTags } from "./tags.js";
 import { upsertArtist, upsertAlbum, upsertTrack } from "./upsert.js";
+import { startResolution } from "../resolver/index.js";
 
 export interface ScanProgress {
   running: boolean;
@@ -50,4 +51,7 @@ export async function startScan(musicDir: string): Promise<void> {
 
   scanProgress.running = false;
   scanProgress.completedAt = new Date();
+
+  console.log("[scanner] scan complete, starting resolution");
+  await startResolution();
 }

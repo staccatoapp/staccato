@@ -18,6 +18,7 @@ export const albums = sqliteTable(
       .notNull()
       .references(() => artists.id),
     musicbrainzId: text("musicbrainz_id"),
+    releaseGroupMbid: text("release_group_mbid"),
     coverArtUrl: text("cover_art_url"),
     releaseYear: integer("release_year"),
     createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(

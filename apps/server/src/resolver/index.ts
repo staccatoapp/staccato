@@ -4,10 +4,19 @@ import { albums } from "../db/schema/albums.js";
 import { artists } from "../db/schema/artists.js";
 import { tracks } from "../db/schema/tracks.js";
 import {
+  type MBReleaseTrack,
+  lookupReleaseDetails,
+  normalizeString,
   searchRecording,
-  searchRelease,
-  throttledFetch,
+  searchReleaseCandidates,
 } from "../musicbrainz/client.js";
+import { fingerprintFile, isFpcalcAvailable } from "../fingerprint/fpcalc.js";
+import { lookupFingerprint } from "../fingerprint/acoustid.js";
+import {
+  fetchCoverArtUrl,
+  fetchCoverArtUrlForGroup,
+} from "../coverart/client.js";
+import { throttledFetch } from "../musicbrainz/client.js";
 
 export interface ResolutionProgress {
   running: boolean;
@@ -28,6 +37,10 @@ export let resolutionProgress: ResolutionProgress = {
 };
 
 export async function startResolution(): Promise<void> {
+  if (resolutionProgress.running) {
+    console.log("[resolver] already running, skipping");
+    return;
+  }
   resolutionProgress = {
     running: true,
     resolved: 0,
@@ -38,9 +51,10 @@ export async function startResolution(): Promise<void> {
   };
 
   try {
-    await runPass1();
-    await runPass2();
-    await runPass3();
+    await runAlbumFirstPass();
+    await runRecordingSearchFallback();
+    await runCoverArtRetryPass();
+    await runFingerprintPass();
     dedupeArtists();
     resolutionProgress.completedAt = new Date();
   } catch (err) {
@@ -50,12 +64,131 @@ export async function startResolution(): Promise<void> {
   }
 }
 
-async function runPass1(): Promise<void> {
+async function runAlbumFirstPass(): Promise<void> {
+  const countRow = db
+    .select({ total: sql<number>`count(*)`.mapWith(Number) })
+    .from(tracks)
+    .where(isNull(tracks.musicbrainzId))
+    .get();
+  resolutionProgress.total = countRow?.total ?? 0;
+
+  const unresolvedAlbums = db
+    .select({
+      albumId: albums.id,
+      title: albums.title,
+      artistId: albums.artistId,
+      artistName: artists.name,
+    })
+    .from(albums)
+    .innerJoin(artists, eq(albums.artistId, artists.id))
+    .where(isNull(albums.musicbrainzId))
+    .all();
+
+  console.log(`[resolver] album-first pass: ${unresolvedAlbums.length} albums`);
+
+  for (const album of unresolvedAlbums) {
+    const localTracks = db
+      .select({
+        id: tracks.id,
+        title: tracks.title,
+        trackNumber: tracks.trackNumber,
+        discNumber: tracks.discNumber,
+      })
+      .from(tracks)
+      .where(
+        and(eq(tracks.albumId, album.albumId), isNull(tracks.musicbrainzId)),
+      )
+      .all();
+
+    if (localTracks.length === 0) continue;
+
+    const candidates = await searchReleaseCandidates(
+      album.title,
+      album.artistName,
+      localTracks.length,
+    );
+    const threshold = Math.ceil(localTracks.length / 2);
+
+    for (const releaseMbid of candidates) {
+      const details = await lookupReleaseDetails(releaseMbid);
+      if (!details) continue;
+
+      const matched = matchLocalTracks(localTracks, details.tracks);
+      const matchCount = matched.filter((m) => m.mbTrack !== undefined).length;
+
+      if (matchCount < threshold) continue;
+
+      const albumResult = db
+        .update(albums)
+        .set({ musicbrainzId: releaseMbid })
+        .where(and(eq(albums.id, album.albumId), isNull(albums.musicbrainzId)))
+        .run();
+      if (albumResult.changes > 0) {
+        void fetchAndStoreCoverArt(
+          album.albumId,
+          releaseMbid,
+          details.releaseGroupMbid ?? undefined,
+        );
+      }
+
+      for (const { localId, mbTrack } of matched) {
+        if (mbTrack) {
+          db.update(tracks)
+            .set({ musicbrainzId: mbTrack.recordingMbid })
+            .where(eq(tracks.id, localId))
+            .run();
+          resolutionProgress.resolved++;
+        }
+      }
+
+      if (details.artistMbid) {
+        resolveArtistMbid(
+          album.artistId,
+          details.artistMbid,
+          details.artistName,
+        );
+      }
+
+      break;
+    }
+  }
+}
+
+function matchLocalTracks(
+  localTracks: Array<{
+    id: string;
+    title: string;
+    trackNumber: number | null;
+    discNumber: number | null;
+  }>,
+  mbTracks: MBReleaseTrack[],
+): Array<{ localId: string; mbTrack: MBReleaseTrack | undefined }> {
+  return localTracks.map((local) => {
+    let mbTrack: MBReleaseTrack | undefined;
+
+    if (local.trackNumber !== null) {
+      const disc = local.discNumber ?? 1;
+      mbTrack = mbTracks.find(
+        (t) => t.trackPosition === local.trackNumber && t.discPosition === disc,
+      );
+    }
+
+    if (!mbTrack) {
+      const norm = normalizeString(local.title);
+      mbTrack = mbTracks.find((t) => normalizeString(t.title) === norm);
+    }
+
+    return { localId: local.id, mbTrack };
+  });
+}
+
+async function runRecordingSearchFallback(): Promise<void> {
   const unresolved = db
     .select({
       trackId: tracks.id,
       title: tracks.title,
       albumId: tracks.albumId,
+      artistId: tracks.artistId,
       artistName: artists.name,
       albumTitle: albums.title,
       releaseYear: albums.releaseYear,
@@ -66,7 +199,9 @@ async function runPass1(): Promise<void> {
     .where(isNull(tracks.musicbrainzId))
     .all();
 
-  resolutionProgress.total = unresolved.length;
+  console.log(
+    `[resolver] recording search fallback: ${unresolved.length} tracks`,
+  );
 
   for (const track of unresolved) {
     const hint = track.albumTitle
@@ -83,12 +218,19 @@ async function runPass1(): Promise<void> {
         .where(eq(tracks.id, track.trackId))
         .run();
       if (match.releaseMbid && track.albumId) {
-        db.update(albums)
+        const albumResult = db
+          .update(albums)
           .set({ musicbrainzId: match.releaseMbid })
           .where(
             and(eq(albums.id, track.albumId), isNull(albums.musicbrainzId)),
           )
           .run();
+        if (albumResult.changes > 0) {
+          void fetchAndStoreCoverArt(track.albumId, match.releaseMbid);
+        }
+      }
+      if (match.mbArtistId && track.artistId) {
+        resolveArtistMbid(track.artistId, match.mbArtistId, match.mbArtistName);
       }
       resolutionProgress.resolved++;
     } else {
@@ -97,58 +239,170 @@ async function runPass1(): Promise<void> {
   }
 }
 
-async function runPass2(): Promise<void> {
-  const unresolvedAlbums = db
+async function fetchAndStoreCoverArt(
+  albumId: string,
+  releaseMbid: string,
+  releaseGroupMbid?: string,
+): Promise<void> {
+  let url = await fetchCoverArtUrl(releaseMbid);
+  if (url === "" && releaseGroupMbid) {
+    url = await fetchCoverArtUrlForGroup(releaseGroupMbid);
+  }
+  if (releaseGroupMbid || url !== null) {
+    db.update(albums)
+      .set({
+        ...(releaseGroupMbid ? { releaseGroupMbid } : {}),
+        ...(url !== null ? { coverArtUrl: url } : {}),
+      })
+      .where(eq(albums.id, albumId))
+      .run();
+  }
+}
+
+async function runCoverArtRetryPass(): Promise<void> {
+  const needsRetry = db
     .select({
       albumId: albums.id,
-      title: albums.title,
-      artistName: artists.name,
+      musicbrainzId: albums.musicbrainzId,
+      releaseGroupMbid: albums.releaseGroupMbid,
     })
     .from(albums)
-    .innerJoin(artists, eq(albums.artistId, artists.id))
-    .where(isNull(albums.musicbrainzId))
+    .where(and(isNotNull(albums.musicbrainzId), eq(albums.coverArtUrl, "")))
     .all();
 
-  for (const album of unresolvedAlbums) {
-    const match = await searchRelease(album.title, album.artistName);
-    if (match) {
+  if (needsRetry.length === 0) return;
+  console.log(`[resolver] cover art retry: ${needsRetry.length} albums`);
+
+  for (const album of needsRetry) {
+    let rgMbid = album.releaseGroupMbid ?? undefined;
+
+    if (!rgMbid) {
+      const res = await throttledFetch(
+        `https://musicbrainz.org/ws/2/release/${album.musicbrainzId}?inc=release-groups&fmt=json`,
+      );
+      if (!res.ok) continue;
+      const data = (await res.json()) as { "release-group"?: { id: string } };
+      rgMbid = data["release-group"]?.id;
+      if (!rgMbid) continue;
+    }
+
+    const url = await fetchCoverArtUrlForGroup(rgMbid);
+    if (url !== null && url !== "") {
       db.update(albums)
-        .set({ musicbrainzId: match.releaseMbid })
+        .set({ coverArtUrl: url, releaseGroupMbid: rgMbid })
         .where(eq(albums.id, album.albumId))
         .run();
     }
   }
 }
 
-async function runPass3(): Promise<void> {
-  const needsArt = db
-    .select({ albumId: albums.id, musicbrainzId: albums.musicbrainzId })
-    .from(albums)
-    .where(and(isNotNull(albums.musicbrainzId), isNull(albums.coverArtUrl)))
+function resolveArtistMbid(
+  localArtistId: string,
+  mbArtistId: string,
+  mbArtistName: string | null,
+): void {
+  const canonical = db
+    .select({ id: artists.id })
+    .from(artists)
+    .where(eq(artists.musicbrainzId, mbArtistId))
+    .get();
+
+  if (canonical && canonical.id !== localArtistId) {
+    db.update(tracks)
+      .set({ artistId: canonical.id })
+      .where(eq(tracks.artistId, localArtistId))
+      .run();
+    db.update(albums)
+      .set({ artistId: canonical.id })
+      .where(eq(albums.artistId, localArtistId))
+      .run();
+    db.delete(artists).where(eq(artists.id, localArtistId)).run();
+    if (mbArtistName) {
+      try {
+        db.update(artists)
+          .set({ name: mbArtistName })
+          .where(eq(artists.id, canonical.id))
+          .run();
+      } catch {}
+    }
+  } else if (!canonical) {
+    try {
+      db.update(artists)
+        .set({
+          musicbrainzId: mbArtistId,
+          ...(mbArtistName ? { name: mbArtistName } : {}),
+        })
+        .where(eq(artists.id, localArtistId))
+        .run();
+    } catch {
+      try {
+        db.update(artists)
+          .set({ musicbrainzId: mbArtistId })
+          .where(eq(artists.id, localArtistId))
+          .run();
+      } catch {}
+    }
+  }
+}
+
+async function runFingerprintPass(): Promise<void> {
+  const apiKey = process.env.ACOUSTID_API_KEY;
+  if (!apiKey) {
+    console.log(
+      "[resolver] ACOUSTID_API_KEY not set — skipping fingerprint pass",
+    );
+    return;
+  }
+
+  const available = await isFpcalcAvailable();
+  if (!available) {
+    console.log("[resolver] fpcalc not found — skipping fingerprint pass");
+    return;
+  }
+
+  const unresolved = db
+    .select({ trackId: tracks.id, filePath: tracks.filePath })
+    .from(tracks)
+    .where(
+      and(
+        isNull(tracks.musicbrainzId),
+        eq(tracks.fingerprintStatus, "pending"),
+      ),
+    )
     .all();
 
-  for (const album of needsArt) {
-    try {
-      const res = await throttledFetch(
-        `https://coverartarchive.org/release/${album.musicbrainzId}/front`,
-        { redirect: "manual" },
-      );
-      if (res.status === 307 || res.status === 302) {
-        const location = res.headers.get("location");
-        if (location) {
-          db.update(albums)
-            .set({ coverArtUrl: location })
-            .where(eq(albums.id, album.albumId))
-            .run();
-        }
-      } else {
-        db.update(albums)
-          .set({ coverArtUrl: "" })
-          .where(eq(albums.id, album.albumId))
-          .run();
-      }
-    } catch {
-      // network error — leave null to retry next run
+  console.log(`[resolver] fingerprint pass: ${unresolved.length} tracks`);
+
+  for (const track of unresolved) {
+    db.update(tracks)
+      .set({ fingerprintStatus: "processing" })
+      .where(eq(tracks.id, track.trackId))
+      .run();
+
+    const fp = await fingerprintFile(track.filePath);
+    if (!fp) {
+      db.update(tracks)
+        .set({ fingerprintStatus: "failed" })
+        .where(eq(tracks.id, track.trackId))
+        .run();
+      continue;
+    }
+
+    const match = await lookupFingerprint(fp.duration, fp.fingerprint, apiKey);
+    if (match) {
+      db.update(tracks)
+        .set({
+          musicbrainzId: match.recordingMbid,
+          fingerprintStatus: "matched",
+        })
+        .where(eq(tracks.id, track.trackId))
+        .run();
+      resolutionProgress.resolved++;
+    } else {
+      db.update(tracks)
+        .set({ fingerprintStatus: "failed" })
+        .where(eq(tracks.id, track.trackId))
+        .run();
     }
   }
 }

@@ -1,0 +1,1 @@
+ALTER TABLE `albums` ADD `release_group_mbid` text;
