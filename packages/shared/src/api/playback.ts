@@ -14,6 +14,8 @@ export const PlaybackSessionSchema = z.object({
   trackQueue: z.array(PlaybackTrackSchema),
   currentTrackIndex: z.number(),
   currentTrackPositionInSeconds: z.number(),
+  currentTrackAccumulatedPlayTimeInSeconds: z.number(),
+  currentTrackListenEventCreated: z.boolean(),
   isPlaying: z.boolean(),
 });
 

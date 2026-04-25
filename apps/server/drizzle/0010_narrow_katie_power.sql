@@ -1,0 +1,1 @@
+ALTER TABLE `playback_session` ADD `current_track_listen_event_created` integer DEFAULT false NOT NULL;

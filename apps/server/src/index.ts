@@ -14,6 +14,8 @@ import { fileURLToPath } from "node:url";
 import libraryRoutes from "./routes/library.js";
 import playbackRoutes from "./routes/playback.js";
 import tracksRoutes from "./routes/tracks.js";
+import playlistRoutes from "./routes/playlists.js";
+import settingsRoutes from "./routes/settings.js";
 
 if (process.env.STACCATO_ENV !== "production") {
   dotenvFlow.config({
@@ -29,6 +31,8 @@ app.register(resolutionRoutes, { prefix: "/api/library" });
 app.register(libraryRoutes, { prefix: "/api/library" });
 app.register(playbackRoutes, { prefix: "/api/playback" });
 app.register(tracksRoutes, { prefix: "/api" });
+app.register(playlistRoutes, { prefix: "/api/playlists" });
+app.register(settingsRoutes, { prefix: "/api/settings" });
 
 app.get("/api/health", async () => {
   return { status: "ok" };

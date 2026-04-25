@@ -57,6 +57,34 @@
       "when": 1776976736019,
       "tag": "0007_long_tattoo",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1777034329868,
+      "tag": "0008_adorable_tarantula",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1777034745042,
+      "tag": "0009_superb_gwen_stacy",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1777045495746,
+      "tag": "0010_narrow_katie_power",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1777048256888,
+      "tag": "0011_colossal_zodiak",
+      "breakpoints": true
     }
   ]
 }

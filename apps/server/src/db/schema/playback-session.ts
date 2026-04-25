@@ -20,5 +20,18 @@ export const playbackSession = sqliteTable("playback_session", {
   currentTrackPositionInSeconds: integer("current_track_position_in_seconds")
     .notNull()
     .default(0),
-  isPlaying: integer("is_playing", { mode: "boolean" }).notNull().default(false),
+  currentTrackAccumulatedPlayTimeInSeconds: integer(
+    "current_track_accumulated_play_time_in_seconds",
+  ) // Used to determine how long a track has actually been listened to for scrobbling purposes
+    .notNull()
+    .default(0),
+  isPlaying: integer("is_playing", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  currentTrackListenEventCreated: integer(
+    "current_track_listen_event_created",
+    { mode: "boolean" },
+  )
+    .notNull()
+    .default(false),
 });

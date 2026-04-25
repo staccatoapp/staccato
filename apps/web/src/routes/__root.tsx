@@ -19,8 +19,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-import type { PlaybackSession, ResolutionProgress, ScanProgress } from "@staccato/shared";
-import { PlayerBar } from "@/components/layout/playerBar";
+import type {
+  PlaybackSession,
+  ResolutionProgress,
+  ScanProgress,
+} from "@staccato/shared";
+import { PlayerBar } from "@/components/layout/player-bar";
 
 const queryClient = new QueryClient();
 
@@ -41,13 +45,14 @@ export const Route = createRootRoute({
 
 const NAV_ITEMS = [
   { to: "/library" as const, label: "Library", icon: Library },
+  { to: "/playlists" as const, label: "Playlists", icon: ListMusic },
+  { to: "/settings" as const, label: "Settings", icon: Settings },
 ] as const;
 
-// TODO - implement at some point way later
-const DISABLED_NAV_ITEMS = [
-  { label: "Playlists", icon: ListMusic },
-  { label: "Settings", icon: Settings },
-];
+const DISABLED_NAV_ITEMS: {
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}[] = [];
 
 function ScanSection() {
   const queryClient = useQueryClient();

@@ -1,15 +1,22 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { db } from "../db/index.js";
-import { playbackSession } from "../db/schema/playbackSession.js";
+import { playbackSession } from "../db/schema/playback-session.js";
 import { eq, inArray } from "drizzle-orm";
-import { albums, artists, tracks } from "../db/schema/index.js";
+import {
+  albums,
+  artists,
+  listeningHistory,
+  tracks,
+  userSettings,
+} from "../db/schema/index.js";
+import { submitListen } from "../listenbrainz/client.js";
 
 const playbackRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/session", async (req) => {
     const userId = req.userId;
     const session = await getSessionWithTrackDetails(userId);
-    return { session };
+    return session;
   });
 
   // TODO - relying on index for order is bad, e.g. if we are listening to 4th song and then add 2 songs before the queue. fractional indexing + separate table queue items would be better. refactor one day
@@ -26,7 +33,7 @@ const playbackRoutes: FastifyPluginAsync = async (fastify) => {
       .run();
 
     const updatedSession = await getSessionWithTrackDetails(userId); // TODO - another round call for no good reason
-    return { session: updatedSession };
+    return updatedSession;
   });
 
   // TODO - relying on index for order is bad, e.g. if we are listening to 4th song and then add 2 songs before the queue. fractional indexing + separate table queue items would be better. refactor one day
@@ -42,26 +49,59 @@ const playbackRoutes: FastifyPluginAsync = async (fastify) => {
       .run();
 
     const updatedSession = await getSessionWithTrackDetails(userId); // TODO - another round call for no good reason
-    return { session: updatedSession };
+    return updatedSession;
   });
 
   fastify.put("/session/state", async (req) => {
     const userId = req.userId;
-    const { isPlaying, currentTrackIndex, currentTrackPositionInSeconds } = z
+    const {
+      isPlaying,
+      currentTrackIndex,
+      currentTrackPositionInSeconds,
+      currentTrackAccumulatedPlayTimeInSeconds,
+      currentTrackListenEventCreated,
+    } = z
       .object({
         isPlaying: z.boolean(),
         currentTrackIndex: z.number(),
         currentTrackPositionInSeconds: z.number(),
+        currentTrackAccumulatedPlayTimeInSeconds: z.number(),
+        currentTrackListenEventCreated: z.boolean().optional(), // TODO - this is a band-aid for the fact that I forgot to add this field until after the fact. need to fix properly at some point
       })
       .parse(req.body);
 
-    await getOrCreateSession(userId);
+    const currentSession = await getSessionWithTrackDetails(userId);
+
+    // only scrobble if listened to more than half the track or 4 mins as per listenbrainz docs. should probably pull this out at some point
+    if (
+      !currentSession.currentTrackListenEventCreated &&
+      isPlaying &&
+      currentTrackAccumulatedPlayTimeInSeconds >
+        Math.min(
+          240,
+          (currentSession.trackQueue[currentTrackIndex]?.durationSeconds ??
+            480) / 2,
+        )
+    ) {
+      addListenEvent(
+        userId,
+        currentSession.trackQueue[currentTrackIndex]?.id ?? "",
+      );
+    }
     db.update(playbackSession)
-      .set({ isPlaying, currentTrackIndex, currentTrackPositionInSeconds })
+      .set({
+        isPlaying,
+        currentTrackIndex,
+        currentTrackPositionInSeconds,
+        currentTrackAccumulatedPlayTimeInSeconds,
+        currentTrackListenEventCreated:
+          currentTrackListenEventCreated ??
+          currentSession.currentTrackListenEventCreated,
+      })
       .where(eq(playbackSession.userId, userId))
       .run();
 
-    return { session: await getSessionWithTrackDetails(userId) };
+    return await getSessionWithTrackDetails(userId); // TODO - can just return update result. whole area needs improvement and no performance issues rn so skipping until later
   });
 
   fastify.put("/session/play", async (req) => {
@@ -80,13 +120,15 @@ const playbackRoutes: FastifyPluginAsync = async (fastify) => {
           trackQueue: trackIds,
           currentTrackIndex: startIndex,
           currentTrackPositionInSeconds: 0,
+          currentTrackAccumulatedPlayTimeInSeconds: 0,
+          currentTrackListenEventCreated: false,
           isPlaying: true,
         })
         .where(eq(playbackSession.userId, userId))
         .run();
     });
 
-    return { session: await getSessionWithTrackDetails(userId) };
+    return await getSessionWithTrackDetails(userId);
   });
 };
 
@@ -140,8 +182,76 @@ async function getSessionWithTrackDetails(userId: string) {
     trackQueue: orderedTracks,
     currentTrackIndex: session.currentTrackIndex,
     currentTrackPositionInSeconds: session.currentTrackPositionInSeconds,
+    currentTrackAccumulatedPlayTimeInSeconds:
+      session.currentTrackAccumulatedPlayTimeInSeconds,
+    currentTrackListenEventCreated: session.currentTrackListenEventCreated,
     isPlaying: session.isPlaying,
   };
+}
+
+// TODO - for now, scrobbling immediately into listenbrainz. In future, this will be handled by redis queues once I can be bothered
+// also should probably be in a transaction/trycatch, and not querying so much separately. being lazy
+async function addListenEvent(userId: string, trackId: string) {
+  if (!trackId) return;
+
+  const insertedListen = db
+    .insert(listeningHistory)
+    .values({
+      userId,
+      trackId,
+      scrobbledToListenbrainz: true,
+    })
+    .returning()
+    .get();
+
+  const currentUserSettings = db
+    .select({ listenbrainzToken: userSettings.listenbrainzToken })
+    .from(userSettings)
+    .where(eq(userSettings.userId, userId))
+    .get();
+
+  if (!currentUserSettings?.listenbrainzToken) {
+    console.warn(
+      "Could not submit listen to ListenBrainz - no token found for user",
+      userId,
+    );
+    return;
+  }
+
+  const track = db
+    .select({
+      title: tracks.title,
+      artistName: artists.name,
+      trackMbid: tracks.musicbrainzId,
+    })
+    .from(tracks)
+    .innerJoin(artists, eq(tracks.artistId, artists.id))
+    .where(eq(tracks.id, trackId))
+    .get();
+
+  if (!track?.artistName || !track?.title) {
+    console.warn(
+      "Could not submit listen to ListenBrainz - missing track or artist name for trackId",
+      trackId,
+    );
+    return;
+  }
+
+  await submitListen({
+    token: currentUserSettings.listenbrainzToken,
+    listenType: "single",
+    artistName: track?.artistName,
+    trackName: track?.title,
+    listenedAt: insertedListen.listenedAt,
+    trackMbid: track?.trackMbid,
+  });
+
+  db.update(playbackSession)
+    .set({
+      currentTrackListenEventCreated: true, // TODO: fix
+    })
+    .where(eq(playbackSession.userId, userId))
+    .run();
 }
 
 export default playbackRoutes;
