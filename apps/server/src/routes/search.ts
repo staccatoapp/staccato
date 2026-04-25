@@ -8,6 +8,7 @@ import { db } from "../db/index.js";
 import { tracks } from "../db/schema/index.js";
 import { inArray } from "drizzle-orm";
 
+// TODO - doing 3 passes for maximum matches is VERY slow. i think refactoring the UI to do separate searches for each category will be worth. also am considering tightening up the search - partial matches return a lot of junk the user probably isn't looking for
 const searchRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/external", async (request) => {
     const { q, limit: rawLimit } = request.query as {
