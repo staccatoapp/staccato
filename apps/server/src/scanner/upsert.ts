@@ -1,6 +1,7 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { artists, albums, tracks } from "../db/schema/index.js";
+import { normalizeString } from "../musicbrainz/client.js";
 import type { TrackTags } from "./tags.js";
 
 export function deleteTrackByPath(filePath: string): void {
@@ -48,10 +49,48 @@ export function deleteTrackByPath(filePath: string): void {
 }
 
 export function upsertArtist(name: string): string {
+  const normalizedInput = normalizeString(name);
+
+  const sqlMatch = db
+    .select({ id: artists.id })
+    .from(artists)
+    .where(eq(artists.normalizedName, normalizedInput))
+    .get();
+  if (sqlMatch) return sqlMatch.id;
+
+  const allArtists = db
+    .select({
+      id: artists.id,
+      name: artists.name,
+      normalizedName: artists.normalizedName,
+      canonicalName: artists.canonicalName,
+    })
+    .from(artists)
+    .all();
+  const match = allArtists.find(
+    (a) =>
+      (a.normalizedName == null &&
+        normalizeString(a.name) === normalizedInput) ||
+      (a.canonicalName != null &&
+        normalizeString(a.canonicalName) === normalizedInput),
+  );
+  if (match) {
+    if (match.normalizedName == null) {
+      db.update(artists)
+        .set({ normalizedName: normalizeString(match.name) })
+        .where(eq(artists.id, match.id))
+        .run();
+    }
+    return match.id;
+  }
+
   return db
     .insert(artists)
-    .values({ name })
-    .onConflictDoUpdate({ target: artists.name, set: { name } })
+    .values({ name, normalizedName: normalizedInput })
+    .onConflictDoUpdate({
+      target: artists.name,
+      set: { name, normalizedName: normalizedInput },
+    })
     .returning({ id: artists.id })
     .get()!.id;
 }
@@ -61,12 +100,53 @@ export function upsertAlbum(
   artistId: string,
   releaseYear: number | null,
 ): string {
+  const normalizedInput = normalizeString(title);
+
+  const sqlMatch = db
+    .select({ id: albums.id })
+    .from(albums)
+    .where(
+      and(
+        eq(albums.artistId, artistId),
+        eq(albums.normalizedTitle, normalizedInput),
+      ),
+    )
+    .get();
+  if (sqlMatch) return sqlMatch.id;
+
+  const artistAlbums = db
+    .select({
+      id: albums.id,
+      title: albums.title,
+      normalizedTitle: albums.normalizedTitle,
+      canonicalTitle: albums.canonicalTitle,
+    })
+    .from(albums)
+    .where(eq(albums.artistId, artistId))
+    .all();
+  const match = artistAlbums.find(
+    (a) =>
+      (a.normalizedTitle == null &&
+        normalizeString(a.title) === normalizedInput) ||
+      (a.canonicalTitle != null &&
+        normalizeString(a.canonicalTitle) === normalizedInput),
+  );
+  if (match) {
+    if (match.normalizedTitle == null) {
+      db.update(albums)
+        .set({ normalizedTitle: normalizeString(match.title) })
+        .where(eq(albums.id, match.id))
+        .run();
+    }
+    return match.id;
+  }
+
   return db
     .insert(albums)
-    .values({ title, artistId, releaseYear })
+    .values({ title, artistId, releaseYear, normalizedTitle: normalizedInput })
     .onConflictDoUpdate({
       target: [albums.title, albums.artistId],
-      set: { title },
+      set: { title, normalizedTitle: normalizedInput },
     })
     .returning({ id: albums.id })
     .get()!.id;

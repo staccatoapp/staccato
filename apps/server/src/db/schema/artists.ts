@@ -6,6 +6,7 @@ export const artists = sqliteTable("artists", {
     .primaryKey()
     .$defaultFn(() => createId()),
   name: text("name").notNull().unique(),
+  normalizedName: text("normalized_name"),
   canonicalName: text("canonical_name"),
   musicbrainzId: text("musicbrainz_id").unique(),
   imageUrl: text("image_url"),

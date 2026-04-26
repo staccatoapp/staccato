@@ -80,7 +80,7 @@ interface MBReleaseCandidateMeta {
 }
 
 const MB_BASE = "https://musicbrainz.org/ws/2";
-export const MB_USER_AGENT =
+const MB_USER_AGENT =
   "Staccato/0.1.0 (https://github.com/staccatoapp/staccato)";
 
 const MB_INTERVAL_MS = parseInt(process.env.MB_RATE_LIMIT_MS ?? "1100", 10);
@@ -410,7 +410,9 @@ async function searchReleaseMetas(
 export function normalizeString(str: string): string {
   return str
     .toLowerCase()
+    .replace(/[-‐‑‒–—―]/g, " ")
     .replace(/[^a-z0-9\s]/g, "")
+    .replace(/\s+/g, " ")
     .trim();
 }
 

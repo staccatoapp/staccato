@@ -1,8 +1,8 @@
 import chokidar from "chokidar";
 import { scanProgress, startScan } from "./index.js";
 import { deleteTrackByPath } from "./upsert.js";
+import { isAudioFile } from "./walk.js";
 
-const AUDIO_EXTENSIONS = /\.(flac|mp3|m4a|ogg|opus|wav|aiff|wv|ape)$/i;
 const DEBOUNCE_MS = 5000;
 
 export function startWatcher(musicDir: string): void {
@@ -27,17 +27,17 @@ export function startWatcher(musicDir: string): void {
       },
     })
     .on("add", (path) => {
-      if (!AUDIO_EXTENSIONS.test(path)) return;
+      if (!isAudioFile(path)) return;
       console.log(`[watcher] file added: ${path}`);
       scheduleScan();
     })
     .on("change", (path) => {
-      if (!AUDIO_EXTENSIONS.test(path)) return;
+      if (!isAudioFile(path)) return;
       console.log(`[watcher] file changed: ${path}`);
       scheduleScan();
     })
     .on("unlink", (path) => {
-      if (!AUDIO_EXTENSIONS.test(path)) return;
+      if (!isAudioFile(path)) return;
       console.log(`[watcher] file removed: ${path}`);
       deleteTrackByPath(path);
     })

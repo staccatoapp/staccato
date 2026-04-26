@@ -140,7 +140,7 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
     return { items, total };
   });
 
-  // TODO - breaks on certain searches (e.g. ",a")
+  // TODO - breaks on certain searches (e.g. ",a", "A$AP")
   fastify.get("/search", async (request) => {
     const { q } = request.query as { q?: string };
     if (!q || q.trim().length < 2)

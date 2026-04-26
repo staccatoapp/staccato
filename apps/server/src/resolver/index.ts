@@ -57,6 +57,7 @@ export async function startResolution(): Promise<void> {
     await runRecordingSearchFallback();
     await runCoverArtRetryPass();
     await runFingerprintPass();
+    await runAlbumBackfillFromTracks();
     dedupeArtists();
     await runArtistImagePass();
     resolutionProgress.completedAt = new Date();
@@ -466,6 +467,101 @@ async function runArtistImagePass(): Promise<void> {
   }
 }
 
+async function runAlbumBackfillFromTracks(): Promise<void> {
+  const toBackfill = db
+    .selectDistinct({
+      albumId: albums.id,
+      title: albums.title,
+    })
+    .from(albums)
+    .innerJoin(tracks, eq(tracks.albumId, albums.id))
+    .where(and(isNull(albums.musicbrainzId), isNotNull(tracks.musicbrainzId)))
+    .all();
+
+  if (toBackfill.length === 0) return;
+  console.log(
+    `[resolver] album backfill from tracks: ${toBackfill.length} albums`,
+  );
+
+  for (const album of toBackfill) {
+    const resolvedTrackMbids = db
+      .select({ musicbrainzId: tracks.musicbrainzId })
+      .from(tracks)
+      .where(
+        and(eq(tracks.albumId, album.albumId), isNotNull(tracks.musicbrainzId)),
+      )
+      .all()
+      .map((t) => t.musicbrainzId!);
+
+    const normalizedAlbumTitle = normalizeString(album.title);
+    let matchingRelease:
+      | {
+          id: string;
+          title: string;
+          status?: string;
+          "release-group"?: { id: string };
+        }
+      | undefined;
+
+    for (const recordingMbid of resolvedTrackMbids) {
+      const res = await throttledFetch(
+        `https://musicbrainz.org/ws/2/recording/${recordingMbid}?inc=releases+release-groups&fmt=json`,
+      );
+      if (!res.ok) continue;
+
+      const data = (await res.json()) as {
+        releases?: Array<{
+          id: string;
+          title: string;
+          status?: string;
+          "release-group"?: { id: string };
+        }>;
+      };
+
+      if (!data.releases?.length) continue;
+
+      const candidate =
+        data.releases.find(
+          (r) =>
+            normalizeString(r.title) === normalizedAlbumTitle &&
+            r.status === "Official",
+        ) ??
+        data.releases.find(
+          (r) => normalizeString(r.title) === normalizedAlbumTitle,
+        ) ??
+        data.releases.find((r) => r.status === "Official");
+
+      if (candidate) {
+        matchingRelease = candidate;
+        break;
+      }
+    }
+
+    if (!matchingRelease) {
+      console.log(
+        `[resolver/backfill] "${album.title}" — no matching release found across ${resolvedTrackMbids.length} resolved tracks`,
+      );
+      continue;
+    }
+
+    const releaseGroupMbid = matchingRelease["release-group"]?.id;
+    db.update(albums)
+      .set({
+        musicbrainzId: matchingRelease.id,
+        canonicalTitle: matchingRelease.title,
+        ...(releaseGroupMbid ? { releaseGroupMbid } : {}),
+      })
+      .where(and(eq(albums.id, album.albumId), isNull(albums.musicbrainzId)))
+      .run();
+
+    void fetchAndStoreCoverArt(
+      album.albumId,
+      matchingRelease.id,
+      releaseGroupMbid,
+    );
+  }
+}
+
 function dedupeArtists(): void {
   const dupes = db
     .select({
@@ -499,10 +595,39 @@ function dedupeArtists(): void {
           .set({ artistId: canonicalId })
           .where(eq(tracks.artistId, dupeId))
           .run();
-        db.update(albums)
-          .set({ artistId: canonicalId })
+
+        const dupeAlbums = db
+          .select({ id: albums.id, title: albums.title })
+          .from(albums)
           .where(eq(albums.artistId, dupeId))
-          .run();
+          .all();
+
+        for (const dupeAlbum of dupeAlbums) {
+          const canonicalAlbum = db
+            .select({ id: albums.id })
+            .from(albums)
+            .where(
+              and(
+                eq(albums.artistId, canonicalId),
+                eq(albums.title, dupeAlbum.title),
+              ),
+            )
+            .get();
+
+          if (canonicalAlbum) {
+            db.update(tracks)
+              .set({ albumId: canonicalAlbum.id })
+              .where(eq(tracks.albumId, dupeAlbum.id))
+              .run();
+            db.delete(albums).where(eq(albums.id, dupeAlbum.id)).run();
+          } else {
+            db.update(albums)
+              .set({ artistId: canonicalId })
+              .where(eq(albums.id, dupeAlbum.id))
+              .run();
+          }
+        }
+
         db.delete(artists).where(eq(artists.id, dupeId)).run();
       }
     }

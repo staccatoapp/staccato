@@ -1,10 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import ReactDOM from "react-dom";
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Check,
@@ -71,7 +67,10 @@ function AlbumCard({ album }: { album: AlbumListItem }) {
         )}
         <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
           <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shadow-lg translate-y-2.5 group-hover:translate-y-0 transition-transform duration-200">
-            <Play className="w-4 h-4 text-primary-foreground ml-0.5" fill="currentColor" />
+            <Play
+              className="w-4 h-4 text-primary-foreground ml-0.5"
+              fill="currentColor"
+            />
           </div>
         </div>
       </div>
@@ -169,7 +168,10 @@ function PlaylistCard({ playlist }: { playlist: PlaylistListItem }) {
         )}
         <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
           <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shadow-lg translate-y-2.5 group-hover:translate-y-0 transition-transform duration-200">
-            <Play className="w-4 h-4 text-primary-foreground ml-0.5" fill="currentColor" />
+            <Play
+              className="w-4 h-4 text-primary-foreground ml-0.5"
+              fill="currentColor"
+            />
           </div>
         </div>
       </div>
@@ -327,8 +329,7 @@ function AddToPlaylistDropdown({
     const rect = btnRef.current.getBoundingClientRect();
     const dropH = 44 + (playlistsData?.items.length ?? 0) * 40;
     const spaceBelow = window.innerHeight - rect.bottom;
-    const top =
-      spaceBelow > dropH + 8 ? rect.bottom + 4 : rect.top - dropH - 4;
+    const top = spaceBelow > dropH + 8 ? rect.bottom + 4 : rect.top - dropH - 4;
     const left = Math.min(rect.right - 200, window.innerWidth - 212);
     setDropStyle({ position: "fixed", top, left, width: 200, zIndex: 300 });
     onOpenChange(true);

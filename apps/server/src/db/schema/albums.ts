@@ -14,6 +14,7 @@ export const albums = sqliteTable(
       .primaryKey()
       .$defaultFn(() => createId()),
     title: text("title").notNull(),
+    normalizedTitle: text("normalized_title"),
     canonicalTitle: text("canonical_title"),
     artistId: text("artist_id")
       .notNull()

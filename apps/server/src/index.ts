@@ -28,7 +28,7 @@ if (process.env.STACCATO_ENV !== "production") {
   });
 }
 
-const app = Fastify({ logger: true });
+const app = Fastify();
 
 app.register(defaultUserPlugin);
 app.register(scanRoutes, { prefix: "/api/library" });
