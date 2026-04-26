@@ -140,7 +140,6 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
     return { items, total };
   });
 
-  // TODO - breaks on certain searches (e.g. ",a", "A$AP")
   fastify.get("/search", async (request) => {
     const { q } = request.query as { q?: string };
     if (!q || q.trim().length < 2)
@@ -186,24 +185,45 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
       .all();
 
     // Tracks — FTS5 prefix match (tokenisation + relevance ranking)
-    const ftsQuery = term.replace(/"/g, '""') + "*";
-    const trackRows = db.all(sql`
-    SELECT
-      t.id,
-      t.title,
-      ar.name       AS artist_name,
-      al.id         AS album_id,
-      al.title      AS album_title,
-      t.duration_seconds,
-      al.cover_art_url
-    FROM tracks_fts f
-    JOIN tracks  t  ON t.id  = f.track_id
-    JOIN artists ar ON ar.id = t.artist_id
-    LEFT JOIN albums al ON al.id = t.album_id
-    WHERE tracks_fts MATCH ${ftsQuery}
-    ORDER BY rank
-    LIMIT 20
-  `) as Array<{
+    const ftsQuery = buildTracksFtsQuery(term);
+    const trackRows = db.all(
+      ftsQuery
+        ? sql`
+            SELECT
+              t.id,
+              t.title,
+              ar.name       AS artist_name,
+              al.id         AS album_id,
+              al.title      AS album_title,
+              t.duration_seconds,
+              al.cover_art_url
+            FROM tracks_fts f
+            JOIN tracks  t  ON t.id  = f.track_id
+            JOIN artists ar ON ar.id = t.artist_id
+            LEFT JOIN albums al ON al.id = t.album_id
+            WHERE tracks_fts MATCH ${ftsQuery}
+            ORDER BY rank
+            LIMIT 20
+          `
+        : sql`
+            SELECT
+              t.id,
+              t.title,
+              ar.name       AS artist_name,
+              al.id         AS album_id,
+              al.title      AS album_title,
+              t.duration_seconds,
+              al.cover_art_url
+            FROM tracks t
+            JOIN artists ar ON ar.id = t.artist_id
+            LEFT JOIN albums al ON al.id = t.album_id
+            WHERE
+              t.title LIKE ${pattern}
+              OR ar.name LIKE ${pattern}
+              OR al.title LIKE ${pattern}
+            LIMIT 20
+          `,
+    ) as Array<{
       id: string;
       title: string;
       artist_name: string;
@@ -236,6 +256,12 @@ function parsePagination(query: { limit?: unknown; offset?: unknown }) {
   const limit = Math.min(Number(query.limit) || DEFAULT_LIMIT, MAX_LIMIT);
   const offset = Number(query.offset) || 0;
   return { limit, offset };
+}
+
+function buildTracksFtsQuery(term: string): string | null {
+  const tokens = term.match(/[\p{L}\p{N}]+/gu) ?? [];
+  if (tokens.length === 0) return null;
+  return tokens.map((token) => `${token.toLowerCase()}*`).join(" AND ");
 }
 
 export default libraryRoutes;
