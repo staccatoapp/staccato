@@ -121,7 +121,7 @@ function LayoutContent() {
       const res = await fetch("/api/playback/session");
       if (!res.ok) throw new Error("Failed to fetch playback session");
       const json = await res.json();
-      return json.session;
+      return json;
     },
     select: (d) => (d?.trackQueue?.length ?? 0) > 0,
   });

@@ -196,7 +196,7 @@ function PlayerBar() {
         body: JSON.stringify(state),
       });
       if (!res.ok) throw new Error("Failed to update playback state");
-      return res.json() as Promise<{ session: PlaybackSession }>;
+      return res.json() as Promise<PlaybackSession>;
     },
     onMutate: async (state) => {
       await queryClient.cancelQueries({ queryKey: ["playback-session"] });
@@ -265,6 +265,7 @@ function PlayerBar() {
         currentTrackIndex: playbackSession.currentTrackIndex,
         currentTrackPositionInSeconds: 0,
         currentTrackAccumulatedPlayTimeInSeconds: 0,
+        currentTrackListenEventCreated: false,
       });
     } else {
       const prevIndex = Math.max(0, playbackSession.currentTrackIndex - 1);
@@ -282,6 +283,7 @@ function PlayerBar() {
         currentTrackAccumulatedPlayTimeInSeconds: isSameTrack
           ? Math.floor(accumulatedPlayTimeRef.current)
           : 0,
+        currentTrackListenEventCreated: false,
       });
     }
   };

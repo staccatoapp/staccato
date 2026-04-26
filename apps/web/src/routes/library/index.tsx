@@ -662,7 +662,7 @@ function LibraryPage() {
       const res = await fetch("/api/playback/session");
       if (!res.ok) throw new Error("Failed to fetch session");
       const json = await res.json();
-      return json.session;
+      return json;
     },
   });
   const activeTrackId = playbackSession?.currentTrack?.id as string | undefined;
@@ -826,27 +826,6 @@ function LibraryPage() {
           <p className="text-sm text-muted-foreground">Searching…</p>
         ) : (
           <div>
-            {/* Tracks first */}
-            {(searchResultsQuery.data?.tracks.length ?? 0) > 0 && (
-              <div>
-                <SectionHeader
-                  label="Tracks"
-                  count={searchResultsQuery.data!.tracks.length}
-                />
-                <TrackList
-                  tracks={searchResultsQuery.data!.tracks as TrackListItem[]}
-                  activeTrackId={activeTrackId}
-                  isPlaying={isPlaying}
-                  onPlayTrack={(i) =>
-                    handlePlayTracks(
-                      searchResultsQuery.data!.tracks as TrackListItem[],
-                      i,
-                    )
-                  }
-                />
-              </div>
-            )}
-
             {/* Playlists (client-side filtered) */}
             {matchedPlaylists.length > 0 && (
               <div>
@@ -863,27 +842,6 @@ function LibraryPage() {
                 >
                   {matchedPlaylists.map((pl) => (
                     <PlaylistCard key={pl.id} playlist={pl} />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Albums */}
-            {(searchResultsQuery.data?.albums.length ?? 0) > 0 && (
-              <div>
-                <SectionHeader
-                  label="Albums"
-                  count={searchResultsQuery.data!.albums.length}
-                />
-                <div
-                  className="grid gap-x-4 gap-y-6"
-                  style={{
-                    gridTemplateColumns:
-                      "repeat(auto-fill, minmax(140px, 1fr))",
-                  }}
-                >
-                  {searchResultsQuery.data!.albums.map((album) => (
-                    <AlbumCard key={album.id} album={album} />
                   ))}
                 </div>
               </div>
@@ -911,6 +869,48 @@ function LibraryPage() {
                     />
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Albums */}
+            {(searchResultsQuery.data?.albums.length ?? 0) > 0 && (
+              <div>
+                <SectionHeader
+                  label="Albums"
+                  count={searchResultsQuery.data!.albums.length}
+                />
+                <div
+                  className="grid gap-x-4 gap-y-6"
+                  style={{
+                    gridTemplateColumns:
+                      "repeat(auto-fill, minmax(140px, 1fr))",
+                  }}
+                >
+                  {searchResultsQuery.data!.albums.map((album) => (
+                    <AlbumCard key={album.id} album={album} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Tracks first */}
+            {(searchResultsQuery.data?.tracks.length ?? 0) > 0 && (
+              <div>
+                <SectionHeader
+                  label="Tracks"
+                  count={searchResultsQuery.data!.tracks.length}
+                />
+                <TrackList
+                  tracks={searchResultsQuery.data!.tracks as TrackListItem[]}
+                  activeTrackId={activeTrackId}
+                  isPlaying={isPlaying}
+                  onPlayTrack={(i) =>
+                    handlePlayTracks(
+                      searchResultsQuery.data!.tracks as TrackListItem[],
+                      i,
+                    )
+                  }
+                />
               </div>
             )}
 

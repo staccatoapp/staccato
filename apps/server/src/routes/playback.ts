@@ -72,6 +72,8 @@ const playbackRoutes: FastifyPluginAsync = async (fastify) => {
 
     const currentSession = await getSessionWithTrackDetails(userId);
 
+    let listenEventCreated = currentSession.currentTrackListenEventCreated;
+
     // only scrobble if listened to more than half the track or 4 mins as per listenbrainz docs. should probably pull this out at some point
     if (
       !currentSession.currentTrackListenEventCreated &&
@@ -87,6 +89,7 @@ const playbackRoutes: FastifyPluginAsync = async (fastify) => {
         userId,
         currentSession.trackQueue[currentTrackIndex]?.id ?? "",
       );
+      listenEventCreated = true;
     }
     db.update(playbackSession)
       .set({
@@ -95,8 +98,7 @@ const playbackRoutes: FastifyPluginAsync = async (fastify) => {
         currentTrackPositionInSeconds,
         currentTrackAccumulatedPlayTimeInSeconds,
         currentTrackListenEventCreated:
-          currentTrackListenEventCreated ??
-          currentSession.currentTrackListenEventCreated,
+          currentTrackListenEventCreated ?? listenEventCreated,
       })
       .where(eq(playbackSession.userId, userId))
       .run();
@@ -245,13 +247,6 @@ async function addListenEvent(userId: string, trackId: string) {
     listenedAt: insertedListen.listenedAt,
     trackMbid: track?.trackMbid,
   });
-
-  db.update(playbackSession)
-    .set({
-      currentTrackListenEventCreated: true, // TODO: fix
-    })
-    .where(eq(playbackSession.userId, userId))
-    .run();
 }
 
 export default playbackRoutes;
