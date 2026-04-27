@@ -26,6 +26,7 @@ import { formatTime, generateAlbumGradient } from "@/lib/music";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { AlbumCard, AlbumCardSkeleton } from "@/components/music/AlbumCard";
 
 export const Route = createFileRoute("/library/")({
   component: LibraryPage,
@@ -35,64 +36,6 @@ function formatTotalDuration(totalSeconds: number): string {
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
   return h > 0 ? `${h} hr ${m} min` : `${m} min`;
-}
-
-// ─── Album Card ───────────────────────────────────────────────
-
-function AlbumCard({ album }: { album: AlbumListItem }) {
-  return (
-    <Link
-      to="/library/albums/$albumId"
-      params={{ albumId: album.id }}
-      className="group block cursor-pointer min-w-0"
-    >
-      <div
-        className="relative aspect-square w-full rounded-lg overflow-hidden mb-2.5 shadow-md"
-        style={{
-          background: album.coverArtUrl
-            ? undefined
-            : generateAlbumGradient(album.title, album.artistName),
-        }}
-      >
-        {album.coverArtUrl ? (
-          <img
-            src={album.coverArtUrl}
-            alt={album.title}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Music2 className="w-8 h-8 text-white/15" />
-          </div>
-        )}
-        <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
-          <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shadow-lg translate-y-2.5 group-hover:translate-y-0 transition-transform duration-200">
-            <Play
-              className="w-4 h-4 text-primary-foreground ml-0.5"
-              fill="currentColor"
-            />
-          </div>
-        </div>
-      </div>
-      <p className="text-[0.8125rem] font-semibold text-foreground truncate leading-snug">
-        {album.title}
-      </p>
-      <p className="text-[0.72rem] text-muted-foreground truncate mt-0.5">
-        {album.artistName}
-        {album.releaseYear && <span> · {album.releaseYear}</span>}
-      </p>
-    </Link>
-  );
-}
-
-function AlbumCardSkeleton() {
-  return (
-    <div>
-      <Skeleton className="aspect-square w-full rounded-lg mb-2.5" />
-      <Skeleton className="h-3.5 w-3/4 mb-1.5" />
-      <Skeleton className="h-3 w-1/2" />
-    </div>
-  );
 }
 
 // ─── Artist Card ──────────────────────────────────────────────
@@ -887,7 +830,14 @@ function LibraryPage() {
                   }}
                 >
                   {searchResultsQuery.data!.albums.map((album) => (
-                    <AlbumCard key={album.id} album={album} />
+                    <AlbumCard
+                      key={album.id}
+                      title={album.title}
+                      artistName={album.artistName}
+                      releaseYear={album.releaseYear}
+                      coverArtUrl={album.coverArtUrl}
+                      href={`/library/albums/${album.id}`}
+                    />
                   ))}
                 </div>
               </div>
@@ -940,7 +890,14 @@ function LibraryPage() {
                     <AlbumCardSkeleton key={i} />
                   ))
                 : albumsQuery.data?.items.map((album) => (
-                    <AlbumCard key={album.id} album={album} />
+                    <AlbumCard
+                      key={album.id}
+                      title={album.title}
+                      artistName={album.artistName}
+                      releaseYear={album.releaseYear}
+                      coverArtUrl={album.coverArtUrl}
+                      href={`/library/albums/${album.id}`}
+                    />
                   ))}
             </div>
           )}

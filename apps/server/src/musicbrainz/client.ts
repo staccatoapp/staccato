@@ -31,6 +31,7 @@ export interface ExternalArtistResult {
 
 export interface ExternalReleaseResult {
   releaseMbid: string;
+  releaseGroupMbid: string | null;
   title: string;
   artistName: string;
   artistMbid: string | null;
@@ -38,11 +39,23 @@ export interface ExternalReleaseResult {
   releaseType: string | null;
 }
 
+export interface ExternalAlbumDetail {
+  releaseGroupMbid: string;
+  releaseMbid: string;
+  title: string;
+  artistName: string;
+  artistMbid: string | null;
+  releaseYear: number | null;
+  releaseType: string | null;
+  tracks: MBReleaseTrack[];
+}
+
 export interface MBReleaseTrack {
   discPosition: number;
   trackPosition: number;
   recordingMbid: string;
   title: string;
+  durationMs: number | null;
 }
 
 export interface MBReleaseDetails {
@@ -53,12 +66,16 @@ export interface MBReleaseDetails {
   releaseGroupMbid: string | null;
 }
 
-interface MBRelease {
+interface MBReleaseLike {
   id: string;
-  title: string;
+  title?: string;
   date?: string;
   status?: string;
-  "release-group"?: { "primary-type"?: string };
+  "release-group"?: { id?: string; "primary-type"?: string };
+}
+
+interface MBRelease extends MBReleaseLike {
+  title: string;
 }
 
 interface MBRecording {
@@ -77,6 +94,12 @@ interface MBReleaseCandidateMeta {
   id: string;
   status: string | undefined;
   trackCount: number | undefined;
+}
+
+function parseReleaseYear(date?: string): number | null {
+  if (!date) return null;
+  const year = parseInt(date.slice(0, 4), 10);
+  return Number.isNaN(year) ? null : year;
 }
 
 const MB_BASE = "https://musicbrainz.org/ws/2";
@@ -159,7 +182,7 @@ async function attemptRecordingSearch(
         recording.releases.length > 0
       ) {
         const matchesHint = recording.releases.some(
-          (rel) => normalizeString(rel.title) === normalizedHint,
+          (rel) => rel.title && normalizeString(rel.title) === normalizedHint,
         );
         if (!matchesHint) continue;
       }
@@ -190,6 +213,8 @@ export async function searchRecordingsByQuery(
       fmt: "json",
       limit: String(limit),
     });
+    const url = `${MB_BASE}/recording?${params}&inc=releases+release-groups+artist-credits`;
+    console.log("MB URL", url);
     const response = await throttledFetch(
       `${MB_BASE}/recording?${params}&inc=releases+release-groups+artist-credits`,
     );
@@ -209,9 +234,6 @@ export async function searchRecordingsByQuery(
         : null;
       const releaseObj =
         r.releases?.find((rel) => rel.id === bestRelease) ?? r.releases?.[0];
-      const year = releaseObj?.date
-        ? parseInt(releaseObj.date.slice(0, 4), 10)
-        : null;
       return {
         recordingMbid: r.id,
         title: r.title,
@@ -219,7 +241,7 @@ export async function searchRecordingsByQuery(
         artistMbid: r["artist-credit"]?.[0]?.artist.id ?? null,
         releaseName: releaseObj?.title ?? null,
         releaseMbid: releaseObj?.id ?? null,
-        releaseYear: isNaN(year!) ? null : year,
+        releaseYear: parseReleaseYear(releaseObj?.date),
         durationMs: r.length ?? null,
       };
     });
@@ -264,10 +286,11 @@ export async function searchReleasesByQuery(
   limit = 8,
 ): Promise<ExternalReleaseResult[]> {
   try {
+    const fetchLimit = Math.min(limit * 3, 25);
     const params = new URLSearchParams({
       query,
       fmt: "json",
-      limit: String(limit),
+      limit: String(fetchLimit),
     });
     const response = await throttledFetch(
       `${MB_BASE}/release?${params}&inc=artist-credits+release-groups`,
@@ -278,21 +301,37 @@ export async function searchReleasesByQuery(
         id: string;
         title: string;
         date?: string;
+        status?: string;
         "artist-credit"?: Array<{ artist: { id: string; name: string } }>;
-        "release-group"?: { "primary-type"?: string };
+        "release-group"?: { id?: string; "primary-type"?: string };
       }>;
     };
-    return data.releases.map((r) => {
-      const year = r.date ? parseInt(r.date.slice(0, 4), 10) : null;
-      return {
-        releaseMbid: r.id,
-        title: r.title,
-        artistName: r["artist-credit"]?.[0]?.artist.name ?? "Unknown Artist",
-        artistMbid: r["artist-credit"]?.[0]?.artist.id ?? null,
-        releaseYear: isNaN(year!) ? null : year,
-        releaseType: r["release-group"]?.["primary-type"] ?? null,
-      };
-    });
+
+    const byGroup = new Map<string, typeof data.releases>();
+    for (const r of data.releases) {
+      const rgId = r["release-group"]?.id ?? r.id;
+      const grp = byGroup.get(rgId) ?? [];
+      grp.push(r);
+      byGroup.set(rgId, grp);
+    }
+
+    const results: ExternalReleaseResult[] = [];
+    for (const grp of byGroup.values()) {
+      const firstRelease = grp[0];
+      if (!firstRelease) continue;
+      const bestId = pickBestRelease(grp) ?? firstRelease.id;
+      const best = grp.find((r) => r.id === bestId) ?? firstRelease;
+      results.push({
+        releaseMbid: best.id,
+        releaseGroupMbid: best["release-group"]?.id ?? null,
+        title: best.title,
+        artistName: best["artist-credit"]?.[0]?.artist.name ?? "Unknown Artist",
+        artistMbid: best["artist-credit"]?.[0]?.artist.id ?? null,
+        releaseYear: parseReleaseYear(best.date),
+        releaseType: best["release-group"]?.["primary-type"] ?? null,
+      });
+    }
+    return results.slice(0, limit);
   } catch {
     return [];
   }
@@ -315,6 +354,7 @@ export async function lookupReleaseDetails(
         tracks: Array<{
           position: number;
           title: string;
+          length?: number;
           recording: { id: string };
         }>;
       }>;
@@ -326,6 +366,7 @@ export async function lookupReleaseDetails(
           trackPosition: t.position,
           recordingMbid: t.recording.id,
           title: t.title,
+          durationMs: t.length ?? null,
         })),
       ),
       releaseName: data.title ?? null,
@@ -416,8 +457,47 @@ export function normalizeString(str: string): string {
     .trim();
 }
 
+export async function lookupExternalAlbum(
+  rgMbid: string,
+): Promise<ExternalAlbumDetail | null> {
+  try {
+    const res = await throttledFetch(
+      `${MB_BASE}/release-group/${rgMbid}?inc=releases+artist-credits&fmt=json`,
+    );
+    if (!res.ok) return null;
+    const rg = (await res.json()) as {
+      title: string;
+      "primary-type"?: string;
+      "artist-credit"?: Array<{ artist: { id: string; name: string } }>;
+      releases?: Array<{ id: string; date?: string; status?: string }>;
+    };
+
+    const releases = rg.releases ?? [];
+    const releaseMbid = pickBestRelease(releases) ?? releases[0]?.id;
+    if (!releaseMbid) return null;
+
+    const canonical = releases.find((r) => r.id === releaseMbid) ?? releases[0];
+
+    const details = await lookupReleaseDetails(releaseMbid);
+    if (!details) return null;
+
+    return {
+      releaseGroupMbid: rgMbid,
+      releaseMbid,
+      title: rg.title,
+      artistName: rg["artist-credit"]?.[0]?.artist.name ?? "Unknown Artist",
+      artistMbid: rg["artist-credit"]?.[0]?.artist.id ?? null,
+      releaseYear: parseReleaseYear(canonical?.date),
+      releaseType: rg["primary-type"] ?? null,
+      tracks: details.tracks,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function pickBestRelease(
-  releases: MBRelease[],
+  releases: MBReleaseLike[],
   hint?: { albumTitle: string; releaseYear?: number },
 ): string | null {
   const officialRelease = releases.filter((r) => r.status === "Official");
@@ -426,7 +506,7 @@ function pickBestRelease(
   if (hint) {
     const albumTitle = normalizeString(hint.albumTitle);
     const hintMatch = officialRelease.find((r) => {
-      if (normalizeString(r.title) !== albumTitle) return false;
+      if (!r.title || normalizeString(r.title) !== albumTitle) return false;
       if (hint.releaseYear && r.date) {
         return r.date.startsWith(String(hint.releaseYear));
       }

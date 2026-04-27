@@ -50,9 +50,10 @@ plans/
 issues/
 apps/server/data/
 data/
-music/
+/music/
 
 # Claude
 .claude/
 .playwright-mcp/
 .claudeignore
+.superpowers/

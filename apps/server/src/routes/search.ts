@@ -1,5 +1,6 @@
 import { FastifyPluginAsync } from "fastify";
 import {
+  lookupExternalAlbum,
   searchArtistsByQuery,
   searchRecordingsByQuery,
   searchReleasesByQuery,
@@ -8,43 +9,85 @@ import { db } from "../db/index.js";
 import { tracks } from "../db/schema/index.js";
 import { inArray } from "drizzle-orm";
 
-// TODO - doing 3 passes for maximum matches is VERY slow. i think refactoring the UI to do separate searches for each category will be worth. also am considering tightening up the search - partial matches return a lot of junk the user probably isn't looking for
 const searchRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/external", async (request) => {
-    const { q, limit: rawLimit } = request.query as {
-      q?: string;
+    const {
+      type,
+      recording,
+      release,
+      artist,
+      limit: rawLimit,
+    } = request.query as {
+      type?: string;
+      recording?: string;
+      release?: string;
+      artist?: string;
       limit?: string;
     };
-    if (!q || q.trim().length < 2)
-      return { recordings: [], artists: [], releases: [] };
+
     const limit = Math.min(Number(rawLimit) || 10, 25);
 
-    const [recordings, artists, releases] = await Promise.all([
-      searchRecordingsByQuery(q.trim(), limit),
-      searchArtistsByQuery(q.trim(), 5),
-      searchReleasesByQuery(q.trim(), 8),
-    ]);
+    if (type === "recording") {
+      const parts: string[] = [];
+      if (recording?.trim()) parts.push(`recording:"${recording.trim()}"`);
+      if (release?.trim()) parts.push(`release:"${release.trim()}"`);
+      if (artist?.trim()) parts.push(`artist:"${artist.trim()}"`);
+      if (parts.length === 0)
+        return { recordings: [], artists: [], releases: [] };
 
-    const mbids = recordings.map((r) => r.recordingMbid);
-    const localMbids = new Set(
-      mbids.length > 0
-        ? db
-            .select({ musicbrainzId: tracks.musicbrainzId })
-            .from(tracks)
-            .where(inArray(tracks.musicbrainzId, mbids))
-            .all()
-            .map((r) => r.musicbrainzId)
-        : [],
-    );
+      const recordings = await searchRecordingsByQuery(
+        parts.join(" AND "),
+        limit,
+      );
+      const mbids = recordings.map((r) => r.recordingMbid);
+      const localMbids = new Set(
+        mbids.length > 0
+          ? db
+              .select({ musicbrainzId: tracks.musicbrainzId })
+              .from(tracks)
+              .where(inArray(tracks.musicbrainzId, mbids))
+              .all()
+              .map((r) => r.musicbrainzId)
+          : [],
+      );
+      return {
+        recordings: recordings.map((r) => ({
+          ...r,
+          inLibrary: localMbids.has(r.recordingMbid),
+        })),
+        artists: [],
+        releases: [],
+      };
+    }
 
-    return {
-      recordings: recordings.map((r) => ({
-        ...r,
-        inLibrary: localMbids.has(r.recordingMbid),
-      })),
-      artists,
-      releases,
-    };
+    if (type === "release") {
+      const parts: string[] = [];
+      if (release?.trim()) parts.push(`release:"${release.trim()}"`);
+      if (artist?.trim()) parts.push(`artist:"${artist.trim()}"`);
+      if (parts.length === 0)
+        return { recordings: [], artists: [], releases: [] };
+
+      const releases = await searchReleasesByQuery(parts.join(" AND "), limit);
+      return { recordings: [], artists: [], releases };
+    }
+
+    if (type === "artist") {
+      if (!artist?.trim()) return { recordings: [], artists: [], releases: [] };
+      const artists = await searchArtistsByQuery(
+        `artist:"${artist.trim()}"`,
+        limit,
+      );
+      return { recordings: [], artists, releases: [] };
+    }
+
+    return { recordings: [], artists: [], releases: [] };
+  });
+
+  fastify.get("/external/albums/:rgMbid", async (request, reply) => {
+    const { rgMbid } = request.params as { rgMbid: string };
+    const album = await lookupExternalAlbum(rgMbid);
+    if (!album) return reply.status(404).send({ error: "Not found" });
+    return album;
   });
 };
 

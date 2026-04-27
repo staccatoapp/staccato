@@ -7,6 +7,13 @@ import { Music2, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { formatTime } from "@/lib/music";
 
+function getSliderValue(
+  value: number | readonly number[],
+  fallback: number,
+): number {
+  return typeof value === "number" ? value : (value[0] ?? fallback);
+}
+
 function PlayerBar() {
   const queryClient = useQueryClient();
 
@@ -289,7 +296,7 @@ function PlayerBar() {
   };
 
   const handleVolumeChanged = (value: number | readonly number[]) => {
-    const v = Array.isArray(value) ? (value as number[])[0] : (value as number);
+    const v = getSliderValue(value, volume);
     setVolume(v);
     if (audioRef.current) {
       audioRef.current.volume = v / 100;
@@ -297,15 +304,13 @@ function PlayerBar() {
   };
 
   const handleSeekChange = (value: number | readonly number[]) => {
-    const v = Array.isArray(value) ? (value as number[])[0] : (value as number);
+    const v = getSliderValue(value, seekDisplay);
     isSeekingRef.current = true;
     setSeekDisplay(v);
   };
 
   const handleSeekCommitted = (value: number | readonly number[]) => {
-    const seekTo = Array.isArray(value)
-      ? (value as number[])[0]
-      : (value as number);
+    const seekTo = getSliderValue(value, seekDisplay);
     isSeekingRef.current = false;
     lastTrackedAudioTimeRef.current = seekTo;
     if (audioRef.current) audioRef.current.currentTime = seekTo;

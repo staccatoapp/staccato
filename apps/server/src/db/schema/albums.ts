@@ -27,10 +27,10 @@ export const albums = sqliteTable(
       () => new Date(),
     ),
   },
-  (table) => ({
-    titleArtistUnq: uniqueIndex("albums_title_artist_id_unique").on(
+  (table) => [
+    uniqueIndex("albums_title_artist_id_unique").on(
       table.title,
       table.artistId,
     ),
-  }),
+  ],
 );

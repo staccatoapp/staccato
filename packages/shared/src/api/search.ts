@@ -59,6 +59,7 @@ export type ExternalArtistResult = z.infer<typeof ExternalArtistResultSchema>;
 
 export const ExternalReleaseResultSchema = z.object({
   releaseMbid: z.string(),
+  releaseGroupMbid: z.string().nullable(),
   title: z.string(),
   artistName: z.string(),
   artistMbid: z.string().nullable(),
@@ -73,3 +74,26 @@ export const ExternalSearchResultsSchema = z.object({
   releases: z.array(ExternalReleaseResultSchema),
 });
 export type ExternalSearchResults = z.infer<typeof ExternalSearchResultsSchema>;
+
+export type ExternalSearchType = "recording" | "release" | "artist";
+
+export const ExternalAlbumTrackSchema = z.object({
+  discPosition: z.number(),
+  trackPosition: z.number(),
+  recordingMbid: z.string(),
+  title: z.string(),
+  durationMs: z.number().nullable(),
+});
+export type ExternalAlbumTrack = z.infer<typeof ExternalAlbumTrackSchema>;
+
+export const ExternalAlbumDetailSchema = z.object({
+  releaseGroupMbid: z.string(),
+  releaseMbid: z.string(),
+  title: z.string(),
+  artistName: z.string(),
+  artistMbid: z.string().nullable(),
+  releaseYear: z.number().nullable(),
+  releaseType: z.string().nullable(),
+  tracks: z.array(ExternalAlbumTrackSchema),
+});
+export type ExternalAlbumDetail = z.infer<typeof ExternalAlbumDetailSchema>;
