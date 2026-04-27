@@ -1,7 +1,8 @@
 import { eq } from "drizzle-orm";
-import { db } from "./index.js";
+import { db } from "./client.js";
 import { NewUserRow, users } from "./schema/users.js";
 
+// TODO - refactor when auth is implemented
 export function seedDefaultUser() {
   const existing = db
     .select()

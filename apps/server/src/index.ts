@@ -6,7 +6,7 @@ import resolutionRoutes from "./routes/resolution.js";
 import fastifyStatic from "@fastify/static";
 import { runMigrations } from "./db/migrate.js";
 import { seedDefaultUser } from "./db/seed.js";
-import { db } from "./db/index.js";
+import { db } from "./db/client.js";
 import { users } from "./db/schema/users.js";
 import { tracks } from "./db/schema/tracks.js";
 import { startScan } from "./scanner/index.js";
@@ -45,6 +45,7 @@ app.get("/api/health", async () => {
   return { status: "ok" };
 });
 
+// TODO - refactor into users query file when auth is properly implemented
 app.get("/api/me", async (request, reply) => {
   const user = db
     .select({ id: users.id, username: users.username, isAdmin: users.isAdmin })

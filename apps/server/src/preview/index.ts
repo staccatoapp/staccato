@@ -1,12 +1,15 @@
-import { db } from "../db/index.js";
-import { previewCache } from "../db/schema/preview-cache.js";
-import { eq } from "drizzle-orm";
 import { lookupDeezerPreview } from "./deezer.js";
-import { lookupItunesPreview } from "./itunes.js";
+import { lookupItunesPreview as iTunesLookupPreview } from "./itunes.js";
+import {
+  getCachedPreview,
+  insertCachedPreview,
+  NewPreviewCacheRow,
+} from "../db/queries/preview-cache.js";
+import { PreviewSource } from "../db/schema/preview-cache.js";
 
 export interface PreviewResolution {
   previewUrl: string | null;
-  source: "deezer" | "itunes" | "none";
+  source: PreviewSource;
 }
 
 export async function resolvePreview(
@@ -14,11 +17,7 @@ export async function resolvePreview(
   artistName: string,
   trackTitle: string,
 ): Promise<PreviewResolution> {
-  const cached = db
-    .select()
-    .from(previewCache)
-    .where(eq(previewCache.musicbrainzRecordingId, recordingMbid))
-    .get();
+  const cached = getCachedPreview(recordingMbid);
 
   if (cached) {
     return {
@@ -29,33 +28,36 @@ export async function resolvePreview(
 
   const deezer = await lookupDeezerPreview(artistName, trackTitle);
   if (deezer) {
-    db.insert(previewCache)
-      .values({
-        musicbrainzRecordingId: recordingMbid,
-        deezerTrackId: deezer.deezerTrackId,
-        previewUrl: deezer.previewUrl,
-        source: "deezer",
-      })
-      .run();
+    const cachePreviewInsert: NewPreviewCacheRow = {
+      musicbrainzRecordingId: recordingMbid,
+      deezerTrackId: deezer.deezerTrackId,
+      previewUrl: deezer.previewUrl,
+      source: "deezer",
+    };
+    insertCachedPreview(cachePreviewInsert);
+
     return { previewUrl: deezer.previewUrl, source: "deezer" };
   }
 
-  const itunes = await lookupItunesPreview(artistName, trackTitle);
-  if (itunes) {
-    db.insert(previewCache)
-      .values({
-        musicbrainzRecordingId: recordingMbid,
-        itunesTrackId: itunes.itunesTrackId,
-        previewUrl: itunes.previewUrl,
-        source: "itunes",
-      })
-      .run();
-    return { previewUrl: itunes.previewUrl, source: "itunes" };
+  // named "iTunesLookupPreview" because "lookupItunesPreview" and "lookupITunesPreview" felt so wrong
+  const iTunes = await iTunesLookupPreview(artistName, trackTitle);
+  if (iTunes) {
+    const cachePreviewInsert: NewPreviewCacheRow = {
+      musicbrainzRecordingId: recordingMbid,
+      itunesTrackId: iTunes.itunesTrackId,
+      previewUrl: iTunes.previewUrl,
+      source: "itunes",
+    };
+    insertCachedPreview(cachePreviewInsert);
+
+    return { previewUrl: iTunes.previewUrl, source: "itunes" };
   }
 
-  // Negative cache — no preview found
-  db.insert(previewCache)
-    .values({ musicbrainzRecordingId: recordingMbid, source: "none" })
-    .run();
+  const negativeCachePreviewInsert: NewPreviewCacheRow = {
+    musicbrainzRecordingId: recordingMbid,
+    source: "none",
+  };
+  insertCachedPreview(negativeCachePreviewInsert);
+
   return { previewUrl: null, source: "none" };
 }

@@ -12,11 +12,10 @@ Staccato is a self-hosted music player app for home labs, emphasising music disc
 - **Language**: TypeScript everywhere (backend, web, docs, shared types)
 - **Backend**: Node.js + Fastify
 - **Database**: SQLite (WAL mode) via Drizzle ORM with `better-sqlite3` driver
-- **Job Queue**: BullMQ + Redis for background tasks (library scanning, fingerprinting, scrobbling, Lidarr polling)
 - **Web Frontend**: React SPA built with Vite, styled with shadcn/ui and Tailwind CSS, data fetching via TanStack Query
 - **Documentation**: VitePress (static site, deployed separately from the main app)
 - **Mobile** (future): Expo (React Native) with react-native-track-player for audio
-- **Deployment**: Docker (single app container + Redis sidecar), music library mounted read-only. Docs site deployed separately (e.g. GitHub Pages, Cloudflare Pages).
+- **Deployment**: Docker (single app container), music library mounted read-only. Docs site deployed separately (e.g. GitHub Pages, Cloudflare Pages).
 
 ## Monorepo Structure
 
@@ -191,6 +190,10 @@ Never use `drizzle-kit push` — it bypasses migration history and breaks other 
 - **Docs deployed separately**: the documentation site is NOT included in the Docker image. It is built and deployed via its own pipeline (e.g. GitHub Pages) to keep the Docker image lean and focused.
 - **Auto-migrate on startup**: migrations run synchronously before the server accepts requests. No manual migration step for users on upgrade — pulling a new image and restarting is sufficient. The Dockerfile must copy `apps/server/drizzle/` into the image alongside `apps/server/dist/`, both under the same WORKDIR so `process.cwd()` resolves `drizzle/` correctly. Recommend users backup `staccato.db` before major version upgrades.
 - **Scanner DB access in `src/scanner/upsert.ts`**: upsert functions live inside `src/scanner/` rather than a shared data access layer. These are scanner-specific operations (find-by-name-or-create) encoding scanning business logic, not generic CRUD. `better-sqlite3` is synchronous and Drizzle is already a thin SQL abstraction, so a repository pattern adds little value at this scale. When later phases introduce multiple writers (API routes, job workers, scrobbling) sharing query logic against the same tables, migrate to a `src/db/queries/` layer consumed across modules.
+- **Async functions over BullMQ + Redis for background tasks**: at 5–15 users on a single container, Redis adds operational complexity without meaningful benefit. Background tasks (scanning, fingerprinting, scrobbling, Lidarr polling) are implemented with plain async functions. Chokidar re-triggers scanning on startup, covering crash-recovery for scans. Add BullMQ only if a concrete need emerges (e.g. guaranteed job delivery across restarts becomes a real pain point).
+- **Disk cache for cover art**: cover art is fetched from Cover Art Archive once, written to `data/covers/<mbid>.jpg`, and served via Fastify static with `Cache-Control: public, max-age=31536000`. The `cover_art_url` column on `albums` points to the local static endpoint after first fetch. Redis is not used for asset caching — it is volatile, non-idiomatic for binary blobs, and unnecessary for content that never changes.
+- **Prefer Zod when defining types from unknown inputs**: whenever data flows in from external sources (e.g. API calls), use Zod to ensure a consistent, shared shape.
+- **Use types wherever reasonable** - When data flows between apps (e.g. server -> web/mobile), use Typescript interfaces or inferred types in the shared package. When data flows internally (e.g. database functions -> server functions, or server -> server functions), TypeScript interfaces or inferred types can be used internally to that app or package.
 
 ## Role
 

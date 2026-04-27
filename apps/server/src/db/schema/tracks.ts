@@ -3,6 +3,14 @@ import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { albums } from "./albums.js";
 import { artists } from "./artists.js";
 
+export const fingerprintStatus = [
+  "pending",
+  "processing",
+  "matched",
+  "failed",
+] as const;
+export type FingerprintStatus = (typeof fingerprintStatus)[number];
+
 export const tracks = sqliteTable("tracks", {
   id: text("id")
     .primaryKey()
@@ -21,7 +29,7 @@ export const tracks = sqliteTable("tracks", {
   fileFormat: text("file_format"),
   fileSizeBytes: integer("file_size_bytes"),
   fingerprintStatus: text("fingerprint_status", {
-    enum: ["pending", "processing", "matched", "failed"],
+    enum: fingerprintStatus,
   })
     .notNull()
     .default("pending"),
