@@ -4,8 +4,8 @@ layout: home
 
 hero:
   name: "Staccato"
-  text: "Self-hosted music discovery and player"
-  tagline: My great project tagline
+  text: "All-In-One Free Music Solution"
+  tagline: Self-hosted music player, discovery, library manager
   actions:
     - theme: brand
       text: Markdown Examples

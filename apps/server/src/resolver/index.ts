@@ -1,16 +1,14 @@
 import {
   type MBReleaseTrack,
+  lookupExternalAlbum,
   lookupReleaseDetails,
   normalizeString,
   searchRecording,
-  searchReleaseCandidates,
+  searchReleaseGroupCandidates,
 } from "../musicbrainz/client.js";
 import { fingerprintFile, isFpcalcAvailable } from "../fingerprint/fpcalc.js";
 import { lookupFingerprint } from "../fingerprint/acoustid.js";
-import {
-  fetchCoverArtUrl,
-  fetchCoverArtUrlForGroup,
-} from "../coverart/client.js";
+import { fetchCoverArtUrlForGroup } from "../coverart/client.js";
 import { throttledFetch } from "../musicbrainz/client.js";
 import {
   countUnresolvedTracks,
@@ -26,6 +24,7 @@ import {
   deleteAlbum,
   getAlbumIdByTitleAndArtistId,
   getAlbumsByArtistId,
+  getAlbumsNeedingTagResolution,
   getResolvedAlbumsWithoutCoverArt,
   getUnresolvedAlbums,
   getUnresolvedAlbumsContainingResolvedTracks,
@@ -75,6 +74,7 @@ export async function startResolution(): Promise<void> {
   };
 
   try {
+    await runTagResolutionPass();
     await runAlbumFirstPass();
     await runRecordingSearchFallback();
     await runCoverArtRetryPass();
@@ -90,6 +90,45 @@ export async function startResolution(): Promise<void> {
   }
 }
 
+async function runTagResolutionPass(): Promise<void> {
+  const albums = getAlbumsNeedingTagResolution();
+
+  if (albums.length === 0) return;
+  console.log(`[resolver] tag resolution pass: ${albums.length} albums`);
+
+  for (const album of albums) {
+    const details = await lookupReleaseDetails(album.releaseMbid!);
+    if (!details || !details.releaseGroupMbid) continue;
+
+    const albumResult = updateUnresolvedAlbum(album.albumId, {
+      releaseGroupMbid: details.releaseGroupMbid,
+      ...(details.releaseName ? { canonicalTitle: details.releaseName } : {}),
+    });
+
+    if (albumResult.changes > 0) {
+      void fetchAndStoreCoverArt(album.albumId, details.releaseGroupMbid);
+    }
+
+    const localTracks = getUnresolvedTracksByAlbum(album.albumId);
+    if (localTracks.length > 0) {
+      const matched = matchLocalTracks(localTracks, details.tracks);
+      for (const { localId, mbTrack } of matched) {
+        if (mbTrack) {
+          updateTrackByTrackId(localId, {
+            musicbrainzId: mbTrack.recordingMbid,
+            canonicalTitle: mbTrack.title,
+          });
+          resolutionProgress.resolved++;
+        }
+      }
+    }
+
+    if (details.artistMbid) {
+      resolveArtistMbid(album.artistId, details.artistMbid, details.artistName);
+    }
+  }
+}
+
 async function runAlbumFirstPass(): Promise<void> {
   resolutionProgress.total = countUnresolvedTracks();
 
@@ -102,33 +141,40 @@ async function runAlbumFirstPass(): Promise<void> {
 
     if (localTracks.length === 0) continue;
 
-    const candidates = await searchReleaseCandidates(
+    let releaseGroupCandidates = await searchReleaseGroupCandidates(
       album.title,
       album.artistName,
-      localTracks.length,
     );
-    const threshold = Math.ceil(localTracks.length / 2);
 
-    for (const releaseMbid of candidates) {
-      const details = await lookupReleaseDetails(releaseMbid);
-      if (!details) continue;
+    if (releaseGroupCandidates.length === 0) {
+      const baseTitle = album.title.replace(/\s*\([^)]*\)\s*$/, "").trim();
+      if (baseTitle !== album.title) {
+        releaseGroupCandidates = await searchReleaseGroupCandidates(
+          baseTitle,
+          album.artistName,
+        );
+      }
+    }
 
-      const matched = matchLocalTracks(localTracks, details.tracks);
+    for (const releaseGroupMbid of releaseGroupCandidates) {
+      const externalAlbum = await lookupExternalAlbum(releaseGroupMbid);
+      if (!externalAlbum) continue;
+
+      const threshold = Math.ceil(
+        Math.min(localTracks.length, externalAlbum.tracks.length) / 2,
+      );
+      const matched = matchLocalTracks(localTracks, externalAlbum.tracks);
       const matchCount = matched.filter((m) => m.mbTrack !== undefined).length;
 
       if (matchCount < threshold) continue;
 
       const albumResult = updateUnresolvedAlbum(album.albumId, {
-        musicbrainzId: releaseMbid,
-        ...(details.releaseName ? { canonicalTitle: details.releaseName } : {}),
+        releaseGroupMbid: externalAlbum.releaseGroupMbid,
+        canonicalTitle: externalAlbum.title,
       });
 
       if (albumResult.changes > 0) {
-        void fetchAndStoreCoverArt(
-          album.albumId,
-          releaseMbid,
-          details.releaseGroupMbid ?? undefined,
-        );
+        void fetchAndStoreCoverArt(album.albumId, externalAlbum.releaseGroupMbid);
       }
 
       for (const { localId, mbTrack } of matched) {
@@ -141,11 +187,11 @@ async function runAlbumFirstPass(): Promise<void> {
         }
       }
 
-      if (details.artistMbid) {
+      if (externalAlbum.artistMbid) {
         resolveArtistMbid(
           album.artistId,
-          details.artistMbid,
-          details.artistName,
+          externalAlbum.artistMbid,
+          externalAlbum.artistName,
         );
       }
 
@@ -190,9 +236,11 @@ async function runRecordingSearchFallback(): Promise<void> {
   );
 
   for (const track of unresolved) {
-    const hint = track.albumTitle
+    const rawAlbumTitle = track.albumTitle ?? undefined;
+    const hintAlbumTitle = rawAlbumTitle?.replace(/\s*\([^)]*\)\s*$/, "").trim();
+    const hint = hintAlbumTitle
       ? {
-          albumTitle: track.albumTitle,
+          albumTitle: hintAlbumTitle,
           releaseYear: track.releaseYear ?? undefined,
         }
       : undefined;
@@ -203,12 +251,12 @@ async function runRecordingSearchFallback(): Promise<void> {
         musicbrainzId: match.recordingMbid,
         ...(match.mbTrackTitle ? { canonicalTitle: match.mbTrackTitle } : {}),
       });
-      if (match.releaseMbid && track.albumId) {
+      if (match.releaseGroupMbid && track.albumId) {
         const albumResult = updateUnresolvedAlbum(track.albumId, {
-          musicbrainzId: match.releaseMbid,
+          releaseGroupMbid: match.releaseGroupMbid,
         });
         if (albumResult.changes > 0) {
-          void fetchAndStoreCoverArt(track.albumId, match.releaseMbid);
+          void fetchAndStoreCoverArt(track.albumId, match.releaseGroupMbid);
         }
       }
       if (match.mbArtistId && track.artistId) {
@@ -223,19 +271,14 @@ async function runRecordingSearchFallback(): Promise<void> {
 
 async function fetchAndStoreCoverArt(
   albumId: string,
-  releaseMbid: string,
-  releaseGroupMbid?: string,
+  releaseGroupMbid: string | null | undefined,
 ): Promise<void> {
-  let url = await fetchCoverArtUrl(releaseMbid);
-  if (url === "" && releaseGroupMbid) {
-    url = await fetchCoverArtUrlForGroup(releaseGroupMbid);
-  }
-  if (releaseGroupMbid || url !== null) {
-    updateAlbumByAlbumId(albumId, {
-      ...(releaseGroupMbid ? { releaseGroupMbid } : {}),
-      ...(url !== null ? { coverArtUrl: url } : {}),
-    });
-  }
+  if (!releaseGroupMbid) return;
+  const url = await fetchCoverArtUrlForGroup(releaseGroupMbid);
+  updateAlbumByAlbumId(albumId, {
+    releaseGroupMbid,
+    ...(url !== null ? { coverArtUrl: url } : {}),
+  });
 }
 
 async function runCoverArtRetryPass(): Promise<void> {
@@ -245,24 +288,10 @@ async function runCoverArtRetryPass(): Promise<void> {
   console.log(`[resolver] cover art retry: ${needsRetry.length} albums`);
 
   for (const album of needsRetry) {
-    let rgMbid = album.releaseGroupMbid ?? undefined;
-
-    if (!rgMbid) {
-      const res = await throttledFetch(
-        `https://musicbrainz.org/ws/2/release/${album.musicbrainzId}?inc=release-groups&fmt=json`,
-      );
-      if (!res.ok) continue;
-      const data = (await res.json()) as { "release-group"?: { id: string } };
-      rgMbid = data["release-group"]?.id;
-      if (!rgMbid) continue;
-    }
-
-    const url = await fetchCoverArtUrlForGroup(rgMbid);
+    if (!album.releaseGroupMbid) continue;
+    const url = await fetchCoverArtUrlForGroup(album.releaseGroupMbid);
     if (url !== null && url !== "") {
-      updateAlbumByAlbumId(album.albumId, {
-        coverArtUrl: url,
-        releaseGroupMbid: rgMbid,
-      });
+      updateAlbumByAlbumId(album.albumId, { coverArtUrl: url });
     }
   }
 }
@@ -428,7 +457,12 @@ async function runAlbumBackfillFromTracks(): Promise<void> {
         data.releases.find(
           (r) => normalizeString(r.title) === normalizedAlbumTitle,
         ) ??
-        data.releases.find((r) => r.status === "Official");
+        data.releases.find(
+          (r) =>
+            r.status === "Official" &&
+            (normalizeString(r.title).includes(normalizedAlbumTitle) ||
+              normalizedAlbumTitle.includes(normalizeString(r.title))),
+        );
 
       if (candidate) {
         matchingRelease = candidate;
@@ -445,16 +479,11 @@ async function runAlbumBackfillFromTracks(): Promise<void> {
 
     const releaseGroupMbid = matchingRelease["release-group"]?.id;
     updateUnresolvedAlbum(album.albumId, {
-      musicbrainzId: matchingRelease.id,
       canonicalTitle: matchingRelease.title,
       ...(releaseGroupMbid ? { releaseGroupMbid } : {}),
     });
 
-    void fetchAndStoreCoverArt(
-      album.albumId,
-      matchingRelease.id,
-      releaseGroupMbid,
-    );
+    void fetchAndStoreCoverArt(album.albumId, releaseGroupMbid);
   }
 }
 

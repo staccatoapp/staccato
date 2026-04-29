@@ -138,7 +138,7 @@ export function getUnresolvedAlbums() {
     })
     .from(albums)
     .innerJoin(artists, eq(albums.artistId, artists.id))
-    .where(isNull(albums.musicbrainzId))
+    .where(isNull(albums.releaseGroupMbid))
     .all();
 }
 export type UnresolvedAlbumRow = ReturnType<typeof getUnresolvedAlbums>[number];
@@ -147,11 +147,10 @@ export function getResolvedAlbumsWithoutCoverArt() {
   return db
     .select({
       albumId: albums.id,
-      musicbrainzId: albums.musicbrainzId,
       releaseGroupMbid: albums.releaseGroupMbid,
     })
     .from(albums)
-    .where(and(isNotNull(albums.musicbrainzId), eq(albums.coverArtUrl, "")))
+    .where(and(isNotNull(albums.releaseGroupMbid), or(isNull(albums.coverArtUrl), eq(albums.coverArtUrl, ""))))
     .all();
 }
 export type ResolvedAlbumWithoutCoverArt = ReturnType<
@@ -166,11 +165,26 @@ export function getUnresolvedAlbumsContainingResolvedTracks() {
     })
     .from(albums)
     .innerJoin(tracks, eq(tracks.albumId, albums.id))
-    .where(and(isNull(albums.musicbrainzId), isNotNull(tracks.musicbrainzId)))
+    .where(and(isNull(albums.releaseGroupMbid), isNotNull(tracks.musicbrainzId)))
     .all();
 }
 export type UnresolvedAlbumContainingResolvedTracks = ReturnType<
   typeof getUnresolvedAlbumsContainingResolvedTracks
+>[number];
+
+export function getAlbumsNeedingTagResolution() {
+  return db
+    .select({
+      albumId: albums.id,
+      releaseMbid: albums.releaseMbid,
+      artistId: albums.artistId,
+    })
+    .from(albums)
+    .where(and(isNotNull(albums.releaseMbid), isNull(albums.releaseGroupMbid)))
+    .all();
+}
+export type AlbumNeedingTagResolution = ReturnType<
+  typeof getAlbumsNeedingTagResolution
 >[number];
 
 export function countAlbums(): number {
@@ -204,7 +218,7 @@ export function updateUnresolvedAlbum(
   albumUpdate: AlbumUpdate,
 ): RunResult {
   return updateAlbumBaseQuery(albumUpdate)
-    .where(and(eq(albums.id, albumId), isNull(albums.musicbrainzId)))
+    .where(and(eq(albums.id, albumId), isNull(albums.releaseGroupMbid)))
     .run();
 }
 

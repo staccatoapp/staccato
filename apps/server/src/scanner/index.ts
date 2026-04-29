@@ -44,9 +44,9 @@ export async function startScan(musicDir: string): Promise<void> {
   for (const filePath of files) {
     try {
       const tags = await extractTags(filePath);
-      const artistId = upsertArtist(tags.albumArtist ?? tags.artistName);
+      const artistId = upsertArtist(tags.albumArtist ?? tags.artistName, tags.mbAlbumArtistId);
       const albumId = tags.albumTitle
-        ? upsertAlbum(tags.albumTitle, artistId, tags.year)
+        ? upsertAlbum(tags.albumTitle, artistId, tags.year, tags.mbAlbumId)
         : null;
       upsertTrack(tags, filePath, artistId, albumId);
       scanProgress.scanned++;

@@ -19,7 +19,7 @@ export const albums = sqliteTable(
     artistId: text("artist_id")
       .notNull()
       .references(() => artists.id),
-    musicbrainzId: text("musicbrainz_id"),
+    releaseMbid: text("release_mbid"),
     releaseGroupMbid: text("release_group_mbid"),
     coverArtUrl: text("cover_art_url"),
     releaseYear: integer("release_year"),

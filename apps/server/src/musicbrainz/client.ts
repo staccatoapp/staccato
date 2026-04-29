@@ -5,6 +5,7 @@ import throttle from "p-throttle";
 export interface RecordingMatch {
   recordingMbid: string;
   releaseMbid: string | null;
+  releaseGroupMbid: string | null;
   score: number;
   mbArtistName: string | null;
   mbArtistId: string | null;
@@ -88,12 +89,6 @@ interface MBRecording {
 
 interface MBRecordingSearchResponse {
   recordings: MBRecording[];
-}
-
-interface MBReleaseCandidateMeta {
-  id: string;
-  status: string | undefined;
-  trackCount: number | undefined;
 }
 
 function parseReleaseYear(date?: string): number | null {
@@ -186,11 +181,16 @@ async function attemptRecordingSearch(
         );
         if (!matchesHint) continue;
       }
+      const bestReleaseMbid = recording.releases?.length
+        ? pickBestRelease(recording.releases, hint)
+        : null;
+      const bestRelease = recording.releases?.find(
+        (rel) => rel.id === bestReleaseMbid,
+      ) ?? recording.releases?.[0];
       return {
         recordingMbid: recording.id,
-        releaseMbid: recording.releases?.length
-          ? pickBestRelease(recording.releases, hint)
-          : null,
+        releaseMbid: bestReleaseMbid,
+        releaseGroupMbid: bestRelease?.["release-group"]?.id ?? null,
         score: recording.score,
         mbArtistName: recording["artist-credit"]?.[0]?.artist.name ?? null,
         mbArtistId: recording["artist-credit"]?.[0]?.artist.id ?? null,
@@ -379,70 +379,28 @@ export async function lookupReleaseDetails(
   }
 }
 
-export async function searchReleaseCandidates(
+export async function searchReleaseGroupCandidates(
   albumTitle: string,
   artistName: string,
-  localTrackCount?: number,
 ): Promise<string[]> {
-  let candidates = await searchReleaseMetas(
-    `artist:"${artistName}" AND release:"${albumTitle}"`,
-    80,
-  );
-  if (candidates.length === 0) {
-    candidates = await searchReleaseMetas(`release:"${albumTitle}"`, 90);
-  }
-  return sortReleaseCandidates(candidates, localTrackCount).map((c) => c.id);
-}
-
-function sortReleaseCandidates(
-  candidates: MBReleaseCandidateMeta[],
-  localTrackCount?: number,
-): MBReleaseCandidateMeta[] {
-  return [...candidates].sort((a, b) => {
-    const aOff = a.status === "Official" ? 0 : 1;
-    const bOff = b.status === "Official" ? 0 : 1;
-    if (aOff !== bOff) return aOff - bOff;
-    if (
-      localTrackCount !== undefined &&
-      a.trackCount !== undefined &&
-      b.trackCount !== undefined
-    ) {
-      return (
-        Math.abs(a.trackCount - localTrackCount) -
-        Math.abs(b.trackCount - localTrackCount)
-      );
-    }
-    return 0;
-  });
-}
-
-async function searchReleaseMetas(
-  queryStr: string,
-  minScore: number,
-): Promise<MBReleaseCandidateMeta[]> {
   try {
-    const query = new URLSearchParams({
-      query: queryStr,
+    const params = new URLSearchParams({
+      query: `artist:"${artistName}" AND releasegroup:"${albumTitle}"`,
+      inc: "releases+artist-credits",
       fmt: "json",
-      limit: "10",
+      limit: "5",
     });
-    const response = await throttledFetch(`${MB_BASE}/release?${query}`);
+    const response = await throttledFetch(`${MB_BASE}/release-group?${params}`);
     if (!response.ok) return [];
     const data = (await response.json()) as {
-      releases: Array<{
+      "release-groups": Array<{
         id: string;
         score: number;
-        status?: string;
-        "track-count"?: number;
       }>;
     };
-    return data.releases
-      .filter((r) => r.score >= minScore)
-      .map((r) => ({
-        id: r.id,
-        status: r.status,
-        trackCount: r["track-count"],
-      }));
+    return data["release-groups"]
+      .filter((rg) => rg.score >= 80)
+      .map((rg) => rg.id);
   } catch {
     return [];
   }
