@@ -1,8 +1,6 @@
 import fs from "node:fs";
 import { FastifyPluginAsync } from "fastify";
-import { db } from "../db/index.js";
-import { tracks } from "../db/schema/index.js";
-import { eq } from "drizzle-orm";
+import { getTrackForStream } from "../db/queries/tracks.js";
 
 const MIME: Record<string, string> = {
   mp3: "audio/mpeg",
@@ -16,13 +14,8 @@ const MIME: Record<string, string> = {
 
 const tracksRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/tracks/:id/stream", async (req, reply) => {
-    // 1. Look up track by ID
     const { id } = req.params as { id: string };
-    const track = db
-      .select({ filePath: tracks.filePath, fileFormat: tracks.fileFormat })
-      .from(tracks)
-      .where(eq(tracks.id, id))
-      .get();
+    const track = getTrackForStream(id);
 
     if (!track) return reply.status(404).send({ error: "Track not found" });
 
@@ -35,7 +28,9 @@ const tracksRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const fileSize = stat.size;
-    const contentType = (track.fileFormat && MIME[track.fileFormat]) ?? "application/octet-stream";
+    const contentType =
+      (track.fileFormat && MIME[track.fileFormat]) ??
+      "application/octet-stream";
     const rangeHeader = req.headers.range;
 
     // 3. Always advertise Range support

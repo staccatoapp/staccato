@@ -1,7 +1,13 @@
-export * from "./api/library.js";
-export * from "./api/resolution.js";
-export * from "./api/scan.js";
-export * from "./api/playback.js";
-export * from "./api/playlists.js";
-export * from "./api/settings.js";
-export * from "./api/search.js";
+export * from "./types/zod/api/settings.js";
+export * from "./types/zod/api/search.js";
+
+export * from "./types/typescript/artists.js";
+export * from "./types/typescript/albums.js";
+export * from "./types/typescript/tracks.js";
+export * from "./types/typescript/playback.js";
+export * from "./types/typescript/playlists.js";
+export * from "./types/typescript/settings.js";
+export * from "./types/typescript/scan.js";
+export * from "./types/typescript/library.js";
+
+export * from "./pagination.js";

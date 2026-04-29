@@ -1,55 +1,39 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { db } from "../db/index.js";
-import { playbackSession } from "../db/schema/playback-session.js";
-import { eq, inArray, sql } from "drizzle-orm";
 import {
-  albums,
-  artists,
-  listeningHistory,
-  tracks,
-  userSettings,
-} from "../db/schema/index.js";
+  getOrCreatePlaybackSession,
+  updatePlaybackSession,
+} from "../db/queries/playback-session.js";
+import { getPlaybackTracksByIds, getTrackForScrobble } from "../db/queries/tracks.js";
+import { insertListenEvent } from "../db/queries/listening-history.js";
+import { getUserListenbrainzToken } from "../db/queries/settings.js";
 import { submitListen } from "../listenbrainz/client.js";
 
 const playbackRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/session", async (req) => {
-    const userId = req.userId;
-    const session = await getSessionWithTrackDetails(userId);
-    return session;
+    return getSessionWithTrackDetails(req.userId);
   });
 
   // TODO - relying on index for order is bad, e.g. if we are listening to 4th song and then add 2 songs before the queue. fractional indexing + separate table queue items would be better. refactor one day
-  fastify.post("/session/queue", async (req, res) => {
+  fastify.post("/session/queue", async (req) => {
     const userId = req.userId;
     const { trackIds } = z
       .object({ trackIds: z.array(z.string()) })
       .parse(req.body);
-    const session = await getOrCreateSession(userId);
+    const session = getOrCreatePlaybackSession(userId);
     const updatedTrackQueue = session.trackQueue.concat(trackIds); // TODO - not atomic, doesn't validate trackIds, only appends. this will need work
-    db.update(playbackSession)
-      .set({ trackQueue: updatedTrackQueue })
-      .where(eq(playbackSession.userId, userId))
-      .run();
-
-    const updatedSession = await getSessionWithTrackDetails(userId); // TODO - another round call for no good reason
-    return updatedSession;
+    updatePlaybackSession(userId, { trackQueue: updatedTrackQueue });
+    return getSessionWithTrackDetails(userId); // TODO - another round call for no good reason
   });
 
   // TODO - relying on index for order is bad, e.g. if we are listening to 4th song and then add 2 songs before the queue. fractional indexing + separate table queue items would be better. refactor one day
-  fastify.put("/session/queue", async (req, res) => {
+  fastify.put("/session/queue", async (req) => {
     const userId = req.userId;
     const { trackIds } = z
       .object({ trackIds: z.array(z.string()) })
       .parse(req.body);
-    const updatedTrackQueue = Array.from(trackIds);
-    db.update(playbackSession)
-      .set({ trackQueue: updatedTrackQueue })
-      .where(eq(playbackSession.userId, userId))
-      .run();
-
-    const updatedSession = await getSessionWithTrackDetails(userId); // TODO - another round call for no good reason
-    return updatedSession;
+    updatePlaybackSession(userId, { trackQueue: Array.from(trackIds) });
+    return getSessionWithTrackDetails(userId); // TODO - another round call for no good reason
   });
 
   fastify.put("/session/state", async (req) => {
@@ -91,19 +75,17 @@ const playbackRoutes: FastifyPluginAsync = async (fastify) => {
       );
       listenEventCreated = true;
     }
-    db.update(playbackSession)
-      .set({
-        isPlaying,
-        currentTrackIndex,
-        currentTrackPositionInSeconds,
-        currentTrackAccumulatedPlayTimeInSeconds,
-        currentTrackListenEventCreated:
-          currentTrackListenEventCreated ?? listenEventCreated,
-      })
-      .where(eq(playbackSession.userId, userId))
-      .run();
 
-    return await getSessionWithTrackDetails(userId); // TODO - can just return update result. whole area needs improvement and no performance issues rn so skipping until later
+    updatePlaybackSession(userId, {
+      isPlaying,
+      currentTrackIndex,
+      currentTrackPositionInSeconds,
+      currentTrackAccumulatedPlayTimeInSeconds,
+      currentTrackListenEventCreated:
+        currentTrackListenEventCreated ?? listenEventCreated,
+    });
+
+    return getSessionWithTrackDetails(userId); // TODO - can just return update result. whole area needs improvement and no performance issues rn so skipping until later
   });
 
   fastify.put("/session/play", async (req) => {
@@ -115,66 +97,23 @@ const playbackRoutes: FastifyPluginAsync = async (fastify) => {
       })
       .parse(req.body);
 
-    await getOrCreateSession(userId);
-    db.transaction(() => {
-      db.update(playbackSession)
-        .set({
-          trackQueue: trackIds,
-          currentTrackIndex: startIndex,
-          currentTrackPositionInSeconds: 0,
-          currentTrackAccumulatedPlayTimeInSeconds: 0,
-          currentTrackListenEventCreated: false,
-          isPlaying: true,
-        })
-        .where(eq(playbackSession.userId, userId))
-        .run();
+    getOrCreatePlaybackSession(userId);
+    updatePlaybackSession(userId, {
+      trackQueue: trackIds,
+      currentTrackIndex: startIndex,
+      currentTrackPositionInSeconds: 0,
+      currentTrackAccumulatedPlayTimeInSeconds: 0,
+      currentTrackListenEventCreated: false,
+      isPlaying: true,
     });
 
-    return await getSessionWithTrackDetails(userId);
+    return getSessionWithTrackDetails(userId);
   });
 };
 
-// TODO - should probably split out db queries into a separate service
-async function getOrCreateSession(userId: string) {
-  return (
-    db // TODO - should probably make all other db queries async instead of using get
-      .insert(playbackSession)
-      .values({
-        userId,
-        trackQueue: [],
-      })
-      // no op update - effectively a get-or-create
-      .onConflictDoUpdate({
-        target: playbackSession.userId,
-        set: {
-          userId,
-        },
-      })
-      .returning()
-      .get()
-  );
-}
-
 async function getSessionWithTrackDetails(userId: string) {
-  const session = await getOrCreateSession(userId);
-  const sessionTracks =
-    session.trackQueue.length === 0
-      ? []
-      : db
-          .select({
-            id: tracks.id,
-            title: sql<string>`COALESCE(${tracks.canonicalTitle}, ${tracks.title})`,
-            trackNumber: tracks.trackNumber,
-            discNumber: tracks.discNumber,
-            artistName: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
-            coverArtUrl: albums.coverArtUrl,
-            durationSeconds: tracks.durationSeconds,
-          })
-          .from(tracks)
-          .innerJoin(albums, eq(tracks.albumId, albums.id))
-          .innerJoin(artists, eq(tracks.artistId, artists.id))
-          .where(inArray(tracks.id, session.trackQueue))
-          .all();
+  const session = getOrCreatePlaybackSession(userId);
+  const sessionTracks = getPlaybackTracksByIds(session.trackQueue);
 
   const orderedTracks = session.trackQueue
     .map((id) => sessionTracks.find((t) => t.id === id))
@@ -196,23 +135,10 @@ async function getSessionWithTrackDetails(userId: string) {
 async function addListenEvent(userId: string, trackId: string) {
   if (!trackId) return;
 
-  const insertedListen = db
-    .insert(listeningHistory)
-    .values({
-      userId,
-      trackId,
-      scrobbledToListenbrainz: true,
-    })
-    .returning()
-    .get();
+  const insertedListen = insertListenEvent(userId, trackId);
 
-  const currentUserSettings = db
-    .select({ listenbrainzToken: userSettings.listenbrainzToken })
-    .from(userSettings)
-    .where(eq(userSettings.userId, userId))
-    .get();
-
-  if (!currentUserSettings?.listenbrainzToken) {
+  const listenbrainzToken = getUserListenbrainzToken(userId);
+  if (!listenbrainzToken) {
     console.warn(
       "Could not submit listen to ListenBrainz - no token found for user",
       userId,
@@ -220,16 +146,7 @@ async function addListenEvent(userId: string, trackId: string) {
     return;
   }
 
-  const track = db
-    .select({
-      title: sql<string>`COALESCE(${tracks.canonicalTitle}, ${tracks.title})`,
-      artistName: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
-      trackMbid: tracks.musicbrainzId,
-    })
-    .from(tracks)
-    .innerJoin(artists, eq(tracks.artistId, artists.id))
-    .where(eq(tracks.id, trackId))
-    .get();
+  const track = getTrackForScrobble(trackId);
 
   if (!track?.artistName || !track?.title) {
     console.warn(
@@ -240,12 +157,12 @@ async function addListenEvent(userId: string, trackId: string) {
   }
 
   await submitListen({
-    token: currentUserSettings.listenbrainzToken,
+    token: listenbrainzToken,
     listenType: "single",
-    artistName: track?.artistName,
-    trackName: track?.title,
+    artistName: track.artistName,
+    trackName: track.title,
     listenedAt: insertedListen.listenedAt,
-    trackMbid: track?.trackMbid,
+    trackMbid: track.musicbrainzId,
   });
 }
 

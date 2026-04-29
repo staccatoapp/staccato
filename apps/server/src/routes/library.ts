@@ -1,141 +1,80 @@
 import { FastifyPluginAsync } from "fastify";
-import { eq, asc, sql, or, like } from "drizzle-orm";
-import { db } from "../db/index.js";
-import { artists, albums, tracks } from "../db/schema/index.js";
-
-const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 200;
+import { sql } from "drizzle-orm";
+import { parsePagination } from "@staccato/shared";
+import {
+  countArtists,
+  getArtists,
+  searchArtists,
+} from "../db/queries/artists.js";
+import {
+  countAlbums,
+  getAlbumsWithArtistDetails,
+  getAlbumWithArtistDetails,
+  searchAlbums,
+} from "../db/queries/albums.js";
+import {
+  countTracks,
+  getLibraryTracks,
+  getTracksInAlbum,
+} from "../db/queries/tracks.js";
+import { db } from "../db/client.js";
 
 const libraryRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/artists", async (request) => {
-    const { limit, offset } = parsePagination(
+    const paginationOptions = parsePagination(
       request.query as Record<string, unknown>,
     );
 
-    const items = db
-      .select({
-        id: artists.id,
-        name: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
-        imageUrl: artists.imageUrl,
-        createdAt: artists.createdAt,
-      })
-      .from(artists)
-      .orderBy(asc(sql`COALESCE(${artists.canonicalName}, ${artists.name})`))
-      .limit(limit)
-      .offset(offset)
-      .all();
+    const items = getArtists(paginationOptions);
+    const total = countArtists();
 
-    const { total } = db
-      .select({ total: sql<number>`count(*)`.mapWith(Number) })
-      .from(artists)
-      .get()!;
-
-    return { items, total };
+    return {
+      items: items.map((r) => ({
+        ...r,
+        createdAt: r.createdAt?.toISOString() ?? null,
+      })),
+      total,
+    };
   });
 
   fastify.get("/albums", async (request) => {
-    const { limit, offset } = parsePagination(
+    const paginationOptions = parsePagination(
       request.query as Record<string, unknown>,
     );
 
-    const items = db
-      .select({
-        id: albums.id,
-        title: sql<string>`COALESCE(${albums.canonicalTitle}, ${albums.title})`,
-        artistId: albums.artistId,
-        artistName: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
-        releaseYear: albums.releaseYear,
-        coverArtUrl: albums.coverArtUrl,
-        createdAt: albums.createdAt,
-      })
-      .from(albums)
-      .innerJoin(artists, eq(albums.artistId, artists.id))
-      .orderBy(
-        asc(sql`COALESCE(${artists.canonicalName}, ${artists.name})`),
-        asc(sql`COALESCE(${albums.canonicalTitle}, ${albums.title})`),
-      )
-      .limit(limit)
-      .offset(offset)
-      .all();
+    const items = getAlbumsWithArtistDetails(paginationOptions);
+    const total = countAlbums();
 
-    const { total } = db
-      .select({ total: sql<number>`count(*)`.mapWith(Number) })
-      .from(albums)
-      .get()!;
-
-    return { items, total };
+    return {
+      items: items.map((r) => ({
+        ...r,
+        createdAt: r.createdAt?.toISOString() ?? null,
+      })),
+      total,
+    };
   });
 
   fastify.get("/albums/:albumId", async (request, reply) => {
     const { albumId } = request.params as { albumId: string };
 
-    const album = db
-      .select({
-        id: albums.id,
-        title: sql<string>`COALESCE(${albums.canonicalTitle}, ${albums.title})`,
-        artistId: albums.artistId,
-        artistName: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
-        releaseYear: albums.releaseYear,
-        coverArtUrl: albums.coverArtUrl,
-        createdAt: albums.createdAt,
-      })
-      .from(albums)
-      .innerJoin(artists, eq(albums.artistId, artists.id))
-      .where(eq(albums.id, albumId))
-      .get();
+    const album = getAlbumWithArtistDetails(albumId);
 
     if (!album) return reply.status(404).send({ error: "Album not found" });
 
-    const albumTracks = db
-      .select({
-        id: tracks.id,
-        title: tracks.title,
-        trackNumber: tracks.trackNumber,
-        discNumber: tracks.discNumber,
-        durationSeconds: tracks.durationSeconds,
-      })
-      .from(tracks)
-      .where(eq(tracks.albumId, albumId))
-      .orderBy(asc(tracks.discNumber), asc(tracks.trackNumber))
-      .all();
-
-    return { album, tracks: albumTracks };
+    const albumTracks = getTracksInAlbum(albumId);
+    return {
+      album: { ...album, createdAt: album.createdAt?.toISOString() ?? null },
+      tracks: albumTracks,
+    };
   });
 
   fastify.get("/tracks", async (request) => {
-    const { limit, offset } = parsePagination(
+    const paginationOptions = parsePagination(
       request.query as Record<string, unknown>,
     );
 
-    const items = db
-      .select({
-        id: tracks.id,
-        title: sql<string>`COALESCE(${tracks.canonicalTitle}, ${tracks.title})`,
-        artistId: tracks.artistId,
-        artistName: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
-        albumId: tracks.albumId,
-        albumTitle: sql<string>`COALESCE(${albums.canonicalTitle}, ${albums.title})`,
-        coverArtUrl: albums.coverArtUrl,
-        durationSeconds: tracks.durationSeconds,
-        fileFormat: tracks.fileFormat,
-      })
-      .from(tracks)
-      .innerJoin(artists, eq(tracks.artistId, artists.id))
-      .leftJoin(albums, eq(tracks.albumId, albums.id))
-      .orderBy(
-        asc(sql`COALESCE(${artists.canonicalName}, ${artists.name})`),
-        asc(sql`COALESCE(${albums.canonicalTitle}, ${albums.title})`),
-        asc(tracks.discNumber),
-        asc(tracks.trackNumber),
-      )
-      .limit(limit)
-      .offset(offset)
-      .all();
-
-    const { total } = db
-      .select({ total: sql<number>`count(*)`.mapWith(Number) })
-      .from(tracks)
-      .get()!;
+    const items = getLibraryTracks(paginationOptions);
+    const total = countTracks();
 
     return { items, total };
   });
@@ -147,44 +86,10 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
     const term = q.trim();
     const pattern = `%${term}%`;
 
-    const artistResults = db
-      .select({
-        id: artists.id,
-        name: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
-        imageUrl: artists.imageUrl,
-      })
-      .from(artists)
-      .where(
-        or(like(artists.name, pattern), like(artists.canonicalName, pattern)),
-      )
-      .limit(5)
-      .all();
+    const artistResults = searchArtists(pattern, 5);
+    const albumResults = searchAlbums(pattern, 8);
 
-    // Albums — LIKE on album title or artist name (tag and canonical)
-    const albumResults = db
-      .select({
-        id: albums.id,
-        title: sql<string>`COALESCE(${albums.canonicalTitle}, ${albums.title})`,
-        artistId: albums.artistId,
-        artistName: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
-        releaseYear: albums.releaseYear,
-        coverArtUrl: albums.coverArtUrl,
-        createdAt: albums.createdAt,
-      })
-      .from(albums)
-      .innerJoin(artists, eq(albums.artistId, artists.id))
-      .where(
-        or(
-          like(albums.title, pattern),
-          like(albums.canonicalTitle, pattern),
-          like(artists.name, pattern),
-          like(artists.canonicalName, pattern),
-        ),
-      )
-      .limit(8)
-      .all();
-
-    // Tracks — FTS5 prefix match (tokenisation + relevance ranking)
+    // FTS5 prefix match — Drizzle doesn't support FTS, raw SQL stays inline
     const ftsQuery = buildTracksFtsQuery(term);
     const trackRows = db.all(
       ftsQuery
@@ -251,12 +156,6 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 };
-
-function parsePagination(query: { limit?: unknown; offset?: unknown }) {
-  const limit = Math.min(Number(query.limit) || DEFAULT_LIMIT, MAX_LIMIT);
-  const offset = Number(query.offset) || 0;
-  return { limit, offset };
-}
 
 function buildTracksFtsQuery(term: string): string | null {
   const tokens = term.match(/[\p{L}\p{N}]+/gu) ?? [];

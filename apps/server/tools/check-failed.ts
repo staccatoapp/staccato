@@ -1,5 +1,5 @@
 import { isNull, eq, and } from "drizzle-orm";
-import { db } from "../src/db/index.js";
+import { db } from "../src/db/client.js";
 import { tracks } from "../src/db/schema/tracks.js";
 import { albums } from "../src/db/schema/albums.js";
 import { artists } from "../src/db/schema/artists.js";

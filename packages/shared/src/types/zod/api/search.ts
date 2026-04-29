@@ -1,41 +1,5 @@
 import { z } from "zod";
 
-export const ArtistSearchResultSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  imageUrl: z.string().nullable(),
-});
-export type ArtistSearchResult = z.infer<typeof ArtistSearchResultSchema>;
-
-export const AlbumSearchResultSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  artistId: z.string(),
-  artistName: z.string(),
-  releaseYear: z.number().nullable(),
-  coverArtUrl: z.string().nullable(),
-  createdAt: z.string().nullable(),
-});
-export type AlbumSearchResult = z.infer<typeof AlbumSearchResultSchema>;
-
-export const TrackSearchResultSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  artistName: z.string(),
-  albumId: z.string().nullable(),
-  albumTitle: z.string().nullable(),
-  durationSeconds: z.number().nullable(),
-  coverArtUrl: z.string().nullable(),
-});
-export type TrackSearchResult = z.infer<typeof TrackSearchResultSchema>;
-
-export const LibrarySearchResultsSchema = z.object({
-  artists: z.array(ArtistSearchResultSchema),
-  albums: z.array(AlbumSearchResultSchema),
-  tracks: z.array(TrackSearchResultSchema),
-});
-export type LibrarySearchResults = z.infer<typeof LibrarySearchResultsSchema>;
-
 export const ExternalRecordingSchema = z.object({
   recordingMbid: z.string(),
   title: z.string(),

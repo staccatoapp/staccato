@@ -5,9 +5,7 @@ import {
   searchRecordingsByQuery,
   searchReleasesByQuery,
 } from "../musicbrainz/client.js";
-import { db } from "../db/index.js";
-import { tracks } from "../db/schema/index.js";
-import { inArray } from "drizzle-orm";
+import { getLocalTrackMbidsByMbids } from "../db/queries/tracks.js";
 
 const searchRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/external", async (request) => {
@@ -40,16 +38,7 @@ const searchRoutes: FastifyPluginAsync = async (fastify) => {
         limit,
       );
       const mbids = recordings.map((r) => r.recordingMbid);
-      const localMbids = new Set(
-        mbids.length > 0
-          ? db
-              .select({ musicbrainzId: tracks.musicbrainzId })
-              .from(tracks)
-              .where(inArray(tracks.musicbrainzId, mbids))
-              .all()
-              .map((r) => r.musicbrainzId)
-          : [],
-      );
+      const localMbids = new Set(getLocalTrackMbidsByMbids(mbids));
       return {
         recordings: recordings.map((r) => ({
           ...r,

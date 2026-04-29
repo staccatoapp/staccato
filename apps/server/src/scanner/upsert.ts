@@ -1,50 +1,34 @@
 import { and, eq, sql } from "drizzle-orm";
-import { db } from "../db/index.js";
+import { db } from "../db/client.js";
 import { artists, albums, tracks } from "../db/schema/index.js";
 import { normalizeString } from "../musicbrainz/client.js";
 import type { TrackTags } from "./tags.js";
+import {
+  getTrackByFilePath,
+  getTrackSiblingInAlbum,
+  getTrackByArtist,
+} from "../db/queries/tracks.js";
+import { getAlbumByArtist, deleteAlbum } from "../db/queries/albums.js";
+import { deleteArtist } from "../db/queries/artists.js";
 
 export function deleteTrackByPath(filePath: string): void {
-  const track = db
-    .select({
-      id: tracks.id,
-      albumId: tracks.albumId,
-      artistId: tracks.artistId,
-    })
-    .from(tracks)
-    .where(eq(tracks.filePath, filePath))
-    .get();
+  const track = getTrackByFilePath(filePath);
   if (!track) return;
 
   db.run(sql`DELETE FROM tracks_fts WHERE track_id = ${track.id}`);
   db.delete(tracks).where(eq(tracks.id, track.id)).run();
 
   if (track.albumId) {
-    const sibling = db
-      .select({ id: tracks.id })
-      .from(tracks)
-      .where(eq(tracks.albumId, track.albumId))
-      .limit(1)
-      .get();
+    const sibling = getTrackSiblingInAlbum(track.albumId);
     if (!sibling) {
-      db.delete(albums).where(eq(albums.id, track.albumId)).run();
+      deleteAlbum(track.albumId);
     }
   }
 
-  const artistTrack = db
-    .select({ id: tracks.id })
-    .from(tracks)
-    .where(eq(tracks.artistId, track.artistId))
-    .limit(1)
-    .get();
-  const artistAlbum = db
-    .select({ id: albums.id })
-    .from(albums)
-    .where(eq(albums.artistId, track.artistId))
-    .limit(1)
-    .get();
+  const artistTrack = getTrackByArtist(track.artistId);
+  const artistAlbum = getAlbumByArtist(track.artistId);
   if (!artistTrack && !artistAlbum) {
-    db.delete(artists).where(eq(artists.id, track.artistId)).run();
+    deleteArtist(track.artistId);
   }
 }
 

@@ -1,10 +1,9 @@
-import { and, eq, notExists } from "drizzle-orm";
-import { db } from "../db/index.js";
-import { artists, albums, tracks } from "../db/schema/index.js";
 import { walkAudioFiles } from "./walk.js";
 import { extractTags } from "./tags.js";
 import { upsertArtist, upsertAlbum, upsertTrack } from "./upsert.js";
 import { startResolution } from "../resolver/index.js";
+import { deleteOrphanAlbums } from "../db/queries/albums.js";
+import { deleteOrphanArtists } from "../db/queries/artists.js";
 
 export interface ScanProgress {
   running: boolean;
@@ -25,38 +24,8 @@ export let scanProgress: ScanProgress = {
 };
 
 function cleanupOrphans(): void {
-  db.delete(albums)
-    .where(
-      notExists(
-        db
-          .select({ id: tracks.id })
-          .from(tracks)
-          .where(eq(tracks.albumId, albums.id))
-          .limit(1),
-      ),
-    )
-    .run();
-
-  db.delete(artists)
-    .where(
-      and(
-        notExists(
-          db
-            .select({ id: albums.id })
-            .from(albums)
-            .where(eq(albums.artistId, artists.id))
-            .limit(1),
-        ),
-        notExists(
-          db
-            .select({ id: tracks.id })
-            .from(tracks)
-            .where(eq(tracks.artistId, artists.id))
-            .limit(1),
-        ),
-      ),
-    )
-    .run();
+  deleteOrphanAlbums();
+  deleteOrphanArtists();
 }
 
 export async function startScan(musicDir: string): Promise<void> {
