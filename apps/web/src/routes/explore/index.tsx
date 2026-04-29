@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Music2, Pause, Play } from "lucide-react";
@@ -6,6 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import type { ExternalSearchResults } from "@staccato/shared";
 import { AlbumCard } from "@/components/music/AlbumCard";
+import { ExploreEmptyState } from "@/components/explore/ExploreEmptyState";
+import { RecommendationTile } from "@/components/explore/RecommendationTile";
+import { generateAlbumGradient } from "@/lib/music";
 
 export const Route = createFileRoute("/explore/")({ component: ExplorePage });
 
@@ -49,6 +52,7 @@ function buildParams(
 }
 
 function ExplorePage() {
+  const navigate = useNavigate();
   const audioRef = useRef<HTMLAudioElement>(null);
   const [tab, setTab] = useState<Tab>("tracks");
   const [fields, setFields] = useState({ track: "", album: "", artist: "" });
@@ -112,6 +116,11 @@ function ExplorePage() {
     audio.addEventListener("ended", onEnded);
     return () => audio.removeEventListener("ended", onEnded);
   }, []);
+
+  const isSearchActive =
+    fields.track.length > 0 ||
+    fields.album.length > 0 ||
+    fields.artist.length > 0;
 
   const searched = hasMinLength(tab, debounced);
   const hasResults =
@@ -339,6 +348,28 @@ function ExplorePage() {
           )}
         </TabsContent>
       </Tabs>
+
+      {!isSearchActive && (
+        <section className="mt-10">
+          <RecommendationTile
+            rec={{
+              id: "test",
+              name: "test",
+              description: "test",
+              tag: "tag",
+              trackCount: 0,
+              gradient: generateAlbumGradient("", ""),
+              accentColor: "primary",
+            }}
+            onClick={() =>
+              navigate({
+                to: "/explore/recommendations/$recId",
+                params: { recId: "e0fdb431-0109-420d-8a37-f99eaeb4d671" },
+              })
+            }
+          ></RecommendationTile>
+        </section>
+      )}
     </div>
   );
 }

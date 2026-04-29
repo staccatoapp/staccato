@@ -9,3 +9,4 @@ export * from "./users.js";
 export * from "./playback-session.js";
 export * from "./user-settings.js";
 export * from "./preview-cache.js";
+export * from "./track-lyrics.js";

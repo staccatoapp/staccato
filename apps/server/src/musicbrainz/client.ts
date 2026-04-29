@@ -1,6 +1,7 @@
 // TODO - desperately needs cleaning up and splitting out, file is messy, but i cba right now
 
 import throttle from "p-throttle";
+import { APP_USER_AGENT } from "../constants.js";
 
 export interface RecordingMatch {
   recordingMbid: string;
@@ -98,8 +99,6 @@ function parseReleaseYear(date?: string): number | null {
 }
 
 const MB_BASE = "https://musicbrainz.org/ws/2";
-const MB_USER_AGENT =
-  "Staccato/0.1.0 (https://github.com/staccatoapp/staccato)";
 
 const MB_INTERVAL_MS = parseInt(process.env.MB_RATE_LIMIT_MS ?? "1100", 10);
 
@@ -108,7 +107,7 @@ export const throttledFetch = throttle({ limit: 1, interval: MB_INTERVAL_MS })(
     fetch(url, {
       ...req,
       headers: {
-        "User-Agent": MB_USER_AGENT,
+        "User-Agent": APP_USER_AGENT,
         Accept: "application/json",
         ...req?.headers,
       },

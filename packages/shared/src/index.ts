@@ -10,4 +10,6 @@ export * from "./types/typescript/settings.js";
 export * from "./types/typescript/scan.js";
 export * from "./types/typescript/library.js";
 
+export * from "./types/typescript/lyrics.js";
+
 export * from "./pagination.js";

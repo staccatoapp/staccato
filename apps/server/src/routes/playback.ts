@@ -8,6 +8,13 @@ import { getPlaybackTracksByIds, getTrackForScrobble } from "../db/queries/track
 import { insertListenEvent } from "../db/queries/listening-history.js";
 import { getUserListenbrainzToken } from "../db/queries/settings.js";
 import { submitListen } from "../listenbrainz/client.js";
+import {
+  getLyricsByTrackId,
+  getTrackMetaForLyrics,
+  insertLyrics,
+} from "../db/queries/track-lyrics.js";
+import { fetchLyrics, parseSyncedLyrics } from "../lyrics/client.js";
+import type { TrackLyrics } from "@staccato/shared";
 
 const playbackRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/session", async (req) => {
@@ -108,6 +115,44 @@ const playbackRoutes: FastifyPluginAsync = async (fastify) => {
     });
 
     return getSessionWithTrackDetails(userId);
+  });
+
+  fastify.get("/lyrics", async (req, reply) => {
+    const { trackId } = z.object({ trackId: z.string() }).parse(req.query);
+
+    let row = getLyricsByTrackId(trackId);
+
+    if (!row) {
+      const meta = getTrackMetaForLyrics(trackId);
+      if (!meta) return reply.status(204).send();
+
+      const fetched = await fetchLyrics({
+        artistName: meta.artistName,
+        trackName: meta.trackTitle,
+        albumName: meta.albumTitle ?? "",
+        durationSeconds: meta.durationSeconds ?? 0,
+      });
+
+      row = insertLyrics({
+        trackId,
+        instrumental: fetched?.instrumental ?? false,
+        plainLyrics: fetched?.plainLyrics ?? null,
+        syncedLyrics: fetched?.syncedLyrics ?? null,
+      });
+    }
+
+    if (row.instrumental || (!row.plainLyrics && !row.syncedLyrics)) {
+      return reply.status(204).send();
+    }
+
+    const result: TrackLyrics = {
+      trackId,
+      instrumental: row.instrumental,
+      plainLyrics: row.plainLyrics ?? null,
+      syncedLyrics: row.syncedLyrics ? parseSyncedLyrics(row.syncedLyrics) : null,
+    };
+
+    return result;
   });
 };
 

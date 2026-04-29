@@ -1,11 +1,12 @@
 // TODO - fix zod typing basically everywhere (this file is a particularly bad offender). need to stop being lazy with it
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import type { PlaybackSession } from "@staccato/shared";
+import type { PlaybackSession, TrackLyrics } from "@staccato/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Music2, Pause, Play, SkipBack, SkipForward } from "lucide-react";
+import { Mic2, MicOff, Music2, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { formatTime } from "@/lib/music";
+import { LyricsPanel } from "./lyrics-panel";
 
 function getSliderValue(
   value: number | readonly number[],
@@ -26,6 +27,7 @@ function PlayerBar() {
   const [currentTime, setCurrentTime] = useState(0);
   const [seekDisplay, setSeekDisplay] = useState(0);
   const [volume, setVolume] = useState(80); // TODO - persist between sessions, no need for db persistence
+  const [lyricsOpen, setLyricsOpen] = useState(false);
 
   const { data: playbackSession } = useQuery({
     queryKey: ["playback-session"],
@@ -40,6 +42,20 @@ function PlayerBar() {
 
   const currentTrack =
     playbackSession?.trackQueue?.[playbackSession?.currentTrackIndex];
+
+  const { data: lyricsData } = useQuery<TrackLyrics | null>({
+    queryKey: ["lyrics", currentTrack?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/playback/lyrics?trackId=${currentTrack!.id}`);
+      if (res.status === 204) return null;
+      if (!res.ok) return null;
+      return res.json() as Promise<TrackLyrics>;
+    },
+    enabled: !!currentTrack?.id,
+    staleTime: Infinity,
+  });
+
+  const lyricsAvailable = lyricsData !== undefined && lyricsData !== null;
 
   // Keep currentTrackIndexRef in sync
   useEffect(() => {
@@ -309,26 +325,37 @@ function PlayerBar() {
     setSeekDisplay(v);
   };
 
-  const handleSeekCommitted = (value: number | readonly number[]) => {
-    const seekTo = getSliderValue(value, seekDisplay);
-    isSeekingRef.current = false;
-    lastTrackedAudioTimeRef.current = seekTo;
-    if (audioRef.current) audioRef.current.currentTime = seekTo;
-    setCurrentTime(seekTo);
-    setSeekDisplay(seekTo);
+  const seekToTime = (time: number) => {
+    lastTrackedAudioTimeRef.current = time;
+    if (audioRef.current) audioRef.current.currentTime = time;
+    setCurrentTime(time);
+    setSeekDisplay(time);
     stateMutation.mutate({
       isPlaying: playbackSession?.isPlaying ?? false,
       currentTrackIndex: playbackSession?.currentTrackIndex ?? 0,
-      currentTrackPositionInSeconds: Math.floor(seekTo),
+      currentTrackPositionInSeconds: Math.floor(time),
       currentTrackAccumulatedPlayTimeInSeconds: Math.floor(
         accumulatedPlayTimeRef.current,
       ),
     });
   };
 
+  const handleSeekCommitted = (value: number | readonly number[]) => {
+    isSeekingRef.current = false;
+    seekToTime(getSliderValue(value, seekDisplay));
+  };
+
   return (
     <>
       <audio ref={audioRef} />
+      <LyricsPanel
+        track={currentTrack}
+        currentTime={currentTime}
+        isOpen={lyricsOpen}
+        onClose={() => setLyricsOpen(false)}
+        onSeek={seekToTime}
+        lyrics={lyricsData ?? null}
+      />
       {playbackSession && playbackSession.trackQueue.length > 0 && (
         <div className="fixed bottom-0 left-0 right-0 h-20 border-t bg-background flex items-center px-4">
           {/* Left: Track info */}
@@ -392,7 +419,28 @@ function PlayerBar() {
             </div>
           </div>
 
-          <div className="flex flex-col items-center w-1/6" />
+          {/* Right extras: Lyrics button */}
+          <div className="flex flex-col items-center justify-center w-1/6">
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={!lyricsAvailable}
+              onClick={() => setLyricsOpen((o) => !o)}
+              className={
+                lyricsOpen && lyricsAvailable
+                  ? "bg-primary/15 text-primary"
+                  : !lyricsAvailable
+                    ? "opacity-40 cursor-not-allowed"
+                    : ""
+              }
+            >
+              {lyricsAvailable ? (
+                <Mic2 className="w-4 h-4" />
+              ) : (
+                <MicOff className="w-4 h-4" />
+              )}
+            </Button>
+          </div>
 
           {/* Right: Volume */}
           <div className="flex justify-end items-center gap-2 w-1/6">
