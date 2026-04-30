@@ -6,9 +6,17 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import type { ExternalSearchResults } from "@staccato/shared";
 import { AlbumCard } from "@/components/music/AlbumCard";
-import { ExploreEmptyState } from "@/components/explore/ExploreEmptyState";
 import { RecommendationTile } from "@/components/explore/RecommendationTile";
+import {
+  RecommendedTrackListHeader,
+  RecommendedTrackRow,
+  type TrackRowData,
+} from "@/components/explore/RecommendedTrackRow";
 import { generateAlbumGradient } from "@/lib/music";
+import {
+  useRecommendedPlaylists,
+  useRecommendedTracks,
+} from "@/hooks/useRecommendations";
 
 export const Route = createFileRoute("/explore/")({ component: ExplorePage });
 
@@ -58,6 +66,13 @@ function ExplorePage() {
   const [fields, setFields] = useState({ track: "", album: "", artist: "" });
   const [debounced, setDebounced] = useState(fields);
   const [playingMbid, setPlayingMbid] = useState<string | null>(null);
+  const [recTrackStates, setRecTrackStates] = useState<Record<string, boolean>>({});
+  const [recDismissed, setRecDismissed] = useState<Set<string>>(new Set());
+
+  const { data: recTracks, isLoading: recTracksLoading } =
+    useRecommendedTracks();
+  const { data: recPlaylists, isLoading: recPlaylistsLoading } =
+    useRecommendedPlaylists();
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(fields), 300);
@@ -107,6 +122,11 @@ function ExplorePage() {
     audio.src = `/api/preview/${recordingMbid}/stream?${params}`;
     audio.play().catch(() => {});
     setPlayingMbid(recordingMbid);
+  };
+
+  const handleRecommendedTrackPlay = (track: TrackRowData) => {
+    if (!track.recordingMbid) return;
+    handlePreview(track.recordingMbid, track.artistName ?? "", track.title);
   };
 
   useEffect(() => {
@@ -350,25 +370,91 @@ function ExplorePage() {
       </Tabs>
 
       {!isSearchActive && (
-        <section className="mt-10">
-          <RecommendationTile
-            rec={{
-              id: "test",
-              name: "test",
-              description: "test",
-              tag: "tag",
-              trackCount: 0,
-              gradient: generateAlbumGradient("", ""),
-              accentColor: "primary",
-            }}
-            onClick={() =>
-              navigate({
-                to: "/explore/recommendations/$recId",
-                params: { recId: "e0fdb431-0109-420d-8a37-f99eaeb4d671" },
-              })
-            }
-          ></RecommendationTile>
-        </section>
+        <div className="mt-10 space-y-10">
+          {/* Recommended playlists */}
+          <section>
+            <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-3">
+              Recommended for you
+            </h2>
+            {recPlaylistsLoading ? (
+              <p className="text-sm text-muted-foreground">Loading…</p>
+            ) : !recPlaylists || "error" in recPlaylists ? (
+              <p className="text-sm text-muted-foreground">
+                {!recPlaylists || recPlaylists.error === "no-id"
+                  ? "Connect your ListenBrainz account in Settings to get playlist recommendations."
+                  : "Not enough listening history yet. Keep listening!"}
+              </p>
+            ) : (
+              <div
+                className="grid gap-3"
+                style={{
+                  gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+                }}
+              >
+                {recPlaylists.map((playlist) => (
+                  <RecommendationTile
+                    key={playlist.id}
+                    rec={{
+                      id: playlist.id,
+                      name: playlist.name,
+                      description: playlist.description ?? "",
+                      tag: "For you",
+                      trackCount: playlist.trackCount,
+                      gradient: generateAlbumGradient(
+                        playlist.name,
+                        "recommendation",
+                      ),
+                      accentColor: "oklch(0.72 0.18 280)",
+                    }}
+                    onClick={() =>
+                      navigate({
+                        to: "/explore/recommendations/$recId",
+                        params: { recId: playlist.id },
+                      })
+                    }
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+          {/* Tracks you'll like */}
+          <section>
+            <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-3">
+              Tracks you'll like
+            </h2>
+            {recTracksLoading ? (
+              <p className="text-sm text-muted-foreground">Loading…</p>
+            ) : !recTracks || "error" in recTracks ? (
+              <p className="text-sm text-muted-foreground">
+                {!recTracks || recTracks.error === "no-id"
+                  ? "Connect your ListenBrainz account in Settings to get track recommendations."
+                  : "Not enough listening history yet. Keep listening!"}
+              </p>
+            ) : (
+              <>
+                <RecommendedTrackListHeader />
+                {recTracks
+                  .filter((t) => !recDismissed.has(t.recordingMbid))
+                  .map((track, i) => (
+                    <RecommendedTrackRow
+                      key={track.recordingMbid}
+                      track={track}
+                      index={i}
+                      isPlaying={playingMbid === track.recordingMbid}
+                      inLibrary={track.inLibrary || (recTrackStates[track.recordingMbid] ?? false)}
+                      onPlay={handleRecommendedTrackPlay}
+                      onAddToLibrary={() =>
+                        setRecTrackStates((s) => ({ ...s, [track.recordingMbid]: true }))
+                      }
+                      onDismiss={() =>
+                        setRecDismissed((s) => new Set(s).add(track.recordingMbid))
+                      }
+                    />
+                  ))}
+              </>
+            )}
+          </section>
+        </div>
       )}
     </div>
   );

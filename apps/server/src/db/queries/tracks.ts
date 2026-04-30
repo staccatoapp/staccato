@@ -141,6 +141,41 @@ export function getTrackForScrobble(id: string):
     .get();
 }
 
+export function getTrackByMusicbrainzId(recordingMbid: string):
+  | {
+      title: string;
+      artistName: string;
+      albumTitle: string | null;
+      releaseGroupMbid: string | null;
+      coverArtUrl: string | null;
+      durationMs: number | null;
+    }
+  | undefined {
+  const row = db
+    .select({
+      title: resolvedTitle,
+      artistName: resolvedArtistName,
+      albumTitle: resolvedAlbumTitle,
+      releaseGroupMbid: albums.releaseGroupMbid,
+      coverArtUrl: albums.coverArtUrl,
+      durationSeconds: tracks.durationSeconds,
+    })
+    .from(tracks)
+    .innerJoin(artists, eq(tracks.artistId, artists.id))
+    .leftJoin(albums, eq(tracks.albumId, albums.id))
+    .where(eq(tracks.musicbrainzId, recordingMbid))
+    .get();
+  if (!row) return undefined;
+  return {
+    title: row.title,
+    artistName: row.artistName,
+    albumTitle: row.albumTitle,
+    releaseGroupMbid: row.releaseGroupMbid,
+    coverArtUrl: row.coverArtUrl,
+    durationMs: row.durationSeconds != null ? row.durationSeconds * 1000 : null,
+  };
+}
+
 export function getLocalTrackMbidsByMbids(mbids: string[]): string[] {
   if (mbids.length === 0) return [];
   return db

@@ -11,6 +11,7 @@ export const userSettings = sqliteTable("user_settings", {
     .unique()
     .references(() => users.id),
   listenbrainzToken: text("listenbrainz_token"),
+  musicbrainzUsername: text("musicbrainz_username"),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(
     () => new Date(),
   ),

@@ -336,6 +336,53 @@ export async function searchReleasesByQuery(
   }
 }
 
+export interface MBRecordingDetail {
+  recordingMbid: string;
+  title: string;
+  artistName: string | null;
+  artistMbid: string | null;
+  releaseGroupMbid: string | null;
+  releaseName: string | null;
+  releaseYear: number | null;
+  durationMs: number | null;
+}
+
+export async function lookupRecording(
+  mbid: string,
+): Promise<MBRecordingDetail | null> {
+  try {
+    const response = await throttledFetch(
+      `${MB_BASE}/recording/${mbid}?inc=artist-credits+releases+release-groups&fmt=json`,
+    );
+    if (!response.ok) return null;
+    const data = (await response.json()) as {
+      id: string;
+      title?: string;
+      length?: number;
+      "artist-credit"?: Array<{ artist: { id: string; name: string } }>;
+      releases?: MBRelease[];
+    };
+    const bestReleaseMbid = data.releases?.length
+      ? pickBestRelease(data.releases)
+      : null;
+    const bestRelease =
+      data.releases?.find((r) => r.id === bestReleaseMbid) ??
+      data.releases?.[0];
+    return {
+      recordingMbid: mbid,
+      title: data.title ?? "",
+      artistName: data["artist-credit"]?.[0]?.artist.name ?? null,
+      artistMbid: data["artist-credit"]?.[0]?.artist.id ?? null,
+      releaseGroupMbid: bestRelease?.["release-group"]?.id ?? null,
+      releaseName: bestRelease?.title ?? null,
+      releaseYear: parseReleaseYear(bestRelease?.date),
+      durationMs: data.length ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function lookupReleaseDetails(
   releaseMbid: string,
 ): Promise<MBReleaseDetails | null> {

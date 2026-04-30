@@ -1,6 +1,7 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { resolvePreview } from "../preview/index.js";
+import { deleteCachedPreview } from "../db/queries/preview-cache.js";
 
 const previewRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/:recordingMbid/stream", async (req, reply) => {
@@ -20,7 +21,16 @@ const previewRoutes: FastifyPluginAsync = async (fastify) => {
     if (!previewUrl)
       return reply.status(404).send({ error: "No preview available" });
 
-    const upstream = await fetch(previewUrl);
+    let upstream = await fetch(previewUrl);
+
+    if (!upstream.ok) {
+      deleteCachedPreview(recordingMbid);
+      const fresh = await resolvePreview(recordingMbid, artistName, trackTitle);
+      if (!fresh.previewUrl)
+        return reply.status(404).send({ error: "No preview available" });
+      upstream = await fetch(fresh.previewUrl);
+    }
+
     if (!upstream.ok || !upstream.body) {
       return reply.status(502).send({ error: "Preview fetch failed" });
     }

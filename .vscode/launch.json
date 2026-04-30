@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Attach to server",
+      "type": "node",
+      "request": "attach",
+      "port": 9329,
+      "restart": true,
+      "continueOnAttach": true,
+      "sourceMaps": true
+    }
+  ]
+}

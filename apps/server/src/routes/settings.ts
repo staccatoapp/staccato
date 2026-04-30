@@ -29,6 +29,7 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
       if (!token.valid) {
         return reply.status(400).send({ error: "Invalid ListenBrainz token" });
       }
+      cleanedUpdates.musicbrainzUsername = token.userName ?? null;
     }
 
     updateUserSettings(req.userId, cleanedUpdates);

@@ -25,6 +25,15 @@ export function updateUserSettings(
   db.update(userSettings).set(data).where(eq(userSettings.userId, userId)).run();
 }
 
+export function getMusicbrainzUsername(userId: string): string | null {
+  const result = db
+    .select({ musicbrainzUsername: userSettings.musicbrainzUsername })
+    .from(userSettings)
+    .where(eq(userSettings.userId, userId))
+    .get();
+  return result?.musicbrainzUsername ?? null;
+}
+
 export function getUserListenbrainzToken(userId: string): string | null {
   const result = db
     .select({ listenbrainzToken: userSettings.listenbrainzToken })

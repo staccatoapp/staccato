@@ -12,4 +12,6 @@ export * from "./types/typescript/library.js";
 
 export * from "./types/typescript/lyrics.js";
 
+export * from "./types/typescript/recommendations.js";
+
 export * from "./pagination.js";

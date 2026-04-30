@@ -21,6 +21,7 @@ import playlistRoutes from "./routes/playlists.js";
 import settingsRoutes from "./routes/settings.js";
 import searchRoutes from "./routes/search.js";
 import previewRoutes from "./routes/preview.js";
+import recommendationRoutes from "./routes/recommendations.js";
 
 if (process.env.STACCATO_ENV !== "production") {
   dotenvFlow.config({
@@ -40,6 +41,7 @@ app.register(playlistRoutes, { prefix: "/api/playlists" });
 app.register(settingsRoutes, { prefix: "/api/settings" });
 app.register(searchRoutes, { prefix: "/api/search" });
 app.register(previewRoutes, { prefix: "/api/preview" });
+app.register(recommendationRoutes, { prefix: "/api/recommendations" });
 
 app.get("/api/health", async () => {
   return { status: "ok" };

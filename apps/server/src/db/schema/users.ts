@@ -8,7 +8,6 @@ export const users = sqliteTable("users", {
   username: text("username").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   isAdmin: integer("is_admin", { mode: "boolean" }).notNull().default(false),
-  listenbrainzToken: text("listenbrainz_token"),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(
     () => new Date(),
   ),

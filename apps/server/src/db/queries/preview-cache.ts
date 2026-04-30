@@ -26,5 +26,11 @@ export function insertCachedPreview(
     .run();
 }
 
+export function deleteCachedPreview(recordingMbid: string): void {
+  db.delete(previewCache)
+    .where(eq(previewCache.musicbrainzRecordingId, recordingMbid))
+    .run();
+}
+
 export type PreviewCacheRow = typeof previewCache.$inferSelect;
 export type NewPreviewCacheRow = typeof previewCache.$inferInsert;

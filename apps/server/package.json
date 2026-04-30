@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "build": "tsc",
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch --inspect=9329 src/index.ts --name=server",
     "lint": "eslint src/",
     "start": "node dist/index.js",
     "studio": "drizzle-kit studio",
