@@ -141,6 +141,20 @@
       "when": 1777507612426,
       "tag": "0019_last_morgan_stark",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1777575786133,
+      "tag": "0020_lethal_chameleon",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1777578170164,
+      "tag": "0021_shiny_elektra",
+      "breakpoints": true
     }
   ]
 }

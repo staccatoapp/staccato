@@ -49,9 +49,10 @@ Until real auth is implemented, a default admin user is seeded on first launch a
 
 ### Authentication (when implemented)
 
-- Session-based auth (`@fastify/secure-session`) with signed cookies for web
+- Session-based auth (`@fastify/session`) for web
 - Long-lived API tokens (Bearer header) for mobile clients
 - Admin user created on first launch, can invite/create additional accounts (Jellyfin model)
+- OIDC will be implemented at a later date.
 
 ### Documentation Site
 

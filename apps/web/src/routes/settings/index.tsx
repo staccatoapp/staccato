@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+  useValidateLBToken,
+  useSaveLBToken,
+} from "@/hooks/use-listenbrainz-token";
 import { useRef, useEffect, useState } from "react";
 import { CheckCircle2, RefreshCw, Sparkles, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -198,7 +198,6 @@ function ResolveSection() {
 }
 
 function SettingsPage() {
-  const queryClient = useQueryClient();
   const [tokenInput, setTokenInput] = useState<string | null>(null);
   const [validateResult, setValidateResult] = useState<{
     valid: boolean;
@@ -214,35 +213,8 @@ function SettingsPage() {
     },
   });
 
-  const saveMutation = useMutation({
-    mutationFn: async (listenbrainzToken: string | null) => {
-      const res = await fetch("/api/settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ listenbrainzToken }),
-      });
-      if (!res.ok) throw new Error("Failed to save settings");
-      return res.json() as Promise<UserSettings>;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["user-settings"] });
-      setTokenInput(null);
-      setValidateResult(null);
-    },
-  });
-
-  const validateMutation = useMutation({
-    mutationFn: async (token: string) => {
-      const res = await fetch("/api/settings/validate-listenbrainz-token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
-      });
-      if (!res.ok) throw new Error("Validation request failed");
-      return res.json() as Promise<{ valid: boolean; userName?: string }>;
-    },
-    onSuccess: (result) => setValidateResult(result),
-  });
+  const saveMutation = useSaveLBToken();
+  const validateMutation = useValidateLBToken();
 
   const savedToken = data?.listenbrainzToken ?? null;
   const currentInput = tokenInput !== null ? tokenInput : (savedToken ?? "");
@@ -313,13 +285,24 @@ function SettingsPage() {
           <div className="flex gap-2">
             <Button
               variant="outline"
-              onClick={() => validateMutation.mutate(currentInput)}
+              onClick={() =>
+                validateMutation.mutate(currentInput, {
+                  onSuccess: setValidateResult,
+                })
+              }
               disabled={!currentInput || validateMutation.isPending}
             >
               Test connection
             </Button>
             <Button
-              onClick={() => saveMutation.mutate(currentInput || null)}
+              onClick={() =>
+                saveMutation.mutate(currentInput || null, {
+                  onSuccess: () => {
+                    setTokenInput(null);
+                    setValidateResult(null);
+                  },
+                })
+              }
               disabled={!isDirty || saveMutation.isPending}
             >
               Save

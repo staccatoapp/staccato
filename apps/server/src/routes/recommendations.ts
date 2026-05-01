@@ -73,7 +73,9 @@ const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
                 if (t.recordingMbid) {
                   const rec = await lookupRecording(t.recordingMbid);
                   if (rec?.releaseGroupMbid) {
-                    trackCoverArtUrl = await fetchCoverArtUrlForGroup(rec.releaseGroupMbid);
+                    trackCoverArtUrl = await fetchCoverArtUrlForGroup(
+                      rec.releaseGroupMbid,
+                    );
                   }
                 }
                 return {
@@ -92,7 +94,7 @@ const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
           } satisfies RecommendedPlaylist;
         }),
       )
-    ).filter((r): r is RecommendedPlaylist => r !== null);
+    ).filter((r) => r !== null) as RecommendedPlaylist[];
 
     const firstExpiry = summaries.find((s) => s.expiresAt)?.expiresAt ?? null;
     playlistCache.set(req.userId, results, firstExpiry);
@@ -154,7 +156,7 @@ const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
           } satisfies RecommendedTrack;
         }),
       )
-    ).filter((t): t is RecommendedTrack => t !== null);
+    ).filter((t) => t !== null) as RecommendedTrack[];
 
     trackCache.set(req.userId, tracks, null);
     return tracks;

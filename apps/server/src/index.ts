@@ -1,17 +1,15 @@
 import Fastify from "fastify";
 import dotenvFlow from "dotenv-flow";
-import defaultUserPlugin from "./plugins/default-user.js";
+import sessionPlugin, { requireAuth } from "./plugins/session.js";
+import authRoutes from "./routes/auth.js";
 import scanRoutes from "./routes/scan.js";
 import resolutionRoutes from "./routes/resolution.js";
 import fastifyStatic from "@fastify/static";
 import { runMigrations } from "./db/migrate.js";
-import { seedDefaultUser } from "./db/seed.js";
 import { db } from "./db/client.js";
-import { users } from "./db/schema/users.js";
 import { tracks } from "./db/schema/tracks.js";
 import { startScan } from "./scanner/index.js";
 import { startWatcher } from "./scanner/watcher.js";
-import { eq } from "drizzle-orm";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import libraryRoutes from "./routes/library.js";
@@ -31,31 +29,28 @@ if (process.env.STACCATO_ENV !== "production") {
 
 const app = Fastify();
 
-app.register(defaultUserPlugin);
-app.register(scanRoutes, { prefix: "/api/library" });
-app.register(resolutionRoutes, { prefix: "/api/library" });
-app.register(libraryRoutes, { prefix: "/api/library" });
-app.register(playbackRoutes, { prefix: "/api/playback" });
-app.register(tracksRoutes, { prefix: "/api" });
-app.register(playlistRoutes, { prefix: "/api/playlists" });
-app.register(settingsRoutes, { prefix: "/api/settings" });
-app.register(searchRoutes, { prefix: "/api/search" });
-app.register(previewRoutes, { prefix: "/api/preview" });
-app.register(recommendationRoutes, { prefix: "/api/recommendations" });
+app.register(sessionPlugin);
 
 app.get("/api/health", async () => {
   return { status: "ok" };
 });
 
-// TODO - refactor into users query file when auth is properly implemented
-app.get("/api/me", async (request, reply) => {
-  const user = db
-    .select({ id: users.id, username: users.username, isAdmin: users.isAdmin })
-    .from(users)
-    .where(eq(users.id, request.userId))
-    .get();
-  if (!user) return reply.status(404).send({ error: "User not found" });
-  return user;
+app.register(authRoutes, { prefix: "/api/auth" });
+
+app.register(async (protectedApp) => {
+  protectedApp.addHook("preHandler", requireAuth);
+  protectedApp.register(scanRoutes, { prefix: "/api/library" });
+  protectedApp.register(resolutionRoutes, { prefix: "/api/library" });
+  protectedApp.register(libraryRoutes, { prefix: "/api/library" });
+  protectedApp.register(playbackRoutes, { prefix: "/api/playback" });
+  protectedApp.register(tracksRoutes, { prefix: "/api" });
+  protectedApp.register(playlistRoutes, { prefix: "/api/playlists" });
+  protectedApp.register(settingsRoutes, { prefix: "/api/settings" });
+  protectedApp.register(searchRoutes, { prefix: "/api/search" });
+  protectedApp.register(previewRoutes, { prefix: "/api/preview" });
+  protectedApp.register(recommendationRoutes, {
+    prefix: "/api/recommendations",
+  });
 });
 
 if (process.env.STACCATO_ENV !== "development") {
@@ -75,7 +70,6 @@ if (process.env.STACCATO_ENV !== "development") {
 
 const start = async () => {
   runMigrations();
-  seedDefaultUser();
 
   const musicDir = process.env.MUSIC_DIR ?? "./music";
   const port = Number(process.env.PORT) || 8280;

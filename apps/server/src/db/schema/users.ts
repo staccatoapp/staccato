@@ -6,8 +6,11 @@ export const users = sqliteTable("users", {
     .primaryKey()
     .$defaultFn(() => createId()),
   username: text("username").notNull().unique(),
-  passwordHash: text("password_hash").notNull(),
+  passwordHash: text("password_hash"),
   isAdmin: integer("is_admin", { mode: "boolean" }).notNull().default(false),
+  onboardingComplete: integer("onboarding_complete", { mode: "boolean" })
+    .notNull()
+    .default(false),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(
     () => new Date(),
   ),

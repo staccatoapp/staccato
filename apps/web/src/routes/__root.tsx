@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { Link, Outlet, createRootRoute } from "@tanstack/react-router";
+import {
+  Link,
+  Outlet,
+  createRootRoute,
+  redirect,
+  useRouterState,
+} from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import {
   QueryClient,
@@ -21,6 +27,14 @@ import { PlayerBar } from "@/components/layout/player-bar";
 const queryClient = new QueryClient();
 
 export const Route = createRootRoute({
+  beforeLoad: async ({ location }) => {
+    const res = await fetch("/api/auth/me");
+    if (location.pathname.startsWith("/onboarding")) {
+      if (res.ok) throw redirect({ to: "/library" });
+      return;
+    }
+    if (!res.ok) throw redirect({ to: "/onboarding" });
+  },
   component: RootComponent,
   notFoundComponent: () => (
     <div className="p-6">
@@ -141,9 +155,11 @@ function LayoutContent() {
 }
 
 function RootComponent() {
+  const { location } = useRouterState();
+  const isOnboarding = location.pathname.startsWith("/onboarding");
   return (
     <QueryClientProvider client={queryClient}>
-      <LayoutContent />
+      {isOnboarding ? <Outlet /> : <LayoutContent />}
     </QueryClientProvider>
   );
 }

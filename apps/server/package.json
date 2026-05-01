@@ -12,9 +12,11 @@
     "inspect-tags": "node tools/inspect-tags.js"
   },
   "dependencies": {
+    "@fastify/secure-session": "^8.3.0",
     "@fastify/static": "^9.1.1",
     "@paralleldrive/cuid2": "^3.3.0",
     "@staccato/shared": "workspace:*",
+    "argon2": "^0.44.0",
     "better-sqlite3": "^12.9.0",
     "chokidar": "^4",
     "dotenv-flow": "^4.1.0",

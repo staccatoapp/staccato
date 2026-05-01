@@ -1,5 +1,8 @@
 export * from "./types/zod/api/settings.js";
 export * from "./types/zod/api/search.js";
+export * from "./types/zod/api/auth.js";
+
+export * from "./types/typescript/auth.js";
 
 export * from "./types/typescript/artists.js";
 export * from "./types/typescript/albums.js";

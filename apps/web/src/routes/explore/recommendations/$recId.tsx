@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronLeft, Clock, Plus } from "lucide-react";
+import { Check, ChevronLeft, Plus } from "lucide-react";
 import { generateAlbumGradient } from "@/lib/music";
 import { useRecommendedPlaylists } from "@/hooks/useRecommendations";
 import {
@@ -51,7 +51,11 @@ function RecommendationDetailPage() {
   const [trackStates, setTrackStates] = useState<Record<string, boolean>>({});
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
-  function handlePreview(recordingMbid: string, artistName: string, title: string) {
+  function handlePreview(
+    recordingMbid: string,
+    artistName: string,
+    title: string,
+  ) {
     const audio = audioRef.current;
     if (!audio) return;
     if (playingMbid === recordingMbid) {
@@ -80,7 +84,9 @@ function RecommendationDetailPage() {
   const allInLibrary =
     visibleTracks.length > 0 &&
     visibleTracks.every(
-      (t) => t.recordingMbid && ((t.inLibrary ?? false) || (trackStates[t.recordingMbid] ?? false)),
+      (t) =>
+        t.recordingMbid &&
+        ((t.inLibrary ?? false) || (trackStates[t.recordingMbid] ?? false)),
     );
   const totalDurationMs = tracks.reduce((s, t) => s + (t.durationMs ?? 0), 0);
 
@@ -197,8 +203,14 @@ function RecommendationDetailPage() {
               key={track.recordingMbid ?? `track-${i}`}
               track={track}
               index={i}
-              isPlaying={!!track.recordingMbid && playingMbid === track.recordingMbid}
-              inLibrary={(track.inLibrary ?? false) || (!!track.recordingMbid && (trackStates[track.recordingMbid] ?? false))}
+              isPlaying={
+                !!track.recordingMbid && playingMbid === track.recordingMbid
+              }
+              inLibrary={
+                (track.inLibrary ?? false) ||
+                (!!track.recordingMbid &&
+                  (trackStates[track.recordingMbid] ?? false))
+              }
               onPlay={(t) => {
                 if (t.recordingMbid) {
                   handlePreview(t.recordingMbid, t.artistName ?? "", t.title);
@@ -206,7 +218,10 @@ function RecommendationDetailPage() {
               }}
               onAddToLibrary={() => {
                 if (track.recordingMbid) {
-                  setTrackStates((s) => ({ ...s, [track.recordingMbid!]: true }));
+                  setTrackStates((s) => ({
+                    ...s,
+                    [track.recordingMbid!]: true,
+                  }));
                 }
               }}
               onDismiss={() => {
