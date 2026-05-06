@@ -133,7 +133,7 @@ Periodic (ListenBrainz weekly/daily playlists) + on-demand + playlist-contextual
 
 ### Phase 7: Lidarr Integration
 
-Song requesting, album-vs-single detection, download status tracking, library rescan on completion.
+Song requesting, download status tracking.
 
 ## Database Schema
 
@@ -192,6 +192,7 @@ Never use `drizzle-kit push` — it bypasses migration history and breaks other 
 - **Auto-migrate on startup**: migrations run synchronously before the server accepts requests. No manual migration step for users on upgrade — pulling a new image and restarting is sufficient. The Dockerfile must copy `apps/server/drizzle/` into the image alongside `apps/server/dist/`, both under the same WORKDIR so `process.cwd()` resolves `drizzle/` correctly. Recommend users backup `staccato.db` before major version upgrades.
 - **Async functions over BullMQ + Redis for background tasks**: at 5–15 users on a single container, Redis adds operational complexity without meaningful benefit. Background tasks (scanning, fingerprinting, scrobbling, Lidarr polling) are implemented with plain async functions. Chokidar re-triggers scanning on startup, covering crash-recovery for scans. Add BullMQ only if a concrete need emerges (e.g. guaranteed job delivery across restarts becomes a real pain point).
 - **Disk cache for cover art**: cover art is fetched from Cover Art Archive once, written to `data/covers/<mbid>.jpg`, and served via Fastify static with `Cache-Control: public, max-age=31536000`. The `cover_art_url` column on `albums` points to the local static endpoint after first fetch. Redis is not used for asset caching — it is volatile, non-idiomatic for binary blobs, and unnecessary for content that never changes.
+- **Minimal user-facing configuration (MVP principle)**: do not expose configuration options to users unless they are strictly necessary. When an external service (e.g. Lidarr) already has sensible defaults configured by the user, infer them automatically rather than asking the user to re-enter them in Staccato. Each new setting must justify its existence.
 - **Prefer Zod when defining types from unknown inputs**: whenever data flows in from external sources (e.g. API calls), use Zod to ensure a consistent, shared shape.
 - **Use types wherever reasonable** - When data flows between apps (e.g. server -> web/mobile), use Typescript interfaces or inferred types in the shared package. When data flows internally (e.g. database functions -> server functions, or server -> server functions), TypeScript interfaces or inferred types can be used internally to that app or package.
 

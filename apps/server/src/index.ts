@@ -19,6 +19,8 @@ import settingsRoutes from "./routes/settings.js";
 import searchRoutes from "./routes/search.js";
 import previewRoutes from "./routes/preview.js";
 import recommendationRoutes from "./routes/recommendations.js";
+import downloadRoutes from "./routes/downloads.js";
+import { startLidarrPoller } from "./lidarr/poller.js";
 
 if (process.env.STACCATO_ENV !== "production") {
   dotenvFlow.config({
@@ -50,6 +52,7 @@ app.register(async (protectedApp) => {
   protectedApp.register(recommendationRoutes, {
     prefix: "/api/recommendations",
   });
+  protectedApp.register(downloadRoutes, { prefix: "/api/downloads" });
 });
 
 if (process.env.STACCATO_ENV !== "development") {
@@ -80,6 +83,7 @@ const start = async () => {
   );
 
   startWatcher(musicDir);
+  startLidarrPoller();
 };
 
 start().catch((err) => {

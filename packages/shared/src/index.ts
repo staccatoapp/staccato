@@ -16,5 +16,8 @@ export * from "./types/typescript/library.js";
 export * from "./types/typescript/lyrics.js";
 
 export * from "./types/typescript/recommendations.js";
+export * from "./types/typescript/downloads.js";
+
+export * from "./types/zod/api/downloads.js";
 
 export * from "./pagination.js";
