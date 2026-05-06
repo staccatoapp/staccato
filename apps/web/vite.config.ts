@@ -15,5 +15,6 @@ export default defineConfig({
     proxy: {
       "/api": "http://localhost:8280", // TODO - fix port handling. PORT env should modify the port exposed for the static pages, NOT the internal API (what was i thinking)
     },
+    allowedHosts: ["christos-pc.rhino-panga.ts.net", "100.95.9.124"],
   },
 });

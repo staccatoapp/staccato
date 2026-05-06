@@ -1,0 +1,1 @@
+ALTER TABLE `tracks` ADD `resolution_status` text DEFAULT 'pending' NOT NULL;

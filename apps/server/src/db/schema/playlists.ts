@@ -8,7 +8,7 @@ export const playlists = sqliteTable("playlists", {
     .$defaultFn(() => createId()),
   userId: text("user_id")
     .notNull()
-    .references(() => users.id),
+    .references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(

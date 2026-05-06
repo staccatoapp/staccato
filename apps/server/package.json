@@ -6,6 +6,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch --inspect=9329 src/index.ts --name=server",
+    "dev:remote": "tsx watch --inspect=9329 src/index.ts --name=server",
     "lint": "eslint src/",
     "start": "node dist/index.js",
     "studio": "drizzle-kit studio",

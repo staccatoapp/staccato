@@ -14,6 +14,10 @@ import { SQLiteUpdateSetSource } from "drizzle-orm/sqlite-core";
 import { artists } from "../schema/artists.js";
 import { albums } from "../schema/albums.js";
 import { PaginationOptions } from "@staccato/shared";
+import type { TrackTags } from "../../scanner/tags.js";
+import { upsertTrackFts, deleteTrackFts } from "./tracks-fts.js";
+import { getAlbumByArtist, deleteAlbum } from "./albums.js";
+import { deleteArtist } from "./artists.js";
 
 const resolvedTitle = sql<string>`COALESCE(${tracks.canonicalTitle}, ${tracks.title})`;
 const resolvedArtistName = sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`;
@@ -254,7 +258,7 @@ export function getUnresolvedTracksWithAlbumAndArtistDetails() {
     .from(tracks)
     .innerJoin(artists, eq(tracks.artistId, artists.id))
     .leftJoin(albums, eq(tracks.albumId, albums.id))
-    .where(isNull(tracks.musicbrainzId))
+    .where(eq(tracks.resolutionStatus, "pending"))
     .all();
 }
 export type UnresolvedTrackWithAlbumAndArtistDetailsRow = ReturnType<
@@ -267,7 +271,7 @@ export function getUnresolvedTracksPendingFingerprint() {
     .from(tracks)
     .where(
       and(
-        isNull(tracks.musicbrainzId),
+        eq(tracks.resolutionStatus, "pending"),
         eq(tracks.fingerprintStatus, "pending"),
       ),
     )
@@ -316,7 +320,104 @@ export function countUnresolvedTracks(): number {
   const result = db
     .select({ count: count() })
     .from(tracks)
-    .where(isNull(tracks.musicbrainzId))
+    .where(eq(tracks.resolutionStatus, "pending"))
     .get();
   return result?.count || 0;
+}
+
+export function getPendingTracksWithFullMbidTags() {
+  return db
+    .select({ id: tracks.id, musicbrainzId: tracks.musicbrainzId })
+    .from(tracks)
+    .innerJoin(albums, eq(tracks.albumId, albums.id))
+    .where(
+      and(
+        eq(tracks.resolutionStatus, "pending"),
+        isNotNull(tracks.musicbrainzId),
+        isNotNull(albums.releaseGroupMbid),
+      ),
+    )
+    .all();
+}
+
+export function markRemainingPendingAsFailed(): void {
+  db.update(tracks)
+    .set({ resolutionStatus: "failed" })
+    .where(eq(tracks.resolutionStatus, "pending"))
+    .run();
+}
+
+export function getAllTrackFilePaths(): string[] {
+  return db
+    .select({ filePath: tracks.filePath })
+    .from(tracks)
+    .all()
+    .map((r) => r.filePath);
+}
+
+export function upsertTrack(
+  tags: TrackTags,
+  filePath: string,
+  artistId: string,
+  albumId: string | null,
+): void {
+  const mbFields = tags.mbRecordingId
+    ? ({ musicbrainzId: tags.mbRecordingId, fingerprintStatus: "matched" } as const)
+    : {};
+
+  const insertedTrack = db
+    .insert(tracks)
+    .values({
+      title: tags.title,
+      artistId,
+      albumId,
+      trackNumber: tags.trackNumber,
+      discNumber: tags.discNumber,
+      durationSeconds: tags.durationSeconds,
+      filePath,
+      fileFormat: tags.fileFormat,
+      fileSizeBytes: tags.fileSizeBytes,
+      musicbrainzId: tags.mbRecordingId ?? null,
+      fingerprintStatus: tags.mbRecordingId ? "matched" : "pending",
+      resolutionStatus: "pending",
+    })
+    .onConflictDoUpdate({
+      target: tracks.filePath,
+      set: {
+        title: tags.title,
+        artistId,
+        albumId,
+        trackNumber: tags.trackNumber,
+        discNumber: tags.discNumber,
+        durationSeconds: tags.durationSeconds,
+        fileFormat: tags.fileFormat,
+        fileSizeBytes: tags.fileSizeBytes,
+        ...mbFields,
+      },
+    })
+    .returning({ id: tracks.id })
+    .get()!;
+
+  upsertTrackFts(insertedTrack.id, tags.title, tags.artistName, tags.albumTitle ?? "");
+}
+
+export function deleteTrackByPath(filePath: string): void {
+  const track = getTrackByFilePath(filePath);
+  if (!track) return;
+
+  deleteTrackFts(track.id);
+  db.delete(tracks).where(eq(tracks.id, track.id)).run();
+
+  if (track.albumId) {
+    const sibling = getTrackSiblingInAlbum(track.albumId);
+    if (!sibling) {
+      deleteAlbum(track.albumId);
+    }
+  }
+
+  const artistTrack = getTrackByArtist(track.artistId);
+  const artistAlbum = getAlbumByArtist(track.artistId);
+  if (!artistTrack && !artistAlbum) {
+    deleteArtist(track.artistId);
+  }
 }

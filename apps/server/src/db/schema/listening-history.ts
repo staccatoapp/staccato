@@ -10,10 +10,10 @@ export const listeningHistory = sqliteTable("listening_history", {
     .$defaultFn(() => createId()),
   userId: text("user_id")
     .notNull()
-    .references(() => users.id),
+    .references(() => users.id, { onDelete: "cascade" }),
   trackId: text("track_id")
     .notNull()
-    .references(() => tracks.id),
+    .references(() => tracks.id, { onDelete: "cascade" }),
   listenedAt: integer("listened_at")
     .notNull()
     .default(sql`(unixepoch())`),

@@ -16,6 +16,8 @@ export interface TrackTags {
   mbRecordingId: string | null;
   mbAlbumId: string | null;
   mbAlbumArtistId: string | null;
+  mbReleaseGroupId: string | null;
+  mbTrackArtistId: string | null;
 }
 
 function toFirstString(val: string | string[] | null | undefined): string | null {
@@ -42,5 +44,7 @@ export async function extractTags(filePath: string): Promise<TrackTags> {
     mbRecordingId: toFirstString(common.musicbrainz_recordingid),
     mbAlbumId: toFirstString(common.musicbrainz_albumid),
     mbAlbumArtistId: toFirstString(common.musicbrainz_albumartistid),
+    mbReleaseGroupId: common.musicbrainz_releasegroupid ?? null,
+    mbTrackArtistId: toFirstString(common.musicbrainz_artistid),
   };
 }

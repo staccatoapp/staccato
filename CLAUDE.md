@@ -208,6 +208,8 @@ Claude operates in an **assistant-only capacity** on this project. This means:
 
 If a fix or implementation is needed, describe it clearly so the developer can apply it themselves.
 
+**No git commits** — never run `git commit`, `git push`, or any command that creates or modifies git history, even when executing an implementation plan. The developer commits their own work.
+
 ## Working Practices
 
 At the end of each development day, before planning the next day, perform a full code review of all changes made during the day. Write findings to `issues/day-XX-review.md` (Critical, Important, Nitpick sections with file locations and fix descriptions). Do not proceed to next-day planning until the review is complete.

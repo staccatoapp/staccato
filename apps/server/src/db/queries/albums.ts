@@ -17,6 +17,7 @@ import { tracks } from "../schema/tracks.js";
 import { SQLiteUpdateSetSource } from "drizzle-orm/sqlite-core";
 import { RunResult } from "better-sqlite3";
 import { PaginationOptions } from "@staccato/shared";
+import { normalizeString } from "../../musicbrainz/client.js";
 
 export type AlbumWithArtistDetailsRow = {
   id: string;
@@ -238,4 +239,74 @@ export type AlbumUpdate = SQLiteUpdateSetSource<typeof albums>;
 
 export function deleteAlbum(albumId: string) {
   db.delete(albums).where(eq(albums.id, albumId)).run();
+}
+
+export function upsertAlbum(
+  title: string,
+  artistId: string,
+  releaseYear: number | null,
+  releaseMbid?: string | null,
+  releaseGroupMbid?: string | null,
+): string {
+  const normalizedInput = normalizeString(title);
+
+  const sqlMatch = db
+    .select({ id: albums.id, releaseMbid: albums.releaseMbid, releaseGroupMbid: albums.releaseGroupMbid })
+    .from(albums)
+    .where(
+      and(
+        eq(albums.artistId, artistId),
+        eq(albums.normalizedTitle, normalizedInput),
+      ),
+    )
+    .get();
+  if (sqlMatch) {
+    if (releaseMbid && !sqlMatch.releaseMbid) {
+      db.update(albums).set({ releaseMbid }).where(eq(albums.id, sqlMatch.id)).run();
+    }
+    if (releaseGroupMbid && !sqlMatch.releaseGroupMbid) {
+      db.update(albums).set({ releaseGroupMbid }).where(eq(albums.id, sqlMatch.id)).run();
+    }
+    return sqlMatch.id;
+  }
+
+  const artistAlbums = db
+    .select({
+      id: albums.id,
+      title: albums.title,
+      normalizedTitle: albums.normalizedTitle,
+      canonicalTitle: albums.canonicalTitle,
+      releaseMbid: albums.releaseMbid,
+      releaseGroupMbid: albums.releaseGroupMbid,
+    })
+    .from(albums)
+    .where(eq(albums.artistId, artistId))
+    .all();
+  const match = artistAlbums.find(
+    (a) =>
+      (a.normalizedTitle == null &&
+        normalizeString(a.title) === normalizedInput) ||
+      (a.canonicalTitle != null &&
+        normalizeString(a.canonicalTitle) === normalizedInput),
+  );
+  if (match) {
+    const updates: Record<string, unknown> = {};
+    if (match.normalizedTitle == null) updates.normalizedTitle = normalizeString(match.title);
+    if (releaseMbid && !match.releaseMbid) updates.releaseMbid = releaseMbid;
+    if (releaseGroupMbid && !match.releaseGroupMbid) updates.releaseGroupMbid = releaseGroupMbid;
+    if (Object.keys(updates).length > 0) {
+      db.update(albums).set(updates).where(eq(albums.id, match.id)).run();
+    }
+    return match.id;
+  }
+
+  return db
+    .insert(albums)
+    .values({ title, artistId, releaseYear, normalizedTitle: normalizedInput, releaseMbid: releaseMbid ?? null, releaseGroupMbid: releaseGroupMbid ?? null })
+    .onConflictDoUpdate({
+      target: [albums.title, albums.artistId],
+      set: { title, normalizedTitle: normalizedInput },
+    })
+    .returning({ id: albums.id })
+    .get()!.id;
 }

@@ -6,10 +6,9 @@ import scanRoutes from "./routes/scan.js";
 import resolutionRoutes from "./routes/resolution.js";
 import fastifyStatic from "@fastify/static";
 import { runMigrations } from "./db/migrate.js";
-import { db } from "./db/client.js";
-import { tracks } from "./db/schema/tracks.js";
 import { startScan } from "./scanner/index.js";
 import { startWatcher } from "./scanner/watcher.js";
+import { reconcileWithFilesystem } from "./scanner/startup-diff.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import libraryRoutes from "./routes/library.js";
@@ -75,13 +74,10 @@ const start = async () => {
   const port = Number(process.env.PORT) || 8280;
   await app.listen({ port, host: "0.0.0.0" });
 
-  const hasTrack = db.select({ id: tracks.id }).from(tracks).limit(1).get();
-  if (!hasTrack) {
-    console.log("[startup] no tracks found, starting initial scan");
-    startScan(musicDir).catch((err) =>
-      console.error("[startup] initial scan error", err),
-    );
-  }
+  reconcileWithFilesystem(musicDir);
+  startScan(musicDir).catch((err) =>
+    console.error("[startup] scan error", err),
+  );
 
   startWatcher(musicDir);
 };

@@ -8,7 +8,7 @@ export const downloadRequests = sqliteTable("download_requests", {
     .$defaultFn(() => createId()),
   userId: text("user_id")
     .notNull()
-    .references(() => users.id),
+    .references(() => users.id, { onDelete: "cascade" }),
   musicbrainzRecordingId: text("musicbrainz_recording_id").notNull(),
   musicbrainzReleaseId: text("musicbrainz_release_id"),
   artistName: text("artist_name").notNull(),

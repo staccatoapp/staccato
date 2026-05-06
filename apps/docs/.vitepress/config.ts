@@ -27,4 +27,9 @@ export default defineConfig({
       { icon: "github", link: "https://github.com/vuejs/vitepress" },
     ],
   },
+  vite: {
+    server: {
+      allowedHosts: ["christos-pc.rhino-panga.ts.net", "100.95.9.124"],
+    },
+  },
 });

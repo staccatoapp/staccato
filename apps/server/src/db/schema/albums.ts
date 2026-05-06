@@ -18,7 +18,7 @@ export const albums = sqliteTable(
     canonicalTitle: text("canonical_title"),
     artistId: text("artist_id")
       .notNull()
-      .references(() => artists.id),
+      .references(() => artists.id, { onDelete: "cascade" }),
     releaseMbid: text("release_mbid"),
     releaseGroupMbid: text("release_group_mbid"),
     coverArtUrl: text("cover_art_url"),

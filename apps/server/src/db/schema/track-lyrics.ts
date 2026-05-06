@@ -9,7 +9,7 @@ export const trackLyrics = sqliteTable("track_lyrics", {
   trackId: text("track_id")
     .notNull()
     .unique()
-    .references(() => tracks.id),
+    .references(() => tracks.id, { onDelete: "cascade" }),
   instrumental: integer("instrumental", { mode: "boolean" }).notNull(),
   plainLyrics: text("plain_lyrics"),
   syncedLyrics: text("synced_lyrics"),

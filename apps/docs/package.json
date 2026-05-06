@@ -6,6 +6,7 @@
   "scripts": {
     "build": "vitepress build",
     "dev": "vitepress dev",
+    "dev:remote": "vitepress dev --host",
     "lint": "eslint src/",
     "preview": "vitepress preview"
   },

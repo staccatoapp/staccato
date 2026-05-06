@@ -9,10 +9,10 @@ export const playlistTracks = sqliteTable("playlist_tracks", {
     .$defaultFn(() => createId()),
   playlistId: text("playlist_id")
     .notNull()
-    .references(() => playlists.id),
+    .references(() => playlists.id, { onDelete: "cascade" }),
   trackId: text("track_id")
     .notNull()
-    .references(() => tracks.id),
+    .references(() => tracks.id, { onDelete: "cascade" }),
   position: integer("position").notNull(),
   addedAt: integer("added_at", { mode: "timestamp" }).$defaultFn(
     () => new Date(),

@@ -11,6 +11,9 @@ export const fingerprintStatus = [
 ] as const;
 export type FingerprintStatus = (typeof fingerprintStatus)[number];
 
+export const resolutionStatus = ["pending", "resolved", "failed"] as const;
+export type ResolutionStatus = (typeof resolutionStatus)[number];
+
 export const tracks = sqliteTable("tracks", {
   id: text("id")
     .primaryKey()
@@ -19,8 +22,10 @@ export const tracks = sqliteTable("tracks", {
   canonicalTitle: text("canonical_title"),
   artistId: text("artist_id")
     .notNull()
-    .references(() => artists.id),
-  albumId: text("album_id").references(() => albums.id),
+    .references(() => artists.id, { onDelete: "cascade" }),
+  albumId: text("album_id").references(() => albums.id, {
+    onDelete: "set null",
+  }),
   musicbrainzId: text("musicbrainz_id"),
   trackNumber: integer("track_number"),
   discNumber: integer("disc_number"),
@@ -30,6 +35,11 @@ export const tracks = sqliteTable("tracks", {
   fileSizeBytes: integer("file_size_bytes"),
   fingerprintStatus: text("fingerprint_status", {
     enum: fingerprintStatus,
+  })
+    .notNull()
+    .default("pending"),
+  resolutionStatus: text("resolution_status", {
+    enum: resolutionStatus,
   })
     .notNull()
     .default("pending"),

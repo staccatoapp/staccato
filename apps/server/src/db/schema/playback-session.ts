@@ -10,8 +10,10 @@ export const playbackSession = sqliteTable("playback_session", {
   userId: text("user_id")
     .notNull()
     .unique()
-    .references(() => users.id),
-  playbackSourceId: text("playback_source_id").references(() => albums.id), // TODO - hack, fails when we implement playlists/other playback sources. using for now so i don't need to create a new table for playback sources
+    .references(() => users.id, { onDelete: "cascade" }),
+  playbackSourceId: text("playback_source_id").references(() => albums.id, {
+    onDelete: "set null",
+  }), // TODO - hack, fails when we implement playlists/other playback sources. using for now so i don't need to create a new table for playback sources
   trackQueue: text("track_queue", { mode: "json" })
     .$type<string[]>()
     .notNull()

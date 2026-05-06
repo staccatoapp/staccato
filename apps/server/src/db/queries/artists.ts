@@ -17,6 +17,7 @@ import { albums } from "../schema/albums.js";
 import { tracks } from "../schema/tracks.js";
 import { SQLiteUpdateSetSource } from "drizzle-orm/sqlite-core";
 import { PaginationOptions } from "@staccato/shared";
+import { normalizeString } from "../../musicbrainz/client.js";
 
 export type ArtistRow = {
   id: string;
@@ -151,4 +152,64 @@ export type ArtistUpdate = SQLiteUpdateSetSource<typeof artists>;
 
 export function deleteArtist(artistId: string) {
   db.delete(artists).where(eq(artists.id, artistId)).run();
+}
+
+export function upsertArtist(name: string, mbid?: string | null): string {
+  const normalizedInput = normalizeString(name);
+
+  const sqlMatch = db
+    .select({ id: artists.id, musicbrainzId: artists.musicbrainzId })
+    .from(artists)
+    .where(eq(artists.normalizedName, normalizedInput))
+    .get();
+  if (sqlMatch) {
+    if (mbid && !sqlMatch.musicbrainzId) trySetArtistMbid(sqlMatch.id, mbid);
+    return sqlMatch.id;
+  }
+
+  const allArtists = db
+    .select({
+      id: artists.id,
+      name: artists.name,
+      normalizedName: artists.normalizedName,
+      canonicalName: artists.canonicalName,
+      musicbrainzId: artists.musicbrainzId,
+    })
+    .from(artists)
+    .all();
+  const match = allArtists.find(
+    (a) =>
+      (a.normalizedName == null &&
+        normalizeString(a.name) === normalizedInput) ||
+      (a.canonicalName != null &&
+        normalizeString(a.canonicalName) === normalizedInput),
+  );
+  if (match) {
+    if (match.normalizedName == null) {
+      db.update(artists)
+        .set({ normalizedName: normalizeString(match.name) })
+        .where(eq(artists.id, match.id))
+        .run();
+    }
+    if (mbid && !match.musicbrainzId) trySetArtistMbid(match.id, mbid);
+    return match.id;
+  }
+
+  return db
+    .insert(artists)
+    .values({ name, normalizedName: normalizedInput, musicbrainzId: mbid ?? null })
+    .onConflictDoUpdate({
+      target: artists.name,
+      set: { name, normalizedName: normalizedInput },
+    })
+    .returning({ id: artists.id })
+    .get()!.id;
+}
+
+function trySetArtistMbid(artistId: string, mbid: string): void {
+  try {
+    db.update(artists).set({ musicbrainzId: mbid }).where(eq(artists.id, artistId)).run();
+  } catch {
+    // unique constraint: mbid belongs to another artist — leave it for resolver dedup
+  }
 }

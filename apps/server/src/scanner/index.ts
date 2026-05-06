@@ -1,9 +1,9 @@
 import { walkAudioFiles } from "./walk.js";
 import { extractTags } from "./tags.js";
-import { upsertArtist, upsertAlbum, upsertTrack } from "./upsert.js";
 import { startResolution } from "../resolver/index.js";
-import { deleteOrphanAlbums } from "../db/queries/albums.js";
-import { deleteOrphanArtists } from "../db/queries/artists.js";
+import { deleteOrphanAlbums, upsertAlbum } from "../db/queries/albums.js";
+import { deleteOrphanArtists, upsertArtist } from "../db/queries/artists.js";
+import { upsertTrack } from "../db/queries/tracks.js";
 
 export interface ScanProgress {
   running: boolean;
@@ -46,7 +46,7 @@ export async function startScan(musicDir: string): Promise<void> {
       const tags = await extractTags(filePath);
       const artistId = upsertArtist(tags.albumArtist ?? tags.artistName, tags.mbAlbumArtistId);
       const albumId = tags.albumTitle
-        ? upsertAlbum(tags.albumTitle, artistId, tags.year, tags.mbAlbumId)
+        ? upsertAlbum(tags.albumTitle, artistId, tags.year, tags.mbAlbumId, tags.mbReleaseGroupId)
         : null;
       upsertTrack(tags, filePath, artistId, albumId);
       scanProgress.scanned++;
