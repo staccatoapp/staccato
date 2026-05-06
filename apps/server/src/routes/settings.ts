@@ -11,6 +11,7 @@ import {
   updateServerSettings,
 } from "../db/queries/server-settings.js";
 import { LidarrClient } from "../lidarr/client.js";
+import { playlistCache, trackCache } from "../recommendations/cache.js";
 
 const settingsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/", async (req) => {
@@ -37,7 +38,21 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
       cleanedUpdates.musicbrainzUsername = token.userName ?? null;
     }
 
+    const tokenChanged =
+      cleanedUpdates.listenbrainzToken !== undefined &&
+      cleanedUpdates.listenbrainzToken !== currentUserSettings.listenbrainzToken;
+    const usernameChanged =
+      cleanedUpdates.musicbrainzUsername !== undefined &&
+      cleanedUpdates.musicbrainzUsername !==
+        currentUserSettings.musicbrainzUsername;
+
     updateUserSettings(req.userId, cleanedUpdates);
+
+    if (tokenChanged || usernameChanged) {
+      playlistCache.delete(req.userId);
+      trackCache.delete(req.userId);
+    }
+
     return reply.status(204).send();
   });
 

@@ -145,16 +145,18 @@ export function getTrackForScrobble(id: string):
     .get();
 }
 
-export function getTrackByMusicbrainzId(recordingMbid: string):
-  | {
-      title: string;
-      artistName: string;
-      albumTitle: string | null;
-      releaseGroupMbid: string | null;
-      coverArtUrl: string | null;
-      durationMs: number | null;
-    }
-  | undefined {
+export type LocalTrackDetail = {
+  title: string;
+  artistName: string;
+  albumTitle: string | null;
+  releaseGroupMbid: string | null;
+  coverArtUrl: string | null;
+  durationMs: number | null;
+};
+
+export function getTrackByMusicbrainzId(
+  recordingMbid: string,
+): LocalTrackDetail | undefined {
   const row = db
     .select({
       title: resolvedTitle,
@@ -178,6 +180,41 @@ export function getTrackByMusicbrainzId(recordingMbid: string):
     coverArtUrl: row.coverArtUrl,
     durationMs: row.durationSeconds != null ? row.durationSeconds * 1000 : null,
   };
+}
+
+export function getTracksByMusicbrainzIds(
+  recordingMbids: string[],
+): Map<string, LocalTrackDetail> {
+  const result = new Map<string, LocalTrackDetail>();
+  if (recordingMbids.length === 0) return result;
+  const rows = db
+    .select({
+      mbid: tracks.musicbrainzId,
+      title: resolvedTitle,
+      artistName: resolvedArtistName,
+      albumTitle: resolvedAlbumTitle,
+      releaseGroupMbid: albums.releaseGroupMbid,
+      coverArtUrl: albums.coverArtUrl,
+      durationSeconds: tracks.durationSeconds,
+    })
+    .from(tracks)
+    .innerJoin(artists, eq(tracks.artistId, artists.id))
+    .leftJoin(albums, eq(tracks.albumId, albums.id))
+    .where(inArray(tracks.musicbrainzId, recordingMbids))
+    .all();
+  for (const row of rows) {
+    if (!row.mbid) continue;
+    result.set(row.mbid, {
+      title: row.title,
+      artistName: row.artistName,
+      albumTitle: row.albumTitle,
+      releaseGroupMbid: row.releaseGroupMbid,
+      coverArtUrl: row.coverArtUrl,
+      durationMs:
+        row.durationSeconds != null ? row.durationSeconds * 1000 : null,
+    });
+  }
+  return result;
 }
 
 export function getLocalTrackMbidsByMbids(mbids: string[]): string[] {

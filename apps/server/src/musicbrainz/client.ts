@@ -347,39 +347,62 @@ export interface MBRecordingDetail {
   durationMs: number | null;
 }
 
+const recordingDetailCache = new Map<string, MBRecordingDetail | null>();
+const recordingDetailInflight = new Map<
+  string,
+  Promise<MBRecordingDetail | null>
+>();
+
 export async function lookupRecording(
   mbid: string,
 ): Promise<MBRecordingDetail | null> {
+  if (recordingDetailCache.has(mbid)) {
+    return recordingDetailCache.get(mbid) ?? null;
+  }
+  const existing = recordingDetailInflight.get(mbid);
+  if (existing) return existing;
+
+  const promise = (async (): Promise<MBRecordingDetail | null> => {
+    try {
+      const response = await throttledFetch(
+        `${MB_BASE}/recording/${mbid}?inc=artist-credits+releases+release-groups&fmt=json`,
+      );
+      if (!response.ok) return null;
+      const data = (await response.json()) as {
+        id: string;
+        title?: string;
+        length?: number;
+        "artist-credit"?: Array<{ artist: { id: string; name: string } }>;
+        releases?: MBRelease[];
+      };
+      const bestReleaseMbid = data.releases?.length
+        ? pickBestRelease(data.releases)
+        : null;
+      const bestRelease =
+        data.releases?.find((r) => r.id === bestReleaseMbid) ??
+        data.releases?.[0];
+      return {
+        recordingMbid: mbid,
+        title: data.title ?? "",
+        artistName: data["artist-credit"]?.[0]?.artist.name ?? null,
+        artistMbid: data["artist-credit"]?.[0]?.artist.id ?? null,
+        releaseGroupMbid: bestRelease?.["release-group"]?.id ?? null,
+        releaseName: bestRelease?.title ?? null,
+        releaseYear: parseReleaseYear(bestRelease?.date),
+        durationMs: data.length ?? null,
+      };
+    } catch {
+      return null;
+    }
+  })();
+
+  recordingDetailInflight.set(mbid, promise);
   try {
-    const response = await throttledFetch(
-      `${MB_BASE}/recording/${mbid}?inc=artist-credits+releases+release-groups&fmt=json`,
-    );
-    if (!response.ok) return null;
-    const data = (await response.json()) as {
-      id: string;
-      title?: string;
-      length?: number;
-      "artist-credit"?: Array<{ artist: { id: string; name: string } }>;
-      releases?: MBRelease[];
-    };
-    const bestReleaseMbid = data.releases?.length
-      ? pickBestRelease(data.releases)
-      : null;
-    const bestRelease =
-      data.releases?.find((r) => r.id === bestReleaseMbid) ??
-      data.releases?.[0];
-    return {
-      recordingMbid: mbid,
-      title: data.title ?? "",
-      artistName: data["artist-credit"]?.[0]?.artist.name ?? null,
-      artistMbid: data["artist-credit"]?.[0]?.artist.id ?? null,
-      releaseGroupMbid: bestRelease?.["release-group"]?.id ?? null,
-      releaseName: bestRelease?.title ?? null,
-      releaseYear: parseReleaseYear(bestRelease?.date),
-      durationMs: data.length ?? null,
-    };
-  } catch {
-    return null;
+    const result = await promise;
+    recordingDetailCache.set(mbid, result);
+    return result;
+  } finally {
+    recordingDetailInflight.delete(mbid);
   }
 }
 
