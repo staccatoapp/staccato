@@ -33,9 +33,14 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
     ) {
       const token = await validateToken(cleanedUpdates.listenbrainzToken);
       if (!token.valid) {
+        req.log.warn({ userId: req.userId }, "invalid listenbrainz token submitted");
         return reply.status(400).send({ error: "Invalid ListenBrainz token" });
       }
       cleanedUpdates.musicbrainzUsername = token.userName ?? null;
+      req.log.info(
+        { userId: req.userId, username: token.userName },
+        "listenbrainz token validated",
+      );
     }
 
     const tokenChanged =

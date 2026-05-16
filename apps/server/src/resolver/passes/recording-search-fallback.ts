@@ -6,12 +6,16 @@ import {
   updateTrackByTrackId,
 } from "../../db/queries/tracks.js";
 import { type ResolutionProgress } from "../types.js";
+import { logger } from "../../logger.js";
+
+const log = logger.child({ module: "resolver:recording-search-fallback" });
 
 export async function runRecordingSearchFallback(progress: ResolutionProgress): Promise<void> {
   const unresolved = getUnresolvedTracksWithAlbumAndArtistDetails();
 
-  console.log(
-    `[resolver] recording search fallback: ${unresolved.length} tracks`,
+  log.info(
+    { count: unresolved.length },
+    "recording search fallback pass starting",
   );
 
   for (const track of unresolved) {

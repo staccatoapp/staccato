@@ -2,6 +2,9 @@ import chokidar from "chokidar";
 import { scanProgress, startScan } from "./index.js";
 import { deleteTrackByPath } from "../db/queries/tracks.js";
 import { isAudioFile } from "./walk.js";
+import { logger } from "../logger.js";
+
+const log = logger.child({ module: "watcher" });
 
 const DEBOUNCE_MS = 5000;
 
@@ -13,7 +16,7 @@ export function startWatcher(musicDir: string): void {
     debounceTimer = setTimeout(() => {
       if (scanProgress.running) return;
       startScan(musicDir).catch((err) =>
-        console.error("[watcher] scan error", err),
+        log.error({ err }, "watcher-triggered scan failed"),
       );
     }, DEBOUNCE_MS);
   };
@@ -29,18 +32,18 @@ export function startWatcher(musicDir: string): void {
       ignored: (path, stats) => !stats?.isFile() || !isAudioFile(path),
     })
     .on("add", (path) => {
-      console.log(`[watcher] file added: ${path}`);
+      log.debug({ path }, "file added");
       scheduleScan();
     })
     .on("change", (path) => {
-      console.log(`[watcher] file changed: ${path}`);
+      log.debug({ path }, "file changed");
       scheduleScan();
     })
     .on("unlink", (path) => {
-      console.log(`[watcher] file removed: ${path}`);
+      log.debug({ path }, "file removed");
       deleteTrackByPath(path);
     })
-    .on("error", (err) => console.error("[watcher] error", err));
+    .on("error", (err) => log.error({ err }, "watcher error"));
 
-  console.log(`[watcher] watching ${musicDir}`);
+  log.info({ musicDir }, "watching music directory");
 }

@@ -5,13 +5,17 @@ import {
   updateUnresolvedAlbum,
 } from "../../db/queries/albums.js";
 import { getResolvedTrackMbidsByAlbumId } from "../../db/queries/tracks.js";
+import { logger } from "../../logger.js";
+
+const log = logger.child({ module: "resolver:album-backfill" });
 
 export async function runAlbumBackfillFromTracks(): Promise<void> {
   const albumsToBackfill = getUnresolvedAlbumsContainingResolvedTracks();
 
   if (albumsToBackfill.length === 0) return;
-  console.log(
-    `[resolver] album backfill from tracks: ${albumsToBackfill.length} albums`,
+  log.info(
+    { count: albumsToBackfill.length },
+    "album backfill from tracks starting",
   );
 
   for (const album of albumsToBackfill) {
@@ -67,8 +71,12 @@ export async function runAlbumBackfillFromTracks(): Promise<void> {
     }
 
     if (!matchingRelease) {
-      console.log(
-        `[resolver/backfill] "${album.title}" — no matching release found across ${resolvedTrackMbids.length} resolved tracks`,
+      log.debug(
+        {
+          album: album.title,
+          candidateCount: resolvedTrackMbids.length,
+        },
+        "no matching release found",
       );
       continue;
     }

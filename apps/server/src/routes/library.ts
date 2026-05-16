@@ -59,7 +59,10 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
 
     const album = getAlbumWithArtistDetails(albumId);
 
-    if (!album) return reply.status(404).send({ error: "Album not found" });
+    if (!album) {
+      request.log.warn({ albumId }, "album not found");
+      return reply.status(404).send({ error: "Album not found" });
+    }
 
     const albumTracks = getTracksInAlbum(albumId);
     return {

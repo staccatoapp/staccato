@@ -1,3 +1,7 @@
+import { logger } from "../logger.js";
+
+const log = logger.child({ module: "preview:itunes" });
+
 const ITUNES_API = "https://itunes.apple.com";
 
 export interface ItunesPreviewResult {
@@ -14,7 +18,13 @@ export async function lookupItunesPreview(
     const res = await fetch(
       `${ITUNES_API}/search?term=${term}&media=music&entity=song&limit=1`,
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      log.warn(
+        { status: res.status, artistName, trackTitle },
+        "itunes preview non-ok response",
+      );
+      return null;
+    }
     const data = (await res.json()) as {
       results?: Array<{ trackId: number; previewUrl?: string }>;
     };
@@ -24,7 +34,11 @@ export async function lookupItunesPreview(
       itunesTrackId: String(track.trackId),
       previewUrl: track.previewUrl,
     };
-  } catch {
+  } catch (err) {
+    log.warn(
+      { err, artistName, trackTitle },
+      "itunes preview lookup failed",
+    );
     return null;
   }
 }

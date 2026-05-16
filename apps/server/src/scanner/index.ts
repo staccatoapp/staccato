@@ -4,6 +4,9 @@ import { startResolution } from "../resolver/index.js";
 import { deleteOrphanAlbums, upsertAlbum } from "../db/queries/albums.js";
 import { deleteOrphanArtists, upsertArtist } from "../db/queries/artists.js";
 import { upsertTrack } from "../db/queries/tracks.js";
+import { logger } from "../logger.js";
+
+const log = logger.child({ module: "scanner" });
 
 export interface ScanProgress {
   running: boolean;
@@ -40,6 +43,7 @@ export async function startScan(musicDir: string): Promise<void> {
 
   const files = [...walkAudioFiles(musicDir)];
   scanProgress.total = files.length;
+  log.info({ musicDir, fileCount: files.length }, "scan starting");
 
   for (const filePath of files) {
     try {
@@ -52,7 +56,7 @@ export async function startScan(musicDir: string): Promise<void> {
       scanProgress.scanned++;
     } catch (err) {
       scanProgress.failed++;
-      console.error(`[scanner] failed: ${filePath}`, err);
+      log.error({ err, filePath }, "scan failed for file");
     }
   }
 
@@ -60,6 +64,9 @@ export async function startScan(musicDir: string): Promise<void> {
   scanProgress.completedAt = new Date();
 
   cleanupOrphans();
-  console.log("[scanner] scan complete, starting resolution");
+  log.info(
+    { scanned: scanProgress.scanned, failed: scanProgress.failed },
+    "scan complete, starting resolution",
+  );
   await startResolution();
 }

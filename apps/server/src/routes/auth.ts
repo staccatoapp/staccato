@@ -19,12 +19,14 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.post("/setup", async (req, reply) => {
     if (isSetupComplete()) {
+      req.log.warn("setup attempted but already complete");
       return reply.code(409).send({ error: "Setup already complete" });
     }
     const { username, password } = SetupSchema.parse(req.body);
     const passwordHash = await argon2.hash(password, { type: argon2.argon2id });
     const user = createUser({ username, passwordHash, isAdmin: true });
     req.session.set("userId", user.id);
+    req.log.info({ userId: user.id, username: user.username }, "initial admin user created");
     return reply
       .code(201)
       .send({
@@ -44,10 +46,12 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     const valid = await argon2.verify(hashToVerify, password);
 
     if (!user || !user.passwordHash || !valid) {
+      req.log.warn({ username }, "login failed: invalid credentials");
       return reply.code(401).send({ error: "Invalid credentials" });
     }
 
     req.session.set("userId", user.id);
+    req.log.info({ userId: user.id, username: user.username }, "user logged in");
     return {
       id: user.id,
       username: user.username,
@@ -63,7 +67,10 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.get("/me", { preHandler: requireAuth }, async (req, reply) => {
     const user = findUserById(req.userId);
-    if (!user) return reply.code(404).send({ error: "User not found" });
+    if (!user) {
+      req.log.warn({ userId: req.userId }, "GET /me: session userId not in db");
+      return reply.code(404).send({ error: "User not found" });
+    }
     return {
       id: user.id,
       username: user.username,

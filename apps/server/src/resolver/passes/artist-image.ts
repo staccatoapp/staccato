@@ -3,13 +3,17 @@ import {
   getResolvedArtistsWithoutCoverArt,
   updateArtist,
 } from "../../db/queries/artists.js";
+import { logger } from "../../logger.js";
+
+const log = logger.child({ module: "resolver:artist-image" });
 
 export async function runArtistImagePass(): Promise<void> {
   const artistsMissingCoverArt = getResolvedArtistsWithoutCoverArt();
 
   if (artistsMissingCoverArt.length === 0) return;
-  console.log(
-    `[resolver] artist image pass: ${artistsMissingCoverArt.length} artists`,
+  log.info(
+    { count: artistsMissingCoverArt.length },
+    "artist image pass starting",
   );
 
   for (const artist of artistsMissingCoverArt) {
@@ -51,6 +55,11 @@ export async function runArtistImagePass(): Promise<void> {
 
       const imageUrl = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(filename)}`;
       updateArtist(artist.id, { imageUrl });
-    } catch {}
+    } catch (err) {
+      log.warn(
+        { err, artistId: artist.id, artistMbid: artist.musicbrainzId },
+        "artist image lookup failed",
+      );
+    }
   }
 }

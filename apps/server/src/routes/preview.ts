@@ -18,20 +18,38 @@ const previewRoutes: FastifyPluginAsync = async (fastify) => {
       trackTitle,
     );
 
-    if (!previewUrl)
+    if (!previewUrl) {
+      req.log.warn(
+        { recordingMbid, artistName, trackTitle },
+        "no preview available",
+      );
       return reply.status(404).send({ error: "No preview available" });
+    }
 
     let upstream = await fetch(previewUrl);
 
     if (!upstream.ok) {
+      req.log.warn(
+        { recordingMbid, status: upstream.status, previewUrl },
+        "cached preview url stale, refetching",
+      );
       deleteCachedPreview(recordingMbid);
       const fresh = await resolvePreview(recordingMbid, artistName, trackTitle);
-      if (!fresh.previewUrl)
+      if (!fresh.previewUrl) {
+        req.log.warn(
+          { recordingMbid },
+          "no preview available after cache miss",
+        );
         return reply.status(404).send({ error: "No preview available" });
+      }
       upstream = await fetch(fresh.previewUrl);
     }
 
     if (!upstream.ok || !upstream.body) {
+      req.log.error(
+        { recordingMbid, status: upstream.status },
+        "preview upstream fetch failed",
+      );
       return reply.status(502).send({ error: "Preview fetch failed" });
     }
 

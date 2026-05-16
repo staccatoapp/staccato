@@ -2,6 +2,9 @@
 
 import throttle from "p-throttle";
 import { APP_USER_AGENT } from "../constants.js";
+import { logger } from "../logger.js";
+
+const log = logger.child({ module: "musicbrainz" });
 import {
   MBArtistSearchResponseSchema,
   MBExternalRecordingSearchResponseSchema,
@@ -159,7 +162,13 @@ async function attemptRecordingSearch(
     const response = await throttledFetch(
       `${MB_BASE}/recording?${query}&inc=releases+release-groups+artist-credits`,
     );
-    if (!response.ok) return null;
+    if (!response.ok) {
+      log.warn(
+        { status: response.status, operation: "attemptRecordingSearch", query: queryStr },
+        "mb recording search non-ok response",
+      );
+      return null;
+    }
     const data = MBRecordingSearchResponseSchema.parse(await response.json());
     const normalizedHint = hint?.albumTitle
       ? normalizeString(hint.albumTitle)
@@ -194,7 +203,11 @@ async function attemptRecordingSearch(
       };
     }
     return null;
-  } catch {
+  } catch (err) {
+    log.warn(
+      { err, operation: "attemptRecordingSearch", query: queryStr },
+      "mb recording search failed",
+    );
     return null;
   }
 }
@@ -212,7 +225,13 @@ export async function searchRecordingsByQuery(
     const response = await throttledFetch(
       `${MB_BASE}/recording?${params}&inc=releases+release-groups+artist-credits`,
     );
-    if (!response.ok) return [];
+    if (!response.ok) {
+      log.warn(
+        { status: response.status, operation: "searchRecordingsByQuery", query },
+        "mb external recording search non-ok response",
+      );
+      return [];
+    }
     const data = MBExternalRecordingSearchResponseSchema.parse(
       await response.json(),
     );
@@ -235,7 +254,11 @@ export async function searchRecordingsByQuery(
         durationMs: r.length ?? null,
       };
     });
-  } catch {
+  } catch (err) {
+    log.warn(
+      { err, operation: "searchRecordingsByQuery", query },
+      "mb external recording search failed",
+    );
     return [];
   }
 }
@@ -251,7 +274,13 @@ export async function searchArtistsByQuery(
       limit: String(limit),
     });
     const response = await throttledFetch(`${MB_BASE}/artist?${params}`);
-    if (!response.ok) return [];
+    if (!response.ok) {
+      log.warn(
+        { status: response.status, operation: "searchArtistsByQuery", query },
+        "mb artist search non-ok response",
+      );
+      return [];
+    }
     const data = MBArtistSearchResponseSchema.parse(await response.json());
     return data.artists.map((a) => ({
       artistMbid: a.id,
@@ -259,7 +288,11 @@ export async function searchArtistsByQuery(
       disambiguation: a.disambiguation ?? null,
       type: a.type ?? null,
     }));
-  } catch {
+  } catch (err) {
+    log.warn(
+      { err, operation: "searchArtistsByQuery", query },
+      "mb artist search failed",
+    );
     return [];
   }
 }
@@ -278,7 +311,13 @@ export async function searchReleasesByQuery(
     const response = await throttledFetch(
       `${MB_BASE}/release?${params}&inc=artist-credits+release-groups`,
     );
-    if (!response.ok) return [];
+    if (!response.ok) {
+      log.warn(
+        { status: response.status, operation: "searchReleasesByQuery", query },
+        "mb release search non-ok response",
+      );
+      return [];
+    }
     const data = MBReleaseSearchResponseSchema.parse(await response.json());
 
     const byGroup = new Map<string, typeof data.releases>();
@@ -306,7 +345,11 @@ export async function searchReleasesByQuery(
       });
     }
     return results.slice(0, limit);
-  } catch {
+  } catch (err) {
+    log.warn(
+      { err, operation: "searchReleasesByQuery", query },
+      "mb release search failed",
+    );
     return [];
   }
 }
@@ -342,7 +385,13 @@ export async function lookupRecording(
       const response = await throttledFetch(
         `${MB_BASE}/recording/${mbid}?inc=artist-credits+releases+release-groups&fmt=json`,
       );
-      if (!response.ok) return null;
+      if (!response.ok) {
+        log.warn(
+          { status: response.status, operation: "lookupRecording", recordingMbid: mbid },
+          "mb recording lookup non-ok response",
+        );
+        return null;
+      }
       const data = MBRecordingLookupSchema.parse(await response.json());
       const bestReleaseMbid = data.releases?.length
         ? pickBestRelease(data.releases)
@@ -360,7 +409,11 @@ export async function lookupRecording(
         releaseYear: parseReleaseYear(bestRelease?.date),
         durationMs: data.length ?? null,
       };
-    } catch {
+    } catch (err) {
+      log.warn(
+        { err, operation: "lookupRecording", recordingMbid: mbid },
+        "mb recording lookup failed",
+      );
       return null;
     }
   })();
@@ -382,7 +435,13 @@ export async function lookupReleaseDetails(
     const response = await throttledFetch(
       `${MB_BASE}/release/${releaseMbid}?inc=recordings+artist-credits+release-groups&fmt=json`,
     );
-    if (!response.ok) return null;
+    if (!response.ok) {
+      log.warn(
+        { status: response.status, operation: "lookupReleaseDetails", releaseMbid },
+        "mb release lookup non-ok response",
+      );
+      return null;
+    }
     const data = MBReleaseLookupSchema.parse(await response.json());
     return {
       tracks: data.media.flatMap((disc) =>
@@ -401,7 +460,11 @@ export async function lookupReleaseDetails(
       artistName: data["artist-credit"]?.[0]?.artist.name ?? null,
       releaseGroupMbid: data["release-group"]?.id ?? null,
     };
-  } catch {
+  } catch (err) {
+    log.warn(
+      { err, operation: "lookupReleaseDetails", releaseMbid },
+      "mb release lookup failed",
+    );
     return null;
   }
 }
@@ -418,14 +481,29 @@ export async function searchReleaseGroupCandidates(
       limit: "5",
     });
     const response = await throttledFetch(`${MB_BASE}/release-group?${params}`);
-    if (!response.ok) return [];
+    if (!response.ok) {
+      log.warn(
+        {
+          status: response.status,
+          operation: "searchReleaseGroupCandidates",
+          albumTitle,
+          artistName,
+        },
+        "mb release-group search non-ok response",
+      );
+      return [];
+    }
     const data = MBReleaseGroupSearchResponseSchema.parse(
       await response.json(),
     );
     return data["release-groups"]
       .filter((rg) => rg.score >= 80)
       .map((rg) => rg.id);
-  } catch {
+  } catch (err) {
+    log.warn(
+      { err, operation: "searchReleaseGroupCandidates", albumTitle, artistName },
+      "mb release-group search failed",
+    );
     return [];
   }
 }
@@ -446,7 +524,13 @@ export async function lookupExternalAlbum(
     const res = await throttledFetch(
       `${MB_BASE}/release-group/${rgMbid}?inc=releases+artist-credits&fmt=json`,
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      log.warn(
+        { status: res.status, operation: "lookupExternalAlbum", releaseGroupMbid: rgMbid },
+        "mb release-group lookup non-ok response",
+      );
+      return null;
+    }
     const rg = MBReleaseGroupLookupSchema.parse(await res.json());
 
     const releases = rg.releases ?? [];
@@ -468,7 +552,11 @@ export async function lookupExternalAlbum(
       releaseType: rg["primary-type"] ?? null,
       tracks: details.tracks,
     };
-  } catch {
+  } catch (err) {
+    log.warn(
+      { err, operation: "lookupExternalAlbum", releaseGroupMbid: rgMbid },
+      "mb release-group lookup failed",
+    );
     return null;
   }
 }

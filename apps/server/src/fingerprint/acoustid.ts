@@ -1,4 +1,7 @@
 import throttle from "p-throttle";
+import { logger } from "../logger.js";
+
+const log = logger.child({ module: "acoustid" });
 
 const ACOUSTID_BASE = "https://api.acoustid.org/v2";
 
@@ -25,7 +28,13 @@ export async function lookupFingerprint(
       meta: "recordings",
     });
     const res = await throttledFetch(`${ACOUSTID_BASE}/lookup?${params}`);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      log.warn(
+        { status: res.status, durationSec: Math.round(duration) },
+        "acoustid lookup non-ok response",
+      );
+      return null;
+    }
 
     const data = (await res.json()) as {
       status: string;
@@ -45,7 +54,11 @@ export async function lookupFingerprint(
       recordingMbid: topRecording.id,
       acoustidScore: best.score,
     };
-  } catch {
+  } catch (err) {
+    log.warn(
+      { err, durationSec: Math.round(duration) },
+      "acoustid lookup failed",
+    );
     return null;
   }
 }

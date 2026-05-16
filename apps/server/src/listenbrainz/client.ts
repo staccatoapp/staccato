@@ -1,6 +1,9 @@
 // TODO - abstract clients so that different scrobbling services are plug and play/not called directly
 
 import { z } from "zod";
+import { logger } from "../logger.js";
+
+const log = logger.child({ module: "listenbrainz" });
 
 const LB_API_BASE = "https://api.listenbrainz.org/1";
 
@@ -102,7 +105,10 @@ async function lbFetch(url: string, token: string): Promise<Response> {
   const remaining = Number(res.headers.get("X-RateLimit-Remaining") ?? 1);
   const resetInMs =
     Number(res.headers.get("X-RateLimit-Reset-In") ?? 0) * 1000;
-  if (remaining === 0 && resetInMs > 0) await sleep(resetInMs);
+  if (remaining === 0 && resetInMs > 0) {
+    log.debug({ sleepMs: resetInMs, url }, "lb rate-limit backoff");
+    await sleep(resetInMs);
+  }
   return res;
 }
 
@@ -132,7 +138,13 @@ export async function getRecommendedPlaylists(
       `${LB_API_BASE}/user/${username}/playlists/recommendations`,
       token,
     );
-    if (!res.ok) return [];
+    if (!res.ok) {
+      log.warn(
+        { status: res.status, operation: "getRecommendedPlaylists", username },
+        "lb recommended playlists non-ok response",
+      );
+      return [];
+    }
     const data = LBPlaylistsListSchema.parse(await res.json());
     return data.playlists.map(({ playlist: p }) => ({
       id: extractPlaylistId(p.identifier),
@@ -143,7 +155,11 @@ export async function getRecommendedPlaylists(
         p.extension?.["https://musicbrainz.org/doc/jspf#playlist"]
           ?.expires_at ?? null,
     }));
-  } catch {
+  } catch (err) {
+    log.warn(
+      { err, operation: "getRecommendedPlaylists", username },
+      "lb recommended playlists failed",
+    );
     return [];
   }
 }
@@ -157,7 +173,13 @@ export async function getPlaylistDetail(
       `${LB_API_BASE}/playlist/${playlistId}`,
       token,
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      log.warn(
+        { status: res.status, operation: "getPlaylistDetail", playlistId },
+        "lb playlist detail non-ok response",
+      );
+      return null;
+    }
     const data = LBPlaylistDetailSchema.parse(await res.json());
     const p = data.playlist;
     return {
@@ -175,7 +197,11 @@ export async function getPlaylistDetail(
         durationMs: t.duration ?? null,
       })),
     };
-  } catch {
+  } catch (err) {
+    log.warn(
+      { err, operation: "getPlaylistDetail", playlistId },
+      "lb playlist detail failed",
+    );
     return null;
   }
 }
@@ -190,12 +216,22 @@ export async function getCFRecommendations(
       `${LB_API_BASE}/cf/recommendation/user/${username}/recording?count=${count}`,
       token,
     );
-    if (!res.ok) return [];
+    if (!res.ok) {
+      log.warn(
+        { status: res.status, operation: "getCFRecommendations", username },
+        "lb CF recommendations non-ok response",
+      );
+      return [];
+    }
     const data = LBCFRecommendationsSchema.parse(await res.json());
     return data.payload.mbids
       .slice(0, count)
       .map((m) => m.recording_mbid);
-  } catch {
+  } catch (err) {
+    log.warn(
+      { err, operation: "getCFRecommendations", username },
+      "lb CF recommendations failed",
+    );
     return [];
   }
 }
@@ -207,10 +243,17 @@ export async function validateToken(
     const res = await fetch(`${LB_API_BASE}/validate-token`, {
       headers: { Authorization: `Token ${token}` },
     });
-    if (!res.ok) return { valid: false };
+    if (!res.ok) {
+      log.warn(
+        { status: res.status, operation: "validateToken" },
+        "lb validate-token non-ok response",
+      );
+      return { valid: false };
+    }
     const data = LBValidateTokenSchema.parse(await res.json());
     return { valid: data.valid, userName: data.user_name };
-  } catch {
+  } catch (err) {
+    log.warn({ err, operation: "validateToken" }, "lb validate-token failed");
     return { valid: false };
   }
 }
@@ -251,6 +294,15 @@ export async function submitListen(data: {
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
+    log.warn(
+      {
+        status: res.status,
+        body,
+        listenedAt: data.listenedAt,
+        trackMbid: data.trackMbid,
+      },
+      "lb submit-listen non-ok response",
+    );
     throw new Error(`Failed to submit listen: ${res.status} ${body}`);
   }
 }

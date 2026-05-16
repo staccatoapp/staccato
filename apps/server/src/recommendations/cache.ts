@@ -3,6 +3,9 @@ import type {
   RecommendedPlaylist,
   RecommendedTrack,
 } from "@staccato/shared";
+import { logger } from "../logger.js";
+
+const log = logger.child({ module: "recommendations-cache" });
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
@@ -50,9 +53,14 @@ class RecommendationCache<T> {
     if (existing) return existing;
 
     const promise = (async () => {
-      const { data, expiresAt } = await factory();
-      this.set(key, data, expiresAt);
-      return data;
+      try {
+        const { data, expiresAt } = await factory();
+        this.set(key, data, expiresAt);
+        return data;
+      } catch (err) {
+        log.error({ err, cacheKey: key }, "recommendation cache factory failed");
+        throw err;
+      }
     })();
 
     this.inflight.set(key, promise);

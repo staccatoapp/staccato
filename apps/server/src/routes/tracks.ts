@@ -17,13 +17,20 @@ const tracksRoutes: FastifyPluginAsync = async (fastify) => {
     const { id } = req.params as { id: string };
     const track = getTrackForStream(id);
 
-    if (!track) return reply.status(404).send({ error: "Track not found" });
+    if (!track) {
+      req.log.warn({ trackId: id }, "stream requested for unknown track");
+      return reply.status(404).send({ error: "Track not found" });
+    }
 
     // 2. Stat the file for size
     let stat: fs.Stats;
     try {
       stat = fs.statSync(track.filePath);
-    } catch {
+    } catch (err) {
+      req.log.error(
+        { err, trackId: id, filePath: track.filePath },
+        "audio file missing on disk",
+      );
       return reply.status(500).send({ error: "Audio file not found on disk" });
     }
 

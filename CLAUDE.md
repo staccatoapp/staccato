@@ -223,3 +223,48 @@ When asked to plan a development session or day of work, produce a markdown file
 - An end-of-day checklist of concrete pass/fail conditions
 
 Save planning files to the project root as `plans/day-XX-plan.md`.
+
+## Logging
+
+The server uses Pino via Fastify's bundled logger. Configuration lives in `apps/server/src/logger.ts` and is controlled by two env vars:
+
+- `LOG_LEVEL` — `error` | `warn` | `info` (default) | `debug`
+- `LOG_FORMAT` — `pretty` (default, human-readable) | `json` (for log aggregators like Loki/ELK)
+
+The same singleton `logger` instance is passed into Fastify via `Fastify({ loggerInstance: logger })`, so `req.log`, `fastify.log`, and the module-level `logger` all write through the same stream with shared redaction (cookies, auth headers, `passwordHash`, `listenbrainzToken`, `lidarrApiKey`).
+
+### When writing new code, always add logs
+
+Prefer adding a log over omitting one. Every `catch` block should log something. Every external API call site should log failures with enough context to debug from the log alone. Lifecycle events (background task started/finished, state transitions, configuration loaded) should land at INFO. Per-item events (per-file scan, per-track resolution, polling tick details) belong at DEBUG.
+
+### Where the logger comes from
+
+- **In a Fastify route handler**: use `req.log.{error,warn,info,debug}`. Fastify auto-tags it with the request id.
+- **In a helper called from a route**: accept a `FastifyBaseLogger` parameter and pass `req.log` in (see `submitToLidarr(row.id, req.log)` in `routes/downloads.ts`).
+- **In a background task or module-level code**: import the root `logger` from `../logger.js` and create a child with a module tag at file top:
+  ```ts
+  import { logger } from "../logger.js";
+  const log = logger.child({ module: "scanner" });
+  ```
+  Then use `log.{error,warn,info,debug}` throughout the file.
+
+### Level guidance
+
+- `error` — unrecoverable failures, fatal errors, anything that breaks user-visible functionality.
+- `warn` — recoverable failures (silent catches in external clients returning null), degraded operating mode (missing optional integration like AcoustID), rate-limit backoffs that affect throughput, 4xx responses worth noting (auth failures, conflicts).
+- `info` — lifecycle events (server up, scan started/complete, pass started with counts), state transitions, successful user-visible actions (user logged in, download queued). Fastify already auto-logs every HTTP request/response at INFO — do not duplicate.
+- `debug` — per-item events (per-file scan, per-track resolution), polling tick details, deduplication skips, anything high-volume that would drown INFO. Default LOG_LEVEL hides these.
+
+### Log call format
+
+Always use the object-first pattern: `log.error({ err, context }, "message")`, not string interpolation. Include the actual `Error` under the `err` key so Pino's serializer captures stack traces. Surrounding context (ids, paths, counts, operation name) goes alongside.
+
+```ts
+// good
+log.warn({ err, operation: "lookupRecording", recordingMbid: mbid }, "mb recording lookup failed");
+
+// bad
+log.warn(`mb recording lookup failed for ${mbid}: ${err}`);
+```
+
+Messages should be lowercase, present-tense, and describe what happened in a way that's greppable without including IDs or counts — those belong in the structured context object.

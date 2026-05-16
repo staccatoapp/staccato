@@ -13,13 +13,16 @@ import {
   updateTrackByTrackId,
 } from "../../db/queries/tracks.js";
 import { type ResolutionProgress } from "../types.js";
+import { logger } from "../../logger.js";
+
+const log = logger.child({ module: "resolver:album-first" });
 
 export async function runAlbumFirstPass(progress: ResolutionProgress): Promise<void> {
   progress.total = countUnresolvedTracks();
 
   const unresolvedAlbums = getUnresolvedAlbums();
 
-  console.log(`[resolver] album-first pass: ${unresolvedAlbums.length} albums`);
+  log.info({ count: unresolvedAlbums.length }, "album-first pass starting");
 
   for (const album of unresolvedAlbums) {
     const localTracks = getUnresolvedTracksByAlbum(album.albumId);

@@ -91,9 +91,14 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/:id", async (req, reply) => {
     const { id } = req.params as { id: string };
     const result = requireOwnPlaylist(id, req.userId);
-    if (result === 404)
+    if (result === 404) {
+      req.log.warn({ playlistId: id }, "playlist not found");
       return reply.status(404).send({ error: "Playlist not found" });
-    if (result === 403) return reply.status(403).send({ error: "Forbidden" });
+    }
+    if (result === 403) {
+      req.log.warn({ playlistId: id, userId: req.userId }, "playlist access forbidden");
+      return reply.status(403).send({ error: "Forbidden" });
+    }
 
     const trackRows = getPlaylistTracks(id);
 
@@ -109,9 +114,14 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.put("/:id", async (req, reply) => {
     const { id } = req.params as { id: string };
     const result = requireOwnPlaylist(id, req.userId);
-    if (result === 404)
+    if (result === 404) {
+      req.log.warn({ playlistId: id }, "playlist not found");
       return reply.status(404).send({ error: "Playlist not found" });
-    if (result === 403) return reply.status(403).send({ error: "Forbidden" });
+    }
+    if (result === 403) {
+      req.log.warn({ playlistId: id, userId: req.userId }, "playlist access forbidden");
+      return reply.status(403).send({ error: "Forbidden" });
+    }
 
     const { name, description } = z
       .object({
@@ -137,9 +147,14 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.delete("/:id", async (req, reply) => {
     const { id } = req.params as { id: string };
     const result = requireOwnPlaylist(id, req.userId);
-    if (result === 404)
+    if (result === 404) {
+      req.log.warn({ playlistId: id }, "playlist not found");
       return reply.status(404).send({ error: "Playlist not found" });
-    if (result === 403) return reply.status(403).send({ error: "Forbidden" });
+    }
+    if (result === 403) {
+      req.log.warn({ playlistId: id, userId: req.userId }, "playlist access forbidden");
+      return reply.status(403).send({ error: "Forbidden" });
+    }
 
     deletePlaylistTracks(id);
     deletePlaylist(id);
@@ -150,9 +165,14 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post("/:id/tracks", async (req, reply) => {
     const { id } = req.params as { id: string };
     const result = requireOwnPlaylist(id, req.userId);
-    if (result === 404)
+    if (result === 404) {
+      req.log.warn({ playlistId: id }, "playlist not found");
       return reply.status(404).send({ error: "Playlist not found" });
-    if (result === 403) return reply.status(403).send({ error: "Forbidden" });
+    }
+    if (result === 403) {
+      req.log.warn({ playlistId: id, userId: req.userId }, "playlist access forbidden");
+      return reply.status(403).send({ error: "Forbidden" });
+    }
 
     const { trackIds } = z
       .object({ trackIds: z.array(z.string()).min(1) })
@@ -171,13 +191,20 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.delete("/:id/tracks/:entryId", async (req, reply) => {
     const { id, entryId } = req.params as { id: string; entryId: string };
     const result = requireOwnPlaylist(id, req.userId);
-    if (result === 404)
+    if (result === 404) {
+      req.log.warn({ playlistId: id }, "playlist not found");
       return reply.status(404).send({ error: "Playlist not found" });
-    if (result === 403) return reply.status(403).send({ error: "Forbidden" });
+    }
+    if (result === 403) {
+      req.log.warn({ playlistId: id, userId: req.userId }, "playlist access forbidden");
+      return reply.status(403).send({ error: "Forbidden" });
+    }
 
     const entry = getPlaylistTrackEntry(entryId, id);
-    if (!entry)
+    if (!entry) {
+      req.log.warn({ playlistId: id, entryId }, "playlist track entry not found");
       return reply.status(404).send({ error: "Track entry not found" });
+    }
 
     removePlaylistTrackEntry(entryId);
     touchPlaylist(id);

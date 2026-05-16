@@ -1,5 +1,8 @@
 import { getAllTrackFilePaths, deleteTrackByPath } from "../db/queries/tracks.js";
 import { walkAudioFiles } from "./walk.js";
+import { logger } from "../logger.js";
+
+const log = logger.child({ module: "startup-diff" });
 
 export function reconcileWithFilesystem(musicDir: string): void {
   const onDisk = new Set([...walkAudioFiles(musicDir)]);
@@ -8,12 +11,12 @@ export function reconcileWithFilesystem(musicDir: string): void {
   let removedCount = 0;
   for (const dbPath of inDb) {
     if (!onDisk.has(dbPath)) {
-      console.log(`[startup-diff] removing deleted track: ${dbPath}`);
+      log.debug({ dbPath }, "removing deleted track");
       deleteTrackByPath(dbPath);
       removedCount++;
     }
   }
 
   const newCount = [...onDisk].filter((p) => !inDb.includes(p)).length;
-  console.log(`[startup-diff] removed ${removedCount} stale, ${newCount} new queued for scan`);
+  log.info({ removedCount, newCount }, "filesystem reconciled");
 }

@@ -1,4 +1,7 @@
 import throttle from "p-throttle";
+import { logger } from "../logger.js";
+
+const log = logger.child({ module: "coverart" });
 
 const CAA_BASE = "https://coverartarchive.org";
 
@@ -36,7 +39,8 @@ async function caaFetch(url: string): Promise<string | null> {
         return res.headers.get("location") ?? "";
       }
       return "";
-    } catch {
+    } catch (err) {
+      log.warn({ err, url }, "cover art fetch failed");
       return null;
     }
   })();

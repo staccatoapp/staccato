@@ -21,6 +21,7 @@ import previewRoutes from "./routes/preview.js";
 import recommendationRoutes from "./routes/recommendations.js";
 import downloadRoutes from "./routes/downloads.js";
 import { startLidarrPoller } from "./lidarr/poller.js";
+import { logger } from "./logger.js";
 
 if (process.env.STACCATO_ENV !== "production") {
   dotenvFlow.config({
@@ -28,7 +29,7 @@ if (process.env.STACCATO_ENV !== "production") {
   });
 }
 
-const app = Fastify();
+const app = Fastify({ loggerInstance: logger });
 
 app.register(sessionPlugin);
 
@@ -79,7 +80,7 @@ const start = async () => {
 
   reconcileWithFilesystem(musicDir);
   startScan(musicDir).catch((err) =>
-    console.error("[startup] scan error", err),
+    logger.error({ err }, "startup scan failed"),
   );
 
   startWatcher(musicDir);
@@ -87,6 +88,6 @@ const start = async () => {
 };
 
 start().catch((err) => {
-  console.error(err);
+  logger.fatal({ err }, "server failed to start");
   process.exit(1);
 });

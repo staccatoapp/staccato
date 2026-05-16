@@ -10,6 +10,9 @@ import {
   updateTrackByTrackId,
 } from "../../db/queries/tracks.js";
 import { type ResolutionProgress } from "../types.js";
+import { logger } from "../../logger.js";
+
+const log = logger.child({ module: "resolver:tag-resolution" });
 
 export async function runTagResolutionPass(progress: ResolutionProgress): Promise<void> {
   const fullyTaggedTracks = getPendingTracksWithFullMbidTags();
@@ -18,13 +21,16 @@ export async function runTagResolutionPass(progress: ResolutionProgress): Promis
     progress.resolved++;
   }
   if (fullyTaggedTracks.length > 0) {
-    console.log(`[resolver] Picard fast-path: ${fullyTaggedTracks.length} tracks resolved from tags`);
+    log.info(
+      { count: fullyTaggedTracks.length },
+      "picard fast-path resolved tracks from tags",
+    );
   }
 
   const albums = getAlbumsNeedingTagResolution();
 
   if (albums.length === 0) return;
-  console.log(`[resolver] tag resolution pass: ${albums.length} albums`);
+  log.info({ count: albums.length }, "tag resolution pass starting");
 
   for (const album of albums) {
     const details = await lookupReleaseDetails(album.releaseMbid!);

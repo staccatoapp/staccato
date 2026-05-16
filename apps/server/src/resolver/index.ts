@@ -8,6 +8,9 @@ import { runFingerprintPass } from "./passes/fingerprint.js";
 import { runAlbumBackfillFromTracks } from "./passes/album-backfill.js";
 import { dedupeArtistsAndAlbums } from "./passes/dedupe.js";
 import { runArtistImagePass } from "./passes/artist-image.js";
+import { logger } from "../logger.js";
+
+const log = logger.child({ module: "resolver" });
 
 export type { ResolutionProgress };
 
@@ -22,7 +25,7 @@ export let resolutionProgress: ResolutionProgress = {
 
 export async function startResolution(): Promise<void> {
   if (resolutionProgress.running) {
-    console.log("[resolver] already running, skipping");
+    log.debug("resolver already running, skipping");
     return;
   }
   resolutionProgress = {
@@ -33,6 +36,8 @@ export async function startResolution(): Promise<void> {
     startedAt: new Date(),
     completedAt: null,
   };
+
+  log.info("resolution pipeline starting");
 
   try {
     await runTagResolutionPass(resolutionProgress);
@@ -45,8 +50,16 @@ export async function startResolution(): Promise<void> {
     await runArtistImagePass();
     markRemainingPendingAsFailed();
     resolutionProgress.completedAt = new Date();
+    log.info(
+      {
+        resolved: resolutionProgress.resolved,
+        failed: resolutionProgress.failed,
+        total: resolutionProgress.total,
+      },
+      "resolution pipeline complete",
+    );
   } catch (err) {
-    console.error("[resolver] fatal error", err);
+    log.error({ err }, "resolver pipeline failed");
   } finally {
     resolutionProgress.running = false;
   }

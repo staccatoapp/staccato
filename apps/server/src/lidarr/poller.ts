@@ -4,12 +4,16 @@ import {
   getActiveDownloadRequests,
   updateDownloadRequest,
 } from "../db/queries/download-requests.js";
+import { logger } from "../logger.js";
+
+const log = logger.child({ module: "lidarr-poller" });
 
 async function pollLidarrRequests(): Promise<void> {
   const settings = getOrCreateServerSettings();
   if (!settings.lidarrUrl || !settings.lidarrApiKey) return;
 
   const active = getActiveDownloadRequests();
+  log.debug({ activeCount: active.length }, "lidarr poll tick");
   if (active.length === 0) return;
 
   const albumIds = active
@@ -39,20 +43,29 @@ async function pollLidarrRequests(): Promise<void> {
       stats.trackFileCount >= stats.trackCount;
 
     if (isImported) {
+      log.info(
+        { requestId: req.id, lidarrAlbumId: req.lidarrAlbumId },
+        "download completed",
+      );
       updateDownloadRequest(req.id, { status: "completed" });
       continue;
     }
 
     if (req.status === "sent_to_lidarr" && queuedAlbumIds.has(req.lidarrAlbumId)) {
+      log.info(
+        { requestId: req.id, lidarrAlbumId: req.lidarrAlbumId },
+        "download entered lidarr queue",
+      );
       updateDownloadRequest(req.id, { status: "downloading" });
     }
   }
 }
 
 export function startLidarrPoller(): void {
+  log.info("lidarr poller started");
   setInterval(() => {
     pollLidarrRequests().catch((err) =>
-      console.error("[lidarr-poller] error", err),
+      log.error({ err }, "lidarr poll failed"),
     );
   }, 60_000);
 }
