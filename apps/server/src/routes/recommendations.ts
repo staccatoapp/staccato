@@ -1,8 +1,11 @@
 import { FastifyPluginAsync } from "fastify";
-import type {
-  RecommendedPlaylist,
-  RecommendedPlaylistTrack,
-  RecommendedTrack,
+import { z } from "zod";
+import {
+  RecommendedPlaylistSchema,
+  RecommendedTrackSchema,
+  type RecommendedPlaylist,
+  type RecommendedPlaylistTrack,
+  type RecommendedTrack,
 } from "@staccato/shared";
 import { getOrCreateUserSettings } from "../db/queries/settings.js";
 import { getTracksByMusicbrainzIds } from "../db/queries/tracks.js";
@@ -137,12 +140,15 @@ const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
             tracks,
             coverArtUrl: playlistCoverArtUrl,
             expiresAt: summary.expiresAt,
-          } satisfies RecommendedPlaylist;
+          };
         },
       );
 
       const firstExpiry = summaries.find((s) => s.expiresAt)?.expiresAt ?? null;
-      return { data: results, expiresAt: firstExpiry };
+      return {
+        data: z.array(RecommendedPlaylistSchema).parse(results),
+        expiresAt: firstExpiry,
+      };
     });
   });
 
@@ -153,18 +159,18 @@ const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
     }
     const { listenbrainzToken, musicbrainzUsername } = settings;
 
-    const cached = trackCache.get(req.userId);
-    if (cached) return cached;
-
-    const mbids = await getCFRecommendations(
-      musicbrainzUsername,
-      listenbrainzToken,
-    );
-    if (!mbids.length) {
-      return reply.send({ error: "no-listens" });
-    }
-
     return trackCache.getOrCompute(req.userId, async () => {
+      const mbids = await getCFRecommendations(
+        musicbrainzUsername,
+        listenbrainzToken,
+      );
+      if (!mbids.length) {
+        // Cache the no-listens sentinel for 1h so a user who follows troi-bot
+        // afterwards gets fresh recommendations within an hour rather than 24h.
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+        return { data: { error: "no-listens" as const }, expiresAt };
+      }
+
       const localMap = getTracksByMusicbrainzIds(mbids);
       const nonLocal = mbids.filter((m) => !localMap.has(m));
       const recDetails = await Promise.all(nonLocal.map(lookupRecording));
@@ -228,7 +234,10 @@ const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
         })
         .filter((t): t is RecommendedTrack => t !== null);
 
-      return { data: tracks, expiresAt: null };
+      return {
+        data: z.array(RecommendedTrackSchema).parse(tracks),
+        expiresAt: null,
+      };
     });
   });
 };

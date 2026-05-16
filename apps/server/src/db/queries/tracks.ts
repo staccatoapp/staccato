@@ -107,6 +107,16 @@ export type PlaybackTrackRow = {
   durationSeconds: number | null;
 };
 
+export function getExistingTrackIds(ids: string[]): Set<string> {
+  if (ids.length === 0) return new Set();
+  const rows = db
+    .select({ id: tracks.id })
+    .from(tracks)
+    .where(inArray(tracks.id, ids))
+    .all();
+  return new Set(rows.map((r) => r.id));
+}
+
 export function getPlaybackTracksByIds(ids: string[]): PlaybackTrackRow[] {
   if (ids.length === 0) return [];
   return db

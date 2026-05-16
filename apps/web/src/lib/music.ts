@@ -4,6 +4,12 @@ export function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+export function formatMs(ms: number | null): string {
+  if (!ms) return "—";
+  const s = Math.round(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
 export function generateAlbumGradient(title: string, artist: string): string {
   const titleAndArtist = title + artist;
   let hash = 0;

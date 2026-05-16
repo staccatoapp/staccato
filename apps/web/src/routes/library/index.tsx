@@ -1,32 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import ReactDOM from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
-import {
-  Check,
-  Clock,
-  ListMusic,
-  Music2,
-  Pause,
-  Play,
-  Plus,
-  Search,
-  User,
-  X,
-} from "lucide-react";
+import { createFileRoute } from "@tanstack/react-router";
+import { Plus, Search, X } from "lucide-react";
 import type {
   AlbumListItem,
   Artist,
   LibrarySearchResults,
-  PlaylistDetail,
   PlaylistListItem,
   TrackListItem,
 } from "@staccato/shared";
-import { formatTime, generateAlbumGradient } from "@/lib/music";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { AlbumCard, AlbumCardSkeleton } from "@/components/music/AlbumCard";
+import { ArtistCard } from "@/components/library/artist-card";
+import { PlaylistCard } from "@/components/library/playlist-card";
+import { SectionHeader } from "@/components/library/section-header";
+import { TrackList } from "@/components/library/track-list";
 
 export const Route = createFileRoute("/library/")({
   component: LibraryPage,
@@ -37,475 +27,6 @@ function formatTotalDuration(totalSeconds: number): string {
   const m = Math.floor((totalSeconds % 3600) / 60);
   return h > 0 ? `${h} hr ${m} min` : `${m} min`;
 }
-
-// ─── Artist Card ──────────────────────────────────────────────
-
-function ArtistCard({
-  artist,
-  albumCount,
-}: {
-  artist: { id: string; name: string; imageUrl: string | null };
-  albumCount?: number;
-}) {
-  return (
-    <div className="group cursor-pointer min-w-0 text-center">
-      <div
-        className="relative aspect-square w-full rounded-full overflow-hidden mb-2.5 shadow-md"
-        style={{
-          background: artist.imageUrl
-            ? undefined
-            : generateAlbumGradient(artist.name, ""),
-        }}
-      >
-        {artist.imageUrl ? (
-          <img
-            src={artist.imageUrl}
-            alt={artist.name}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <User className="w-8 h-8 text-white/15" />
-          </div>
-        )}
-      </div>
-      <p className="text-[0.8125rem] font-semibold text-foreground truncate leading-snug">
-        {artist.name}
-      </p>
-      {albumCount != null && (
-        <p className="text-[0.72rem] text-muted-foreground mt-0.5">
-          {albumCount} {albumCount === 1 ? "album" : "albums"}
-        </p>
-      )}
-    </div>
-  );
-}
-
-// ─── Playlist Card ────────────────────────────────────────────
-
-function PlaylistCard({ playlist }: { playlist: PlaylistListItem }) {
-  return (
-    <Link
-      to="/playlists/$playlistId"
-      params={{ playlistId: playlist.id }}
-      className="group block cursor-pointer min-w-0"
-    >
-      <div
-        className="relative aspect-square w-full rounded-lg overflow-hidden mb-2.5 shadow-md"
-        style={{
-          background: playlist.coverArtUrl
-            ? undefined
-            : generateAlbumGradient(playlist.name, ""),
-        }}
-      >
-        {playlist.coverArtUrl ? (
-          <img
-            src={playlist.coverArtUrl}
-            alt={playlist.name}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <ListMusic className="w-8 h-8 text-white/15" />
-          </div>
-        )}
-        <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
-          <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shadow-lg translate-y-2.5 group-hover:translate-y-0 transition-transform duration-200">
-            <Play
-              className="w-4 h-4 text-primary-foreground ml-0.5"
-              fill="currentColor"
-            />
-          </div>
-        </div>
-      </div>
-      <p className="text-[0.8125rem] font-semibold text-foreground truncate leading-snug">
-        {playlist.name}
-      </p>
-      <p className="text-[0.72rem] text-muted-foreground mt-0.5">
-        {playlist.trackCount} {playlist.trackCount === 1 ? "track" : "tracks"}
-      </p>
-    </Link>
-  );
-}
-
-// ─── Add-to-playlist dropdown ─────────────────────────────────
-
-function PlaylistCheckboxRow({
-  trackId,
-  playlist,
-  dropdownOpen,
-}: {
-  trackId: string;
-  playlist: PlaylistListItem;
-  dropdownOpen: boolean;
-}) {
-  const queryClient = useQueryClient();
-  const [hovered, setHovered] = useState(false);
-
-  const { data: detail } = useQuery({
-    queryKey: ["playlist", playlist.id],
-    queryFn: async (): Promise<PlaylistDetail> => {
-      const res = await fetch(`/api/playlists/${playlist.id}`);
-      if (!res.ok) throw new Error("Failed to fetch playlist");
-      return res.json();
-    },
-    enabled: dropdownOpen,
-    staleTime: 60_000,
-  });
-
-  const isMember = detail?.tracks.some((t) => t.trackId === trackId) ?? false;
-  const entryId = detail?.tracks.find((t) => t.trackId === trackId)?.entryId;
-
-  const addMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/playlists/${playlist.id}/tracks`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trackId }),
-      });
-      if (!res.ok) throw new Error("Failed to add track");
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["playlist", playlist.id] });
-      queryClient.invalidateQueries({ queryKey: ["playlists"] });
-    },
-  });
-
-  const removeMutation = useMutation({
-    mutationFn: async () => {
-      if (!entryId) return;
-      const res = await fetch(
-        `/api/playlists/${playlist.id}/tracks/${entryId}`,
-        { method: "DELETE" },
-      );
-      if (!res.ok) throw new Error("Failed to remove track");
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["playlist", playlist.id] });
-      queryClient.invalidateQueries({ queryKey: ["playlists"] });
-    },
-  });
-
-  const toggle = () => {
-    if (isMember && entryId) {
-      removeMutation.mutate();
-    } else if (!isMember) {
-      addMutation.mutate();
-    }
-  };
-
-  return (
-    <button
-      className={cn(
-        "flex items-center gap-2.5 px-3 py-2 w-full text-left transition-colors",
-        hovered ? "bg-white/5" : "bg-transparent",
-      )}
-      onClick={toggle}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <div
-        className={cn(
-          "w-4 h-4 rounded shrink-0 border flex items-center justify-center transition-colors",
-          isMember
-            ? "bg-primary border-primary"
-            : "bg-transparent border-white/25",
-        )}
-      >
-        {isMember && <Check className="w-2.5 h-2.5 text-primary-foreground" />}
-      </div>
-      <span
-        className={cn(
-          "text-[0.8125rem] truncate transition-colors",
-          isMember ? "text-foreground font-medium" : "text-muted-foreground",
-        )}
-      >
-        {playlist.name}
-      </span>
-    </button>
-  );
-}
-
-function AddToPlaylistDropdown({
-  trackId,
-  open,
-  onOpenChange,
-}: {
-  trackId: string;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const [dropStyle, setDropStyle] = useState<React.CSSProperties>({});
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const dropRef = useRef<HTMLDivElement>(null);
-
-  const { data: playlistsData } = useQuery({
-    queryKey: ["playlists"],
-    queryFn: async (): Promise<{ items: PlaylistListItem[] }> => {
-      const res = await fetch("/api/playlists");
-      if (!res.ok) throw new Error("Failed to fetch playlists");
-      return res.json();
-    },
-  });
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (
-        !dropRef.current?.contains(e.target as Node) &&
-        !btnRef.current?.contains(e.target as Node)
-      ) {
-        onOpenChange(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open, onOpenChange]);
-
-  const handleOpen = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (open) {
-      onOpenChange(false);
-      return;
-    }
-    if (!btnRef.current) return;
-    const rect = btnRef.current.getBoundingClientRect();
-    const dropH = 44 + (playlistsData?.items.length ?? 0) * 40;
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const top = spaceBelow > dropH + 8 ? rect.bottom + 4 : rect.top - dropH - 4;
-    const left = Math.min(rect.right - 200, window.innerWidth - 212);
-    setDropStyle({ position: "fixed", top, left, width: 200, zIndex: 300 });
-    onOpenChange(true);
-  };
-
-  const playlists = playlistsData?.items ?? [];
-
-  return (
-    <>
-      <button
-        ref={btnRef}
-        title="Add to playlist"
-        onClick={handleOpen}
-        className="flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-foreground hover:bg-muted border border-transparent hover:border-white/20 transition-colors"
-      >
-        <Plus className="w-3.5 h-3.5" />
-      </button>
-
-      {open &&
-        ReactDOM.createPortal(
-          <div
-            ref={dropRef}
-            style={{ ...dropStyle, background: "oklch(0.22 0 0)" }}
-            className="rounded-xl border border-white/10 shadow-2xl overflow-hidden"
-          >
-            <div className="px-3 py-2 border-b border-white/10">
-              <span className="text-[0.68rem] font-semibold uppercase tracking-widest text-muted-foreground">
-                Add to playlist
-              </span>
-            </div>
-            {playlists.length === 0 ? (
-              <p className="px-3 py-2 text-xs text-muted-foreground">
-                No playlists yet
-              </p>
-            ) : (
-              playlists.map((pl) => (
-                <PlaylistCheckboxRow
-                  key={pl.id}
-                  trackId={trackId}
-                  playlist={pl}
-                  dropdownOpen={open}
-                />
-              ))
-            )}
-          </div>,
-          document.body,
-        )}
-    </>
-  );
-}
-
-// ─── Track Row + List ─────────────────────────────────────────
-
-function TrackRow({
-  track,
-  index,
-  isActive,
-  isPlaying,
-  onPlay,
-}: {
-  track: TrackListItem;
-  index: number;
-  isActive: boolean;
-  isPlaying: boolean;
-  onPlay: () => void;
-}) {
-  const [hovered, setHovered] = useState(false);
-  const [dropOpen, setDropOpen] = useState(false);
-  const active = hovered || dropOpen;
-
-  return (
-    <div
-      className={cn(
-        "grid items-center gap-3 px-2 py-1.5 rounded-lg cursor-pointer transition-colors",
-        "grid-cols-[2rem_2.25rem_1fr_1fr_1fr_1.5rem_4rem]",
-        active ? "bg-white/5" : "bg-transparent",
-      )}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onDoubleClick={onPlay}
-    >
-      {/* # */}
-      <div
-        className="flex items-center justify-center text-[0.8rem] tabular-nums"
-        style={{ color: isActive ? "var(--color-primary)" : undefined }}
-      >
-        {active ? (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onPlay();
-            }}
-            className="text-foreground"
-          >
-            <Play className="w-3.5 h-3.5" fill="currentColor" />
-          </button>
-        ) : isActive && isPlaying ? (
-          <Pause
-            className="w-3.5 h-3.5"
-            fill="currentColor"
-            style={{ color: "var(--color-primary)" }}
-          />
-        ) : (
-          <span className="text-muted-foreground">{index + 1}</span>
-        )}
-      </div>
-
-      {/* Art */}
-      <div
-        className="w-9 h-9 rounded overflow-hidden flex items-center justify-center shrink-0"
-        style={{
-          background: generateAlbumGradient(
-            track.albumTitle ?? track.title,
-            track.artistName,
-          ),
-        }}
-      >
-        {track.coverArtUrl ? (
-          <img
-            src={track.coverArtUrl}
-            alt=""
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <Music2 className="w-3.5 h-3.5 text-white/20" />
-        )}
-      </div>
-
-      {/* Title */}
-      <div
-        className="truncate text-[0.875rem]"
-        style={{
-          color: isActive ? "var(--color-primary)" : undefined,
-          fontWeight: isActive ? 600 : 400,
-        }}
-      >
-        {track.title}
-      </div>
-
-      {/* Album */}
-      <div className="truncate text-[0.8rem] text-muted-foreground">
-        {track.albumTitle ?? "—"}
-      </div>
-
-      {/* Artist */}
-      <div className="truncate text-[0.8rem] text-muted-foreground">
-        {track.artistName}
-      </div>
-
-      {/* + playlist */}
-      <div
-        className={cn(
-          "flex items-center justify-center transition-opacity",
-          active ? "opacity-100" : "opacity-0",
-        )}
-      >
-        <AddToPlaylistDropdown
-          trackId={track.id}
-          open={dropOpen}
-          onOpenChange={setDropOpen}
-        />
-      </div>
-
-      {/* Duration */}
-      <div className="text-[0.8rem] text-muted-foreground tabular-nums text-right">
-        {track.durationSeconds ? formatTime(track.durationSeconds) : "—"}
-      </div>
-    </div>
-  );
-}
-
-function TrackList({
-  tracks,
-  activeTrackId,
-  isPlaying,
-  onPlayTrack,
-}: {
-  tracks: TrackListItem[];
-  activeTrackId?: string;
-  isPlaying?: boolean;
-  onPlayTrack: (index: number) => void;
-}) {
-  return (
-    <div>
-      {/* Header */}
-      <div className="grid items-center gap-3 px-2 pb-2 border-b border-border mb-1 grid-cols-[2rem_2.25rem_1fr_1fr_1fr_1.5rem_4rem]">
-        <div className="text-[0.7rem] font-semibold uppercase tracking-wider text-muted-foreground text-center">
-          #
-        </div>
-        <div />
-        <div className="text-[0.7rem] font-semibold uppercase tracking-wider text-muted-foreground">
-          Title
-        </div>
-        <div className="text-[0.7rem] font-semibold uppercase tracking-wider text-muted-foreground">
-          Album
-        </div>
-        <div className="text-[0.7rem] font-semibold uppercase tracking-wider text-muted-foreground">
-          Artist
-        </div>
-        <div />
-        <div className="flex justify-end text-muted-foreground">
-          <Clock className="w-3 h-3" />
-        </div>
-      </div>
-
-      {tracks.map((track, i) => (
-        <TrackRow
-          key={track.id}
-          track={track}
-          index={i}
-          isActive={track.id === activeTrackId}
-          isPlaying={isPlaying ?? false}
-          onPlay={() => onPlayTrack(i)}
-        />
-      ))}
-    </div>
-  );
-}
-
-// ─── Section header (search results) ─────────────────────────
-
-function SectionHeader({ label, count }: { label: string; count: number }) {
-  return (
-    <div className="flex items-baseline gap-2 mb-3 mt-8 first:mt-0">
-      <span className="text-[0.7rem] font-semibold uppercase tracking-widest text-muted-foreground">
-        {label}
-      </span>
-      <span className="text-[0.75rem] text-muted-foreground/60">{count}</span>
-    </div>
-  );
-}
-
-// ─── Library Page ─────────────────────────────────────────────
 
 function LibraryPage() {
   const queryClient = useQueryClient();
@@ -525,7 +46,6 @@ function LibraryPage() {
 
   const isSearchMode = debouncedSearch.length >= 2;
 
-  // All data pre-fetched
   const albumsQuery = useQuery({
     queryKey: ["albums"],
     queryFn: async (): Promise<{ items: AlbumListItem[]; total: number }> => {
@@ -579,7 +99,6 @@ function LibraryPage() {
     staleTime: 30_000,
   });
 
-  // Album count by artist id
   const albumCountByArtistId = useMemo(() => {
     const map = new Map<string, number>();
     albumsQuery.data?.items.forEach((a) =>
@@ -588,7 +107,6 @@ function LibraryPage() {
     return map;
   }, [albumsQuery.data]);
 
-  // Total duration
   const totalDurationSeconds = useMemo(
     () =>
       tracksQuery.data?.items.reduce(
@@ -598,14 +116,12 @@ function LibraryPage() {
     [tracksQuery.data],
   );
 
-  // Playback
   const { data: playbackSession } = useQuery({
     queryKey: ["playback-session"],
     queryFn: async () => {
       const res = await fetch("/api/playback/session");
       if (!res.ok) throw new Error("Failed to fetch session");
-      const json = await res.json();
-      return json;
+      return res.json();
     },
   });
   const activeTrackId = playbackSession?.currentTrack?.id as string | undefined;
@@ -655,7 +171,6 @@ function LibraryPage() {
     });
   };
 
-  // Count label
   const countLabel = (() => {
     switch (activeTab) {
       case "albums":
@@ -677,7 +192,6 @@ function LibraryPage() {
     }
   })();
 
-  // Playlist search (client-side)
   const matchedPlaylists =
     isSearchMode && playlistsQuery.data
       ? playlistsQuery.data.items.filter((p) =>
@@ -763,13 +277,12 @@ function LibraryPage() {
         </div>
       )}
 
-      {/* ─── Search mode ─── */}
+      {/* Search mode */}
       {isSearchMode ? (
         searchResultsQuery.isFetching ? (
           <p className="text-sm text-muted-foreground">Searching…</p>
         ) : (
           <div>
-            {/* Playlists (client-side filtered) */}
             {matchedPlaylists.length > 0 && (
               <div>
                 <SectionHeader
@@ -790,7 +303,6 @@ function LibraryPage() {
               </div>
             )}
 
-            {/* Artists */}
             {(searchResultsQuery.data?.artists.length ?? 0) > 0 && (
               <div>
                 <SectionHeader
@@ -815,7 +327,6 @@ function LibraryPage() {
               </div>
             )}
 
-            {/* Albums */}
             {(searchResultsQuery.data?.albums.length ?? 0) > 0 && (
               <div>
                 <SectionHeader
@@ -843,7 +354,6 @@ function LibraryPage() {
               </div>
             )}
 
-            {/* Tracks first */}
             {(searchResultsQuery.data?.tracks.length ?? 0) > 0 && (
               <div>
                 <SectionHeader
@@ -876,7 +386,7 @@ function LibraryPage() {
           </div>
         )
       ) : (
-        /* ─── Tab content ─── */
+        /* Tab content */
         <>
           {activeTab === "albums" && (
             <div

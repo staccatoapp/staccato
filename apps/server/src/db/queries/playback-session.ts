@@ -25,9 +25,31 @@ export function getOrCreatePlaybackSession(
 export function updatePlaybackSession(
   userId: string,
   data: PlaybackSessionUpdate,
-): void {
-  db.update(playbackSession)
+): PlaybackSessionRow {
+  return db
+    .update(playbackSession)
     .set(data)
     .where(eq(playbackSession.userId, userId))
-    .run();
+    .returning()
+    .get()!;
+}
+
+export function appendToQueue(
+  userId: string,
+  trackIds: string[],
+): PlaybackSessionRow {
+  return db.transaction((tx) => {
+    const current = tx
+      .select({ trackQueue: playbackSession.trackQueue })
+      .from(playbackSession)
+      .where(eq(playbackSession.userId, userId))
+      .get();
+    const next = (current?.trackQueue ?? []).concat(trackIds);
+    return tx
+      .update(playbackSession)
+      .set({ trackQueue: next })
+      .where(eq(playbackSession.userId, userId))
+      .returning()
+      .get()!;
+  });
 }

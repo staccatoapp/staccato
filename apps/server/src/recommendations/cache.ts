@@ -1,4 +1,8 @@
-import type { RecommendedPlaylist, RecommendedTrack } from "@staccato/shared";
+import type {
+  RecommendationError,
+  RecommendedPlaylist,
+  RecommendedTrack,
+} from "@staccato/shared";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
@@ -60,7 +64,11 @@ class RecommendationCache<T> {
   }
 }
 
+export type RecommendedTracksCacheValue =
+  | RecommendedTrack[]
+  | RecommendationError;
+
 export const playlistCache = new RecommendationCache<RecommendedPlaylist[]>();
-export const trackCache = new RecommendationCache<RecommendedTrack[]>(
+export const trackCache = new RecommendationCache<RecommendedTracksCacheValue>(
   ONE_DAY_MS,
 );

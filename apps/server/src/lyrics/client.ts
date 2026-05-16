@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { APP_USER_AGENT } from "../constants.js";
-import type { SyncedLyricsRow } from "@staccato/shared";
+import type { SyncedLyricsLine } from "@staccato/shared";
 
 const LRCLIB_BASE = "https://lrclib.net/api";
 
@@ -44,8 +44,8 @@ export async function fetchLyrics(params: {
   }
 }
 
-// Parses "[MM:SS.cs] text" lines into SyncedLyricsRow[]
-export function parseSyncedLyrics(raw: string): SyncedLyricsRow[] {
+// Parses "[MM:SS.cs] text" lines into SyncedLyricsLine[]
+export function parseSyncedLyrics(raw: string): SyncedLyricsLine[] {
   return raw
     .split("\n")
     .map((line) => {
@@ -61,5 +61,5 @@ export function parseSyncedLyrics(raw: string): SyncedLyricsRow[] {
       if (Number.isNaN(minutes) || Number.isNaN(seconds)) return null;
       return { startingTime: minutes * 60 + seconds, lyrics: text };
     })
-    .filter((row): row is SyncedLyricsRow => row !== null);
+    .filter((row): row is SyncedLyricsLine => row !== null);
 }

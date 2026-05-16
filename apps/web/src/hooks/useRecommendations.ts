@@ -1,10 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import type { RecommendedPlaylist, RecommendedTrack } from "@staccato/shared";
+import type {
+  RecommendationError,
+  RecommendedPlaylist,
+  RecommendedTrack,
+} from "@staccato/shared";
 
-type TracksResponse = RecommendedTrack[] | { error: "no-id" | "no-listens" };
-type PlaylistsResponse =
-  | RecommendedPlaylist[]
-  | { error: "no-id" | "no-listens" };
+type TracksResponse = RecommendedTrack[] | RecommendationError;
+type PlaylistsResponse = RecommendedPlaylist[] | RecommendationError;
 
 async function fetchJson<T>(url: string): Promise<T> {
   const res = await fetch(url);

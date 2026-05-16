@@ -58,6 +58,11 @@ const LBCFRecommendationsSchema = z.object({
   }),
 });
 
+const LBValidateTokenSchema = z.object({
+  valid: z.boolean(),
+  user_name: z.string().optional(),
+});
+
 // ── Types inferred from schemas ───────────────────────────────────────────────
 
 export interface LBPlaylistSummary {
@@ -204,7 +209,7 @@ export async function validateToken(
       headers: { Authorization: `Token ${token}` },
     });
     if (!res.ok) return { valid: false };
-    const data = (await res.json()) as { valid: boolean; user_name?: string };
+    const data = LBValidateTokenSchema.parse(await res.json());
     return { valid: data.valid, userName: data.user_name };
   } catch {
     return { valid: false };

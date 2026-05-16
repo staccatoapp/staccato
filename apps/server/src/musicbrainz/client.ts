@@ -2,6 +2,16 @@
 
 import throttle from "p-throttle";
 import { APP_USER_AGENT } from "../constants.js";
+import {
+  MBArtistSearchResponseSchema,
+  MBExternalRecordingSearchResponseSchema,
+  MBRecordingLookupSchema,
+  MBRecordingSearchResponseSchema,
+  MBReleaseGroupLookupSchema,
+  MBReleaseGroupSearchResponseSchema,
+  MBReleaseLookupSchema,
+  MBReleaseSearchResponseSchema,
+} from "./schemas.js";
 
 export interface RecordingMatch {
   recordingMbid: string;
@@ -76,22 +86,6 @@ interface MBReleaseLike {
   "release-group"?: { id?: string; "primary-type"?: string };
 }
 
-interface MBRelease extends MBReleaseLike {
-  title: string;
-}
-
-interface MBRecording {
-  id: string;
-  title?: string;
-  score: number;
-  releases?: MBRelease[];
-  "artist-credit"?: Array<{ artist: { id: string; name: string } }>;
-}
-
-interface MBRecordingSearchResponse {
-  recordings: MBRecording[];
-}
-
 function parseReleaseYear(date?: string): number | null {
   if (!date) return null;
   const year = parseInt(date.slice(0, 4), 10);
@@ -164,7 +158,7 @@ async function attemptRecordingSearch(
       `${MB_BASE}/recording?${query}&inc=releases+release-groups+artist-credits`,
     );
     if (!response.ok) return null;
-    const data: MBRecordingSearchResponse = await response.json();
+    const data = MBRecordingSearchResponseSchema.parse(await response.json());
     const normalizedHint = hint?.albumTitle
       ? normalizeString(hint.albumTitle)
       : null;
@@ -218,15 +212,9 @@ export async function searchRecordingsByQuery(
       `${MB_BASE}/recording?${params}&inc=releases+release-groups+artist-credits`,
     );
     if (!response.ok) return [];
-    const data = (await response.json()) as {
-      recordings: Array<{
-        id: string;
-        title: string;
-        length?: number;
-        "artist-credit"?: Array<{ artist: { id: string; name: string } }>;
-        releases?: MBRelease[];
-      }>;
-    };
+    const data = MBExternalRecordingSearchResponseSchema.parse(
+      await response.json(),
+    );
     return data.recordings.map((r) => {
       const bestRelease = r.releases?.length
         ? pickBestRelease(r.releases)
@@ -261,14 +249,7 @@ export async function searchArtistsByQuery(
     });
     const response = await throttledFetch(`${MB_BASE}/artist?${params}`);
     if (!response.ok) return [];
-    const data = (await response.json()) as {
-      artists: Array<{
-        id: string;
-        name: string;
-        disambiguation?: string;
-        type?: string;
-      }>;
-    };
+    const data = MBArtistSearchResponseSchema.parse(await response.json());
     return data.artists.map((a) => ({
       artistMbid: a.id,
       name: a.name,
@@ -295,16 +276,7 @@ export async function searchReleasesByQuery(
       `${MB_BASE}/release?${params}&inc=artist-credits+release-groups`,
     );
     if (!response.ok) return [];
-    const data = (await response.json()) as {
-      releases: Array<{
-        id: string;
-        title: string;
-        date?: string;
-        status?: string;
-        "artist-credit"?: Array<{ artist: { id: string; name: string } }>;
-        "release-group"?: { id?: string; "primary-type"?: string };
-      }>;
-    };
+    const data = MBReleaseSearchResponseSchema.parse(await response.json());
 
     const byGroup = new Map<string, typeof data.releases>();
     for (const r of data.releases) {
@@ -368,13 +340,7 @@ export async function lookupRecording(
         `${MB_BASE}/recording/${mbid}?inc=artist-credits+releases+release-groups&fmt=json`,
       );
       if (!response.ok) return null;
-      const data = (await response.json()) as {
-        id: string;
-        title?: string;
-        length?: number;
-        "artist-credit"?: Array<{ artist: { id: string; name: string } }>;
-        releases?: MBRelease[];
-      };
+      const data = MBRecordingLookupSchema.parse(await response.json());
       const bestReleaseMbid = data.releases?.length
         ? pickBestRelease(data.releases)
         : null;
@@ -414,20 +380,7 @@ export async function lookupReleaseDetails(
       `${MB_BASE}/release/${releaseMbid}?inc=recordings+artist-credits+release-groups&fmt=json`,
     );
     if (!response.ok) return null;
-    const data = (await response.json()) as {
-      title?: string;
-      "artist-credit"?: Array<{ artist: { id: string; name: string } }>;
-      "release-group"?: { id: string };
-      media: Array<{
-        position: number;
-        tracks: Array<{
-          position: number;
-          title: string;
-          length?: number;
-          recording: { id: string };
-        }>;
-      }>;
-    };
+    const data = MBReleaseLookupSchema.parse(await response.json());
     return {
       tracks: data.media.flatMap((disc) =>
         disc.tracks.map((t) => ({
@@ -461,12 +414,9 @@ export async function searchReleaseGroupCandidates(
     });
     const response = await throttledFetch(`${MB_BASE}/release-group?${params}`);
     if (!response.ok) return [];
-    const data = (await response.json()) as {
-      "release-groups": Array<{
-        id: string;
-        score: number;
-      }>;
-    };
+    const data = MBReleaseGroupSearchResponseSchema.parse(
+      await response.json(),
+    );
     return data["release-groups"]
       .filter((rg) => rg.score >= 80)
       .map((rg) => rg.id);
@@ -492,12 +442,7 @@ export async function lookupExternalAlbum(
       `${MB_BASE}/release-group/${rgMbid}?inc=releases+artist-credits&fmt=json`,
     );
     if (!res.ok) return null;
-    const rg = (await res.json()) as {
-      title: string;
-      "primary-type"?: string;
-      "artist-credit"?: Array<{ artist: { id: string; name: string } }>;
-      releases?: Array<{ id: string; date?: string; status?: string }>;
-    };
+    const rg = MBReleaseGroupLookupSchema.parse(await res.json());
 
     const releases = rg.releases ?? [];
     const releaseMbid = pickBestRelease(releases) ?? releases[0]?.id;

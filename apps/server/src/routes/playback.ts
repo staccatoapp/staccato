@@ -1,11 +1,21 @@
-import { FastifyPluginAsync } from "fastify";
+import { FastifyBaseLogger, FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import {
+  appendToQueue,
   getOrCreatePlaybackSession,
   updatePlaybackSession,
+  type PlaybackSessionRow,
 } from "../db/queries/playback-session.js";
-import { getPlaybackTracksByIds, getTrackForScrobble } from "../db/queries/tracks.js";
-import { insertListenEvent } from "../db/queries/listening-history.js";
+import {
+  getExistingTrackIds,
+  getPlaybackTracksByIds,
+  getTrackForScrobble,
+  type PlaybackTrackRow,
+} from "../db/queries/tracks.js";
+import {
+  insertListenEvent,
+  markScrobbled,
+} from "../db/queries/listening-history.js";
 import { getUserListenbrainzToken } from "../db/queries/settings.js";
 import { submitListen } from "../listenbrainz/client.js";
 import {
@@ -18,29 +28,38 @@ import type { TrackLyrics } from "@staccato/shared";
 
 const playbackRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/session", async (req) => {
-    return getSessionWithTrackDetails(req.userId);
+    const session = getOrCreatePlaybackSession(req.userId);
+    return buildSessionResponse(session);
   });
 
-  // TODO - relying on index for order is bad, e.g. if we are listening to 4th song and then add 2 songs before the queue. fractional indexing + separate table queue items would be better. refactor one day
-  fastify.post("/session/queue", async (req) => {
-    const userId = req.userId;
+  // TODO(queue-items): queue order via array index breaks when items insert
+  // ahead of the current track. Switch to fractional indexing + a queue_items
+  // table in a future plan.
+  fastify.post("/session/queue", async (req, reply) => {
     const { trackIds } = z
       .object({ trackIds: z.array(z.string()) })
       .parse(req.body);
-    const session = getOrCreatePlaybackSession(userId);
-    const updatedTrackQueue = session.trackQueue.concat(trackIds); // TODO - not atomic, doesn't validate trackIds, only appends. this will need work
-    updatePlaybackSession(userId, { trackQueue: updatedTrackQueue });
-    return getSessionWithTrackDetails(userId); // TODO - another round call for no good reason
+    const valid = filterExistingTrackIds(trackIds);
+    if (valid.length === 0) {
+      return reply.code(400).send({ error: "no-valid-tracks" });
+    }
+    getOrCreatePlaybackSession(req.userId);
+    const session = appendToQueue(req.userId, valid);
+    return buildSessionResponse(session);
   });
 
-  // TODO - relying on index for order is bad, e.g. if we are listening to 4th song and then add 2 songs before the queue. fractional indexing + separate table queue items would be better. refactor one day
-  fastify.put("/session/queue", async (req) => {
-    const userId = req.userId;
+  // TODO(queue-items): see comment on POST /session/queue.
+  fastify.put("/session/queue", async (req, reply) => {
     const { trackIds } = z
       .object({ trackIds: z.array(z.string()) })
       .parse(req.body);
-    updatePlaybackSession(userId, { trackQueue: Array.from(trackIds) });
-    return getSessionWithTrackDetails(userId); // TODO - another round call for no good reason
+    const valid = filterExistingTrackIds(trackIds);
+    if (valid.length === 0 && trackIds.length > 0) {
+      return reply.code(400).send({ error: "no-valid-tracks" });
+    }
+    getOrCreatePlaybackSession(req.userId);
+    const session = updatePlaybackSession(req.userId, { trackQueue: valid });
+    return buildSessionResponse(session);
   });
 
   fastify.put("/session/state", async (req) => {
@@ -57,33 +76,40 @@ const playbackRoutes: FastifyPluginAsync = async (fastify) => {
         currentTrackIndex: z.number(),
         currentTrackPositionInSeconds: z.number(),
         currentTrackAccumulatedPlayTimeInSeconds: z.number(),
-        currentTrackListenEventCreated: z.boolean().optional(), // TODO - this is a band-aid for the fact that I forgot to add this field until after the fact. need to fix properly at some point
+        currentTrackListenEventCreated: z.boolean().optional(),
       })
       .parse(req.body);
 
-    const currentSession = await getSessionWithTrackDetails(userId);
+    const current = getOrCreatePlaybackSession(userId);
+    const currentTrackId = current.trackQueue[currentTrackIndex];
+    const currentTrackDurationSeconds = currentTrackId
+      ? getTrackDurationSeconds(currentTrackId)
+      : null;
 
-    let listenEventCreated = currentSession.currentTrackListenEventCreated;
+    let listenEventCreated = current.currentTrackListenEventCreated;
 
-    // only scrobble if listened to more than half the track or 4 mins as per listenbrainz docs. should probably pull this out at some point
+    // only scrobble if listened to more than half the track or 4 mins as per
+    // listenbrainz docs. should probably pull this out at some point
     if (
-      !currentSession.currentTrackListenEventCreated &&
+      !current.currentTrackListenEventCreated &&
       isPlaying &&
       currentTrackAccumulatedPlayTimeInSeconds >
-        Math.min(
-          240,
-          (currentSession.trackQueue[currentTrackIndex]?.durationSeconds ??
-            480) / 2,
-        )
+        Math.min(240, (currentTrackDurationSeconds ?? 480) / 2)
     ) {
-      addListenEvent(
-        userId,
-        currentSession.trackQueue[currentTrackIndex]?.id ?? "",
-      );
+      if (currentTrackId) {
+        addListenEvent(userId, currentTrackId, req.log).catch(() => {
+          /* logged inside */
+        });
+      } else {
+        req.log.warn(
+          { userId, currentTrackIndex },
+          "scrobble triggered but no track at currentTrackIndex",
+        );
+      }
       listenEventCreated = true;
     }
 
-    updatePlaybackSession(userId, {
+    const session = updatePlaybackSession(userId, {
       isPlaying,
       currentTrackIndex,
       currentTrackPositionInSeconds,
@@ -92,11 +118,10 @@ const playbackRoutes: FastifyPluginAsync = async (fastify) => {
         currentTrackListenEventCreated ?? listenEventCreated,
     });
 
-    return getSessionWithTrackDetails(userId); // TODO - can just return update result. whole area needs improvement and no performance issues rn so skipping until later
+    return buildSessionResponse(session);
   });
 
-  fastify.put("/session/play", async (req) => {
-    const userId = req.userId;
+  fastify.put("/session/play", async (req, reply) => {
     const { trackIds, startIndex } = z
       .object({
         trackIds: z.array(z.string()),
@@ -104,17 +129,26 @@ const playbackRoutes: FastifyPluginAsync = async (fastify) => {
       })
       .parse(req.body);
 
-    getOrCreatePlaybackSession(userId);
-    updatePlaybackSession(userId, {
-      trackQueue: trackIds,
-      currentTrackIndex: startIndex,
+    const valid = filterExistingTrackIds(trackIds);
+    if (valid.length === 0) {
+      return reply.code(400).send({ error: "no-valid-tracks" });
+    }
+    const safeStartIndex = Math.max(
+      0,
+      Math.min(startIndex, valid.length - 1),
+    );
+
+    getOrCreatePlaybackSession(req.userId);
+    const session = updatePlaybackSession(req.userId, {
+      trackQueue: valid,
+      currentTrackIndex: safeStartIndex,
       currentTrackPositionInSeconds: 0,
       currentTrackAccumulatedPlayTimeInSeconds: 0,
       currentTrackListenEventCreated: false,
       isPlaying: true,
     });
 
-    return getSessionWithTrackDetails(userId);
+    return buildSessionResponse(session);
   });
 
   fastify.get("/lyrics", async (req, reply) => {
@@ -156,13 +190,29 @@ const playbackRoutes: FastifyPluginAsync = async (fastify) => {
   });
 };
 
-async function getSessionWithTrackDetails(userId: string) {
-  const session = getOrCreatePlaybackSession(userId);
-  const sessionTracks = getPlaybackTracksByIds(session.trackQueue);
+function filterExistingTrackIds(trackIds: string[]): string[] {
+  const existing = getExistingTrackIds(trackIds);
+  return trackIds.filter((id) => existing.has(id));
+}
 
-  const orderedTracks = session.trackQueue
-    .map((id) => sessionTracks.find((t) => t.id === id))
-    .filter((t): t is NonNullable<typeof t> => t !== undefined);
+function getTrackDurationSeconds(trackId: string): number | null {
+  const [track] = getPlaybackTracksByIds([trackId]);
+  return track?.durationSeconds ?? null;
+}
+
+function orderTracksByQueue(
+  queue: string[],
+  tracks: PlaybackTrackRow[],
+): PlaybackTrackRow[] {
+  const byId = new Map(tracks.map((t) => [t.id, t]));
+  return queue
+    .map((id) => byId.get(id))
+    .filter((t): t is PlaybackTrackRow => t !== undefined);
+}
+
+function buildSessionResponse(session: PlaybackSessionRow) {
+  const sessionTracks = getPlaybackTracksByIds(session.trackQueue);
+  const orderedTracks = orderTracksByQueue(session.trackQueue, sessionTracks);
 
   return {
     trackQueue: orderedTracks,
@@ -175,40 +225,48 @@ async function getSessionWithTrackDetails(userId: string) {
   };
 }
 
-// TODO - for now, scrobbling immediately into listenbrainz. In future, this will be handled by redis queues once I can be bothered
-// also should probably be in a transaction/trycatch, and not querying so much separately. being lazy
-async function addListenEvent(userId: string, trackId: string) {
+// TODO: a periodic retry job should pick up listening_history rows with
+// scrobbled_to_listenbrainz = false and replay them. Out of scope for now.
+async function addListenEvent(
+  userId: string,
+  trackId: string,
+  log: FastifyBaseLogger,
+): Promise<void> {
   if (!trackId) return;
 
   const insertedListen = insertListenEvent(userId, trackId);
 
   const listenbrainzToken = getUserListenbrainzToken(userId);
   if (!listenbrainzToken) {
-    console.warn(
-      "Could not submit listen to ListenBrainz - no token found for user",
-      userId,
+    log.warn(
+      { userId },
+      "could not submit listen to listenbrainz - no token found for user",
     );
     return;
   }
 
   const track = getTrackForScrobble(trackId);
-
   if (!track?.artistName || !track?.title) {
-    console.warn(
-      "Could not submit listen to ListenBrainz - missing track or artist name for trackId",
-      trackId,
+    log.warn(
+      { trackId },
+      "could not submit listen to listenbrainz - missing track or artist name",
     );
     return;
   }
 
-  await submitListen({
-    token: listenbrainzToken,
-    listenType: "single",
-    artistName: track.artistName,
-    trackName: track.title,
-    listenedAt: insertedListen.listenedAt,
-    trackMbid: track.musicbrainzId,
-  });
+  try {
+    await submitListen({
+      token: listenbrainzToken,
+      listenType: "single",
+      artistName: track.artistName,
+      trackName: track.title,
+      listenedAt: insertedListen.listenedAt,
+      trackMbid: track.musicbrainzId,
+    });
+    markScrobbled(insertedListen.id);
+  } catch (err) {
+    log.error({ err, userId, trackId }, "scrobble to listenbrainz failed");
+  }
 }
 
 export default playbackRoutes;

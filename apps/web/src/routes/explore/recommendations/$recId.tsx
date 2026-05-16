@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Check, ChevronLeft, Plus } from "lucide-react";
 import { generateAlbumGradient } from "@/lib/music";
 import { useRecommendedPlaylists } from "@/hooks/useRecommendations";
+import { usePreviewAudio } from "@/hooks/usePreviewAudio";
 import {
   RecommendedTrackListHeader,
   RecommendedTrackRow,
@@ -28,8 +29,7 @@ function RecommendationDetailPage() {
   const { recId } = Route.useParams();
   const { data: playlists, isLoading } = useRecommendedPlaylists();
 
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const [playingMbid, setPlayingMbid] = useState<string | null>(null);
+  const { audioRef, playingMbid, handlePreview } = usePreviewAudio();
 
   const gradient = generateAlbumGradient(recId, "recommendation");
 
@@ -50,33 +50,6 @@ function RecommendationDetailPage() {
 
   const [trackStates, setTrackStates] = useState<Record<string, boolean>>({});
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
-
-  function handlePreview(
-    recordingMbid: string,
-    artistName: string,
-    title: string,
-  ) {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (playingMbid === recordingMbid) {
-      audio.pause();
-      setPlayingMbid(null);
-      return;
-    }
-    window.dispatchEvent(new Event("staccato:preview-start"));
-    const params = new URLSearchParams({ artistName, trackTitle: title });
-    audio.src = `/api/preview/${recordingMbid}/stream?${params}`;
-    audio.play().catch(() => {});
-    setPlayingMbid(recordingMbid);
-  }
-
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const onEnded = () => setPlayingMbid(null);
-    audio.addEventListener("ended", onEnded);
-    return () => audio.removeEventListener("ended", onEnded);
-  }, []);
 
   const visibleTracks = tracks.filter(
     (t) => !t.recordingMbid || !dismissed.has(t.recordingMbid),
