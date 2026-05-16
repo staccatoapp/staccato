@@ -133,10 +133,14 @@ const playbackRoutes: FastifyPluginAsync = async (fastify) => {
     if (valid.length === 0) {
       return reply.code(400).send({ error: "no-valid-tracks" });
     }
-    const safeStartIndex = Math.max(
-      0,
-      Math.min(startIndex, valid.length - 1),
-    );
+    const safeStartIndex = (() => {
+      const target = trackIds[startIndex];
+      if (target) {
+        const translated = valid.indexOf(target);
+        if (translated >= 0) return translated;
+      }
+      return Math.max(0, Math.min(startIndex, valid.length - 1));
+    })();
 
     getOrCreatePlaybackSession(req.userId);
     const session = updatePlaybackSession(req.userId, {
@@ -232,8 +236,6 @@ async function addListenEvent(
   trackId: string,
   log: FastifyBaseLogger,
 ): Promise<void> {
-  if (!trackId) return;
-
   const insertedListen = insertListenEvent(userId, trackId);
 
   const listenbrainzToken = getUserListenbrainzToken(userId);

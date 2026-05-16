@@ -5,35 +5,53 @@ import {
   updateDownloadRequest,
 } from "../db/queries/download-requests.js";
 
-async function pollLidarrQueue(): Promise<void> {
+async function pollLidarrRequests(): Promise<void> {
   const settings = getOrCreateServerSettings();
   if (!settings.lidarrUrl || !settings.lidarrApiKey) return;
 
   const active = getActiveDownloadRequests();
   if (active.length === 0) return;
 
+  const albumIds = active
+    .map((req) => req.lidarrAlbumId)
+    .filter((id): id is number => id != null);
+  if (albumIds.length === 0) return;
+
   const client = new LidarrClient(settings.lidarrUrl, settings.lidarrApiKey);
-  const queue = await client.getQueue();
+  const [albums, queue] = await Promise.all([
+    client.getAlbumsByIds(albumIds),
+    client.getQueue(),
+  ]);
+
+  const albumById = new Map(albums.map((album) => [album.id, album]));
   const queuedAlbumIds = new Set(queue.map((item) => item.albumId));
 
   for (const req of active) {
     if (req.lidarrAlbumId == null) continue;
 
-    const inQueue = queuedAlbumIds.has(req.lidarrAlbumId);
+    const album = albumById.get(req.lidarrAlbumId);
+    if (!album) continue;
 
-    if (req.status === "sent_to_lidarr" && inQueue) {
-      updateDownloadRequest(req.id, { status: "downloading" });
-    } else if (req.status === "downloading" && !inQueue) {
-      // Lidarr removes items from queue on completion AND on failure/cancellation.
-      // We optimistically mark completed; Lidarr's own UI remains the source of truth.
+    const stats = album.statistics;
+    const isImported =
+      stats != null &&
+      stats.trackCount > 0 &&
+      stats.trackFileCount >= stats.trackCount;
+
+    if (isImported) {
       updateDownloadRequest(req.id, { status: "completed" });
+      continue;
+    }
+
+    if (req.status === "sent_to_lidarr" && queuedAlbumIds.has(req.lidarrAlbumId)) {
+      updateDownloadRequest(req.id, { status: "downloading" });
     }
   }
 }
 
 export function startLidarrPoller(): void {
   setInterval(() => {
-    pollLidarrQueue().catch((err) =>
+    pollLidarrRequests().catch((err) =>
       console.error("[lidarr-poller] error", err),
     );
   }, 60_000);

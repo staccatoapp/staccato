@@ -204,7 +204,6 @@ export async function validateToken(
   token: string,
 ): Promise<{ valid: boolean; userName?: string }> {
   try {
-    console.log("Validating ListenBrainz token");
     const res = await fetch(`${LB_API_BASE}/validate-token`, {
       headers: { Authorization: `Token ${token}` },
     });
@@ -242,23 +241,16 @@ export async function submitListen(data: {
     ],
   };
 
-  try {
-    console.log("Submitting listen to ListenBrainz");
-    console.log(JSON.stringify(dataToSubmit));
-    const res = await fetch(`${LB_API_BASE}/submit-listens`, {
-      method: "POST",
-      headers: {
-        Authorization: `Token ${data.token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(dataToSubmit),
-    });
-    if (!res.ok) {
-      console.log(await res.text());
-      throw new Error(`Failed to submit listen: ${res.status}`);
-    }
-  } catch (error) {
-    console.error("Error submitting listen to ListenBrainz:", error);
-    throw error;
+  const res = await fetch(`${LB_API_BASE}/submit-listens`, {
+    method: "POST",
+    headers: {
+      Authorization: `Token ${data.token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(dataToSubmit),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to submit listen: ${res.status} ${body}`);
   }
 }

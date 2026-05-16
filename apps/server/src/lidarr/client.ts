@@ -5,12 +5,20 @@ export type LidarrArtist = {
   monitored: boolean;
 };
 
+export type LidarrAlbumStatistics = {
+  trackCount: number;
+  trackFileCount: number;
+  percentOfTracks: number;
+  sizeOnDisk: number;
+};
+
 export type LidarrAlbum = {
   id: number;
   title: string;
   foreignAlbumId: string;
   artistId: number;
   monitored: boolean;
+  statistics?: LidarrAlbumStatistics;
 };
 
 export type LidarrQueueItem = {
@@ -114,6 +122,12 @@ export class LidarrClient {
 
   async getAlbumsForArtist(lidarrArtistId: number): Promise<LidarrAlbum[]> {
     return this.request("GET", `/album?artistId=${lidarrArtistId}`);
+  }
+
+  async getAlbumsByIds(ids: number[]): Promise<LidarrAlbum[]> {
+    if (ids.length === 0) return [];
+    const query = ids.map((id) => `albumIds=${id}`).join("&");
+    return this.request("GET", `/album?${query}`);
   }
 
   async setAlbumMonitored(albumId: number, monitored: boolean): Promise<void> {

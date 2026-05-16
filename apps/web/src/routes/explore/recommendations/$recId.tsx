@@ -4,6 +4,7 @@ import { Check, ChevronLeft, Plus } from "lucide-react";
 import { generateAlbumGradient } from "@/lib/music";
 import { useRecommendedPlaylists } from "@/hooks/useRecommendations";
 import { usePreviewAudio } from "@/hooks/usePreviewAudio";
+import { useRequestDownload } from "@/hooks/useRequestDownload";
 import {
   RecommendedTrackListHeader,
   RecommendedTrackRow,
@@ -30,6 +31,7 @@ function RecommendationDetailPage() {
   const { data: playlists, isLoading } = useRecommendedPlaylists();
 
   const { audioRef, playingMbid, handlePreview } = usePreviewAudio();
+  const requestDownload = useRequestDownload();
 
   const gradient = generateAlbumGradient(recId, "recommendation");
 
@@ -190,12 +192,22 @@ function RecommendationDetailPage() {
                 }
               }}
               onAddToLibrary={() => {
-                if (track.recordingMbid) {
-                  setTrackStates((s) => ({
-                    ...s,
-                    [track.recordingMbid!]: true,
-                  }));
-                }
+                if (!track.recordingMbid) return;
+                const mbid = track.recordingMbid;
+                setTrackStates((s) => ({ ...s, [mbid]: true }));
+                requestDownload.mutate(
+                  { recordingMbid: mbid },
+                  {
+                    onError: (err) => {
+                      setTrackStates((s) => {
+                        const next = { ...s };
+                        delete next[mbid];
+                        return next;
+                      });
+                      alert(`Download request failed: ${err.message}`);
+                    },
+                  },
+                );
               }}
               onDismiss={() => {
                 if (track.recordingMbid) {

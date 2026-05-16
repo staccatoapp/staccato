@@ -11,6 +11,13 @@ import type {
 } from "@staccato/shared";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { AlbumCard, AlbumCardSkeleton } from "@/components/music/AlbumCard";
 import { ArtistCard } from "@/components/library/artist-card";
@@ -472,50 +479,44 @@ function LibraryPage() {
       )}
 
       {/* New playlist dialog */}
-      {newPlaylistOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setNewPlaylistOpen(false);
-          }}
-        >
-          <div className="bg-card border border-border rounded-xl p-6 w-full max-w-sm shadow-2xl">
-            <h2 className="text-base font-semibold mb-4">New playlist</h2>
-            <input
-              autoFocus
-              placeholder="Playlist name"
-              value={newPlaylistName}
-              onChange={(e) => setNewPlaylistName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && newPlaylistName.trim())
-                  createPlaylistMutation.mutate(newPlaylistName.trim());
-                if (e.key === "Escape") setNewPlaylistOpen(false);
-              }}
-              className="w-full bg-transparent border border-border rounded-lg text-sm px-3 py-2 h-9 outline-none focus:border-white/25 text-foreground placeholder:text-muted-foreground mb-4 transition-colors"
-            />
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setNewPlaylistOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                disabled={
-                  !newPlaylistName.trim() || createPlaylistMutation.isPending
-                }
-                onClick={() =>
-                  createPlaylistMutation.mutate(newPlaylistName.trim())
-                }
-              >
-                Create
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Dialog open={newPlaylistOpen} onOpenChange={setNewPlaylistOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New playlist</DialogTitle>
+          </DialogHeader>
+          <input
+            autoFocus
+            placeholder="Playlist name"
+            value={newPlaylistName}
+            onChange={(e) => setNewPlaylistName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && newPlaylistName.trim())
+                createPlaylistMutation.mutate(newPlaylistName.trim());
+            }}
+            className="w-full bg-transparent border border-border rounded-lg text-sm px-3 py-2 h-9 outline-none focus:border-white/25 text-foreground placeholder:text-muted-foreground transition-colors"
+          />
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setNewPlaylistOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              disabled={
+                !newPlaylistName.trim() || createPlaylistMutation.isPending
+              }
+              onClick={() =>
+                createPlaylistMutation.mutate(newPlaylistName.trim())
+              }
+            >
+              Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

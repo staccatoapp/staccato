@@ -36,6 +36,7 @@ const RecordingSchema = z.object({
   id: z.string(),
   title: z.string().optional(),
   score: z.number(),
+  video: z.boolean().optional(),
   releases: z.array(ReleaseSchema).optional(),
   "artist-credit": ArtistCreditSchema.optional(),
 });
@@ -50,6 +51,7 @@ export const MBExternalRecordingSearchResponseSchema = z.object({
       id: z.string(),
       title: z.string(),
       length: z.number().optional(),
+      video: z.boolean().optional(),
       "artist-credit": ArtistCreditSchema.optional(),
       releases: z.array(ReleaseSchema).optional(),
     }),
@@ -89,6 +91,7 @@ export const MBRecordingLookupSchema = z.object({
   id: z.string(),
   title: z.string().optional(),
   length: z.number().optional(),
+  video: z.boolean().optional(),
   "artist-credit": ArtistCreditSchema.optional(),
   releases: z.array(ReleaseSchema).optional(),
 });
@@ -109,7 +112,10 @@ export const MBReleaseLookupSchema = z.object({
           position: z.number(),
           title: z.string(),
           length: z.number().optional(),
-          recording: z.object({ id: z.string() }),
+          recording: z.object({
+            id: z.string(),
+            video: z.boolean().optional(),
+          }),
         }),
       ),
     }),

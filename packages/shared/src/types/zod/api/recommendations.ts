@@ -36,31 +36,9 @@ export const RecommendationErrorSchema = z.object({
   error: z.enum(["no-id", "no-listens"]),
 });
 
-export const RecommendationPlaylistsResponseSchema = z.union([
-  RecommendationErrorSchema,
-  z.object({
-    data: z.array(RecommendedPlaylistSchema),
-    expiresAt: z.string().nullable(),
-  }),
-]);
-
-export const RecommendationTracksResponseSchema = z.union([
-  RecommendationErrorSchema,
-  z.object({
-    data: z.array(RecommendedTrackSchema),
-    expiresAt: z.string().nullable(),
-  }),
-]);
-
 export type RecommendedTrack = z.infer<typeof RecommendedTrackSchema>;
 export type RecommendedPlaylistTrack = z.infer<
   typeof RecommendedPlaylistTrackSchema
 >;
 export type RecommendedPlaylist = z.infer<typeof RecommendedPlaylistSchema>;
 export type RecommendationError = z.infer<typeof RecommendationErrorSchema>;
-export type RecommendationPlaylistsResponse = z.infer<
-  typeof RecommendationPlaylistsResponseSchema
->;
-export type RecommendationTracksResponse = z.infer<
-  typeof RecommendationTracksResponseSchema
->;

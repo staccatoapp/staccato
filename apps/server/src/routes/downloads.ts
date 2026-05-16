@@ -56,8 +56,8 @@ const downloadRoutes: FastifyPluginAsync = async (app) => {
       status: "requested",
     });
 
-    submitToLidarr(row.id).catch((err) =>
-      console.error("[downloads] submitToLidarr failed", err),
+    submitToLidarr(row.id, req.log).catch((err) =>
+      req.log.error({ err, requestId: row.id }, "[downloads] submitToLidarr failed"),
     );
 
     return reply.status(202).send(toDto(row));

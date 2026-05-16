@@ -123,8 +123,10 @@ export async function searchRecording(
   hint?: { albumTitle: string; releaseYear?: number },
 ): Promise<RecordingMatch | null> {
   // first try match on artist + title - gets the better tagged matches out of the way faster
+  // video:false excludes music-video recordings, which share artist+title with the audio recording
+  // and can outrank it in MB's relevance scoring (e.g. alt-J "Breezeblocks")
   const artistAndTitleMatch = await attemptRecordingSearch(
-    `artist:"${artistName}" AND recording:"${title}"`,
+    `artist:"${artistName}" AND recording:"${title}" AND video:false`,
     85,
     hint,
   );
@@ -134,7 +136,7 @@ export async function searchRecording(
   // there probably is a cleaner/more reusable way to construct the queries. im just happy it's working atm tbh
   if (hint?.albumTitle) {
     return attemptRecordingSearch(
-      `recording:"${title}" AND release:"${hint.albumTitle}"`,
+      `recording:"${title}" AND release:"${hint.albumTitle}" AND video:false`,
       90,
       hint,
     );
@@ -163,6 +165,7 @@ async function attemptRecordingSearch(
       ? normalizeString(hint.albumTitle)
       : null;
     for (const recording of data.recordings) {
+      if (recording.video === true) continue;
       if (recording.score < minScore) continue;
       if (
         normalizedHint &&
@@ -206,8 +209,6 @@ export async function searchRecordingsByQuery(
       fmt: "json",
       limit: String(limit),
     });
-    const url = `${MB_BASE}/recording?${params}&inc=releases+release-groups+artist-credits`;
-    console.log("MB URL", url);
     const response = await throttledFetch(
       `${MB_BASE}/recording?${params}&inc=releases+release-groups+artist-credits`,
     );
@@ -215,7 +216,9 @@ export async function searchRecordingsByQuery(
     const data = MBExternalRecordingSearchResponseSchema.parse(
       await response.json(),
     );
-    return data.recordings.map((r) => {
+    return data.recordings
+      .filter((r) => r.video !== true)
+      .map((r) => {
       const bestRelease = r.releases?.length
         ? pickBestRelease(r.releases)
         : null;
@@ -383,13 +386,15 @@ export async function lookupReleaseDetails(
     const data = MBReleaseLookupSchema.parse(await response.json());
     return {
       tracks: data.media.flatMap((disc) =>
-        disc.tracks.map((t) => ({
-          discPosition: disc.position,
-          trackPosition: t.position,
-          recordingMbid: t.recording.id,
-          title: t.title,
-          durationMs: t.length ?? null,
-        })),
+        disc.tracks
+          .filter((t) => t.recording.video !== true)
+          .map((t) => ({
+            discPosition: disc.position,
+            trackPosition: t.position,
+            recordingMbid: t.recording.id,
+            title: t.title,
+            durationMs: t.length ?? null,
+          })),
       ),
       releaseName: data.title ?? null,
       artistMbid: data["artist-credit"]?.[0]?.artist.id ?? null,

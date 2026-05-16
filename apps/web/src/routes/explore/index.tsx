@@ -17,6 +17,7 @@ import {
   useRecommendedTracks,
 } from "@/hooks/useRecommendations";
 import { usePreviewAudio } from "@/hooks/usePreviewAudio";
+import { useRequestDownload } from "@/hooks/useRequestDownload";
 
 export const Route = createFileRoute("/explore/")({ component: ExplorePage });
 
@@ -66,6 +67,7 @@ function ExplorePage() {
     useRecommendedTracks();
   const { data: recPlaylists, isLoading: recPlaylistsLoading } =
     useRecommendedPlaylists();
+  const requestDownload = useRequestDownload();
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(fields), 300);
@@ -376,9 +378,25 @@ function ExplorePage() {
                       isPlaying={playingMbid === track.recordingMbid}
                       inLibrary={track.inLibrary || (recTrackStates[track.recordingMbid] ?? false)}
                       onPlay={handleRecommendedTrackPlay}
-                      onAddToLibrary={() =>
-                        setRecTrackStates((s) => ({ ...s, [track.recordingMbid]: true }))
-                      }
+                      onAddToLibrary={() => {
+                        setRecTrackStates((s) => ({
+                          ...s,
+                          [track.recordingMbid]: true,
+                        }));
+                        requestDownload.mutate(
+                          { recordingMbid: track.recordingMbid },
+                          {
+                            onError: (err) => {
+                              setRecTrackStates((s) => {
+                                const next = { ...s };
+                                delete next[track.recordingMbid];
+                                return next;
+                              });
+                              alert(`Download request failed: ${err.message}`);
+                            },
+                          },
+                        );
+                      }}
                       onDismiss={() =>
                         setRecDismissed((s) => new Set(s).add(track.recordingMbid))
                       }

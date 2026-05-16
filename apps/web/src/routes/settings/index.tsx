@@ -11,8 +11,10 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import type {
+  LidarrSettings,
   ResolutionProgress,
   ScanProgress,
+  UpdateLidarrSettings,
   UserSettings,
 } from "@staccato/shared";
 
@@ -197,6 +199,153 @@ function ResolveSection() {
   );
 }
 
+function LidarrSection() {
+  const queryClient = useQueryClient();
+  const [urlInput, setUrlInput] = useState<string | null>(null);
+  const [keyInput, setKeyInput] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<{ connected: boolean } | null>(
+    null,
+  );
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["lidarr-settings"],
+    queryFn: async (): Promise<LidarrSettings> => {
+      const res = await fetch("/api/settings/lidarr");
+      if (!res.ok) throw new Error("Failed to fetch Lidarr settings");
+      return res.json();
+    },
+  });
+
+  const savedUrl = data?.url ?? "";
+  const apiKeySet = data?.apiKeySet ?? false;
+  const currentUrl = urlInput !== null ? urlInput : savedUrl;
+  const keyPlaceholder = apiKeySet ? "•••••• (saved)" : "Lidarr API key";
+  const currentKey = keyInput ?? "";
+
+  const urlDirty = urlInput !== null && urlInput !== savedUrl;
+  const keyDirty = keyInput !== null && keyInput.length > 0;
+  const isDirty = urlDirty || keyDirty;
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const body: UpdateLidarrSettings = {};
+      if (urlDirty) body.url = urlInput!.trim() || null;
+      if (keyDirty) body.apiKey = keyInput!.trim() || null;
+      const res = await fetch("/api/settings/lidarr", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? "Failed to save Lidarr settings");
+      }
+    },
+    onSuccess: () => {
+      setUrlInput(null);
+      setKeyInput(null);
+      setTestResult(null);
+      queryClient.invalidateQueries({ queryKey: ["lidarr-settings"] });
+    },
+  });
+
+  const testMutation = useMutation({
+    mutationFn: async (): Promise<{ connected: boolean }> => {
+      const res = await fetch("/api/settings/lidarr/test", { method: "POST" });
+      if (!res.ok) throw new Error("Test failed");
+      return res.json();
+    },
+    onSuccess: setTestResult,
+  });
+
+  return (
+    <div className="space-y-3">
+      <div className="space-y-1.5">
+        <label htmlFor="lidarr-url" className="text-sm font-medium">
+          Lidarr URL
+        </label>
+        <Input
+          id="lidarr-url"
+          type="text"
+          placeholder="http://localhost:8686"
+          value={currentUrl}
+          onChange={(e) => {
+            setUrlInput(e.target.value);
+            setTestResult(null);
+          }}
+          disabled={isLoading}
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <label htmlFor="lidarr-key" className="text-sm font-medium">
+          API key
+        </label>
+        <Input
+          id="lidarr-key"
+          type="password"
+          placeholder={keyPlaceholder}
+          value={currentKey}
+          onChange={(e) => {
+            setKeyInput(e.target.value);
+            setTestResult(null);
+          }}
+          disabled={isLoading}
+        />
+        <p className="text-xs text-muted-foreground">
+          Find your API key under Settings → General in your Lidarr instance.
+        </p>
+      </div>
+
+      {testResult && (
+        <div
+          className={`flex items-center gap-2 text-sm ${
+            testResult.connected ? "text-green-500" : "text-destructive"
+          }`}
+        >
+          {testResult.connected ? (
+            <>
+              <CheckCircle2 className="w-4 h-4" />
+              Connected
+            </>
+          ) : (
+            <>
+              <XCircle className="w-4 h-4" />
+              Could not connect
+            </>
+          )}
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          onClick={() => testMutation.mutate()}
+          disabled={
+            testMutation.isPending ||
+            isDirty ||
+            (!savedUrl && !urlInput) ||
+            (!apiKeySet && !keyDirty)
+          }
+        >
+          Test connection
+        </Button>
+        <Button
+          onClick={() => saveMutation.mutate()}
+          disabled={!isDirty || saveMutation.isPending}
+        >
+          Save
+        </Button>
+      </div>
+      {isDirty && (
+        <p className="text-xs text-muted-foreground">
+          Save changes before testing.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function SettingsPage() {
   const [tokenInput, setTokenInput] = useState<string | null>(null);
   const [validateResult, setValidateResult] = useState<{
@@ -309,6 +458,17 @@ function SettingsPage() {
             </Button>
           </div>
         </div>
+      </section>
+
+      <section className="space-y-4 mt-8">
+        <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
+          Lidarr
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Connect a Lidarr instance to request downloads for songs that aren&apos;t
+          in your library yet.
+        </p>
+        <LidarrSection />
       </section>
     </div>
   );

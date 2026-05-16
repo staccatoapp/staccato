@@ -8,7 +8,10 @@ import {
   type RecommendedTrack,
 } from "@staccato/shared";
 import { getOrCreateUserSettings } from "../db/queries/settings.js";
-import { getTracksByMusicbrainzIds } from "../db/queries/tracks.js";
+import {
+  getLocalTrackMbidsByMbids,
+  getTracksByMusicbrainzIds,
+} from "../db/queries/tracks.js";
 import {
   getCFRecommendations,
   getPlaylistDetail,
@@ -22,6 +25,42 @@ import { fetchCoverArtUrlForGroup } from "../coverart/client.js";
 import { resolvePreview } from "../preview/index.js";
 import { playlistCache, trackCache } from "../recommendations/cache.js";
 
+// inLibrary is not safe to cache: a track can transition into the local
+// library at any point (download completion, library scan, manual import).
+// Re-resolve from the live DB on every serve so the user sees the truth.
+function refreshTracksInLibrary(
+  tracks: RecommendedTrack[],
+): RecommendedTrack[] {
+  if (tracks.length === 0) return tracks;
+  const localSet = new Set(
+    getLocalTrackMbidsByMbids(tracks.map((t) => t.recordingMbid)),
+  );
+  return tracks.map((t) => ({
+    ...t,
+    inLibrary: localSet.has(t.recordingMbid),
+  }));
+}
+
+function refreshPlaylistsInLibrary(
+  playlists: RecommendedPlaylist[],
+): RecommendedPlaylist[] {
+  const allMbids: string[] = [];
+  for (const p of playlists) {
+    for (const t of p.tracks) {
+      if (t.recordingMbid) allMbids.push(t.recordingMbid);
+    }
+  }
+  if (allMbids.length === 0) return playlists;
+  const localSet = new Set(getLocalTrackMbidsByMbids(allMbids));
+  return playlists.map((p) => ({
+    ...p,
+    tracks: p.tracks.map((t) => ({
+      ...t,
+      inLibrary: t.recordingMbid ? localSet.has(t.recordingMbid) : false,
+    })),
+  }));
+}
+
 const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/playlists", async (req, reply) => {
     const settings = getOrCreateUserSettings(req.userId);
@@ -30,7 +69,7 @@ const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
     }
     const { listenbrainzToken, musicbrainzUsername } = settings;
 
-    return playlistCache.getOrCompute(req.userId, async () => {
+    const playlists = await playlistCache.getOrCompute(req.userId, async () => {
       const summaries = await getRecommendedPlaylists(
         musicbrainzUsername,
         listenbrainzToken,
@@ -150,6 +189,8 @@ const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
         expiresAt: firstExpiry,
       };
     });
+
+    return refreshPlaylistsInLibrary(playlists);
   });
 
   fastify.get("/tracks", async (req, reply) => {
@@ -159,7 +200,7 @@ const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
     }
     const { listenbrainzToken, musicbrainzUsername } = settings;
 
-    return trackCache.getOrCompute(req.userId, async () => {
+    const cached = await trackCache.getOrCompute(req.userId, async () => {
       const mbids = await getCFRecommendations(
         musicbrainzUsername,
         listenbrainzToken,
@@ -239,6 +280,9 @@ const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
         expiresAt: null,
       };
     });
+
+    if ("error" in cached) return cached;
+    return refreshTracksInLibrary(cached);
   });
 };
 

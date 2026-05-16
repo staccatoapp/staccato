@@ -96,14 +96,15 @@ Cross-reference is by artist name + track title string matching (not IDs). A loc
 
 Lidarr only downloads full albums, not individual tracks. When a user requests a song:
 
-1. Identify the album containing the track via MusicBrainz
-2. Check if a Single release group exists for that recording — prefer it over the full album
-3. Add the artist (if not present) and monitor the specific album via Lidarr API
-4. Track request status in `download_requests` table (per-user, with status: requested → sent_to_lidarr → downloading → completed → failed)
-5. Notify the requesting user when the download completes
-6. Trigger a library rescan for new content
+1. Identify the release group containing the track via MusicBrainz (the recording's primary release group — typically the full album)
+2. Add the artist (if not present) and monitor that release group via Lidarr API
+3. Track request status in `download_requests` table (per-user, with status: requested → sent_to_lidarr → downloading → completed → failed)
+4. Notify the requesting user when the download completes
+5. Trigger a library rescan for new content
 
-The UX must be transparent: show the user that they're downloading a full album (with track count and estimated size) when a single release isn't available. Auto-add the requested track to a "Recently Added" playlist so it doesn't get lost among other album tracks.
+The UX must be transparent: show the user that they're downloading a full album (with track count and estimated size) before they confirm the request. Auto-add the requested track to a "Recently Added" playlist so it doesn't get lost among other album tracks.
+
+Single-vs-album preference (downloading a Single release group when one exists for the recording) was considered and explicitly dropped — added complexity for marginal user benefit. The user is always told upfront they're queuing the full album.
 
 ## Implementation Phases
 
@@ -185,7 +186,7 @@ Never use `drizzle-kit push` — it bypasses migration history and breaks other 
 - **MBIDs as universal identifiers**: connects local files, recommendations, search results, and download requests through a single ID space.
 - **Two-pass metadata resolution**: fast tag-based matching first, expensive fingerprinting in background — so the library is browsable immediately after scan.
 - **Deezer over Spotify for previews**: Spotify deprecated preview URLs in November 2024. Deezer is the primary source, iTunes is the fallback.
-- **Full album downloads via Lidarr**: accepted constraint. Single releases are preferred when available. UX must be transparent about what's being downloaded.
+- **Full album downloads via Lidarr**: accepted constraint. The user is always told upfront they're queuing the full album; no single-vs-album release-group preference logic (decided against — added complexity for marginal benefit).
 - **Auth deferred but data model ready**: default user injected via hook, but all per-user tables have user_id from the start. Swapping in real auth later is a single hook change.
 - **apps/ vs packages/ split**: deployable applications (server, web, docs, future mobile) live in `apps/`. Shared libraries (types, API client, utilities) live in `packages/`. This is the standard Turborepo convention.
 - **Docs deployed separately**: the documentation site is NOT included in the Docker image. It is built and deployed via its own pipeline (e.g. GitHub Pages) to keep the Docker image lean and focused.
