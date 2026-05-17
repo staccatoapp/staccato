@@ -7,16 +7,3 @@ export type AlbumListItem = {
   coverArtUrl: string | null;
   createdAt: string | null;
 };
-
-export type AlbumTrack = {
-  id: string;
-  title: string;
-  trackNumber: number | null;
-  discNumber: number | null;
-  durationSeconds: number | null;
-};
-
-export type AlbumDetail = {
-  album: AlbumListItem;
-  tracks: AlbumTrack[];
-};

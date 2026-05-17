@@ -1,6 +1,5 @@
 import { FastifyPluginAsync } from "fastify";
 import {
-  lookupExternalAlbum,
   searchArtistsByQuery,
   searchRecordingsByQuery,
   searchReleasesByQuery,
@@ -110,18 +109,6 @@ const searchRoutes: FastifyPluginAsync = async (fastify) => {
     return { recordings: [], artists: [], releases: [] };
   });
 
-  fastify.get("/external/albums/:rgMbid", async (request, reply) => {
-    const { rgMbid } = request.params as { rgMbid: string };
-    const [album, coverArtUrl] = await Promise.all([
-      lookupExternalAlbum(rgMbid),
-      ensureCoverOnDisk(rgMbid),
-    ]);
-    if (!album) {
-      request.log.warn({ releaseGroupMbid: rgMbid }, "external album lookup returned nothing");
-      return reply.status(404).send({ error: "Not found" });
-    }
-    return { ...album, coverArtUrl };
-  });
 };
 
 export default searchRoutes;

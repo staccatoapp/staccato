@@ -95,6 +95,26 @@ export function getAlbumWithArtistDetails(
     .get();
 }
 
+export function getAlbumByMbid(
+  mbid: string,
+): AlbumWithArtistDetailsRow | undefined {
+  return db
+    .select({
+      id: albums.id,
+      title: sql<string>`COALESCE(${albums.canonicalTitle}, ${albums.title})`,
+      artistId: albums.artistId,
+      artistName: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
+      releaseYear: albums.releaseYear,
+      releaseGroupMbid: albums.releaseGroupMbid,
+      coverArtUrl: albums.coverArtUrl,
+      createdAt: albums.createdAt,
+    })
+    .from(albums)
+    .innerJoin(artists, eq(albums.artistId, artists.id))
+    .where(or(eq(albums.releaseGroupMbid, mbid), eq(albums.releaseMbid, mbid)))
+    .get();
+}
+
 export function searchAlbums(
   pattern: string,
   limit: number,

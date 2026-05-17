@@ -2,6 +2,7 @@ export * from "./types/zod/api/settings.js";
 export * from "./types/zod/api/search.js";
 export * from "./types/zod/api/auth.js";
 export * from "./types/zod/api/recommendations.js";
+export * from "./types/zod/api/albums.js";
 
 export * from "./types/typescript/auth.js";
 

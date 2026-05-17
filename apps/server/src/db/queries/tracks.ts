@@ -31,13 +31,13 @@ export function getTracksInAlbum(albumId: string) {
       trackNumber: tracks.trackNumber,
       discNumber: tracks.discNumber,
       durationSeconds: tracks.durationSeconds,
+      recordingMbid: tracks.musicbrainzId,
     })
     .from(tracks)
     .where(eq(tracks.albumId, albumId))
     .orderBy(asc(tracks.discNumber), asc(tracks.trackNumber))
     .all();
 }
-// Shape intentionally matches shared AlbumTrack type — keep in sync
 export type TrackInAlbumRow = ReturnType<typeof getTracksInAlbum>[number];
 
 export function getTrackForStream(

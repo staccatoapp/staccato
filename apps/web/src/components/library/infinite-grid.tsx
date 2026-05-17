@@ -125,7 +125,7 @@ export function InfiniteGrid<T>({
       components={gridComponents}
       itemContent={(_, item) => renderItem(item)}
       endReached={onEndReached}
-      increaseViewportBy={400}
+      increaseViewportBy={1600}
     />
   );
 }

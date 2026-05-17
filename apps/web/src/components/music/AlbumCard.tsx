@@ -37,7 +37,6 @@ export const AlbumCard = memo(function AlbumCard({
           <img
             src={coverArtUrl}
             alt={title}
-            loading="lazy"
             decoding="async"
             className="w-full h-full object-cover"
             onError={() => setImgFailed(true)}

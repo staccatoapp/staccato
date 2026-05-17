@@ -30,7 +30,6 @@ export const PlaylistCard = memo(function PlaylistCard({
           <img
             src={playlist.coverArtUrl}
             alt={playlist.name}
-            loading="lazy"
             decoding="async"
             className="w-full h-full object-cover"
           />

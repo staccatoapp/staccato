@@ -14,6 +14,7 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { artistImagesDir, coversDir, metadataDir } from "./paths.js";
 import libraryRoutes from "./routes/library.js";
+import albumRoutes from "./routes/albums.js";
 import playbackRoutes from "./routes/playback.js";
 import tracksRoutes from "./routes/tracks.js";
 import playlistRoutes from "./routes/playlists.js";
@@ -57,6 +58,7 @@ app.register(async (protectedApp) => {
   protectedApp.register(scanRoutes, { prefix: "/api/library" });
   protectedApp.register(resolutionRoutes, { prefix: "/api/library" });
   protectedApp.register(libraryRoutes, { prefix: "/api/library" });
+  protectedApp.register(albumRoutes, { prefix: "/api/albums" });
   protectedApp.register(playbackRoutes, { prefix: "/api/playback" });
   protectedApp.register(tracksRoutes, { prefix: "/api" });
   protectedApp.register(playlistRoutes, { prefix: "/api/playlists" });

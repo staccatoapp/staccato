@@ -26,7 +26,6 @@ export const ArtistCard = memo(function ArtistCard({
           <img
             src={artist.imageUrl}
             alt={artist.name}
-            loading="lazy"
             decoding="async"
             className="w-full h-full object-cover"
           />

@@ -256,7 +256,7 @@ function ExplorePage() {
                       ? `https://coverartarchive.org/release-group/${release.releaseGroupMbid}/front`
                       : null
                   }
-                  href={`/explore/albums/${release.releaseGroupMbid ?? release.releaseMbid}`}
+                  href={`/albums/${release.releaseGroupMbid ?? release.releaseMbid}`}
                 />
               ))}
             </div>

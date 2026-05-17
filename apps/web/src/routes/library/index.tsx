@@ -194,7 +194,7 @@ function LibraryPage() {
         artistName={album.artistName}
         releaseYear={album.releaseYear}
         coverArtUrl={album.coverArtUrl}
-        href={`/library/albums/${album.id}`}
+        href={`/albums/${album.id}`}
       />
     ),
     [],
@@ -354,7 +354,7 @@ function LibraryPage() {
                       artistName={album.artistName}
                       releaseYear={album.releaseYear}
                       coverArtUrl={album.coverArtUrl}
-                      href={`/library/albums/${album.id}`}
+                      href={`/albums/${album.id}`}
                     />
                   ))}
                 </div>

@@ -9,14 +9,9 @@ import {
 import {
   countAlbums,
   getAlbumsWithArtistDetails,
-  getAlbumWithArtistDetails,
   searchAlbums,
 } from "../db/queries/albums.js";
-import {
-  countTracks,
-  getLibraryTracks,
-  getTracksInAlbum,
-} from "../db/queries/tracks.js";
+import { countTracks, getLibraryTracks } from "../db/queries/tracks.js";
 import { db } from "../db/client.js";
 import { resolveAlbumCoverNow } from "../coverart/store.js";
 import { resolveArtistImageNow } from "../artistimage/store.js";
@@ -63,31 +58,6 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
         createdAt: r.createdAt?.toISOString() ?? null,
       })),
       total,
-    };
-  });
-
-  fastify.get("/albums/:albumId", async (request, reply) => {
-    const { albumId } = request.params as { albumId: string };
-
-    const album = getAlbumWithArtistDetails(albumId);
-
-    if (!album) {
-      request.log.warn({ albumId }, "album not found");
-      return reply.status(404).send({ error: "Album not found" });
-    }
-
-    const albumTracks = getTracksInAlbum(albumId);
-    return {
-      album: {
-        ...album,
-        coverArtUrl: resolveAlbumCoverNow({
-          albumId: album.id,
-          releaseGroupMbid: album.releaseGroupMbid,
-          coverArtUrl: album.coverArtUrl,
-        }),
-        createdAt: album.createdAt?.toISOString() ?? null,
-      },
-      tracks: albumTracks,
     };
   });
 

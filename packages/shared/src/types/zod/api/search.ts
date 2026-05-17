@@ -48,7 +48,6 @@ export const ExternalAlbumTrackSchema = z.object({
   title: z.string(),
   durationMs: z.number().nullable(),
 });
-export type ExternalAlbumTrack = z.infer<typeof ExternalAlbumTrackSchema>;
 
 export const ExternalAlbumDetailSchema = z.object({
   releaseGroupMbid: z.string(),
@@ -60,4 +59,3 @@ export const ExternalAlbumDetailSchema = z.object({
   releaseType: z.string().nullable(),
   tracks: z.array(ExternalAlbumTrackSchema),
 });
-export type ExternalAlbumDetail = z.infer<typeof ExternalAlbumDetailSchema>;
