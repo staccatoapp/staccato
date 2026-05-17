@@ -73,6 +73,26 @@ export function searchArtists(
     .all();
 }
 
+export type ArtistDetailsRow = {
+  id: string;
+  name: string;
+  musicbrainzId: string | null;
+  imageUrl: string | null;
+};
+
+export function getArtistDetails(artistId: string): ArtistDetailsRow | undefined {
+  return db
+    .select({
+      id: artists.id,
+      name: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
+      musicbrainzId: artists.musicbrainzId,
+      imageUrl: artists.imageUrl,
+    })
+    .from(artists)
+    .where(eq(artists.id, artistId))
+    .get();
+}
+
 export function getArtistIdByMbid(artistMbid: string): string | null {
   const result = db
     .select({ id: artists.id })

@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -251,11 +251,7 @@ function ExplorePage() {
                   title={release.title}
                   artistName={release.artistName}
                   releaseYear={release.releaseYear}
-                  coverArtUrl={
-                    release.releaseGroupMbid
-                      ? `https://coverartarchive.org/release-group/${release.releaseGroupMbid}/front`
-                      : null
-                  }
+                  coverArtUrl={release.coverArtUrl}
                   href={`/albums/${release.releaseGroupMbid ?? release.releaseMbid}`}
                 />
               ))}
@@ -286,9 +282,11 @@ function ExplorePage() {
               </h2>
               <div className="space-y-1">
                 {data.artists.map((artist) => (
-                  <div
+                  <Link
                     key={artist.artistMbid}
-                    className="px-3 py-2 rounded-md hover:bg-accent/50"
+                    to="/artists/$artistKey"
+                    params={{ artistKey: artist.artistMbid }}
+                    className="block px-3 py-2 rounded-md hover:bg-accent/50 transition-colors"
                   >
                     <p className="text-sm font-medium">{artist.name}</p>
                     {artist.disambiguation && (
@@ -296,7 +294,7 @@ function ExplorePage() {
                         {artist.disambiguation}
                       </p>
                     )}
-                  </div>
+                  </Link>
                 ))}
               </div>
             </section>

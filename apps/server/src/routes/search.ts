@@ -5,23 +5,16 @@ import {
   searchReleasesByQuery,
 } from "../musicbrainz/client.js";
 import { getLocalTrackMbidsByMbids } from "../db/queries/tracks.js";
-import { ensureCoverOnDisk } from "../coverart/store.js";
+import { resolveExternalCoverNow } from "../coverart/store.js";
 import { ensureArtistImageOnDisk } from "../artistimage/store.js";
 
-async function attachCoverArtByReleaseGroup<
+function attachCoverArtByReleaseGroup<
   T extends { releaseGroupMbid: string | null },
->(items: T[]): Promise<Array<T & { coverArtUrl: string | null }>> {
-  const rgMbids = Array.from(
-    new Set(items.map((i) => i.releaseGroupMbid).filter((m): m is string => !!m)),
-  );
-  const covers = await Promise.all(
-    rgMbids.map(async (m) => [m, await ensureCoverOnDisk(m)] as const),
-  );
-  const coverMap = new Map(covers);
+>(items: T[]): Array<T & { coverArtUrl: string | null }> {
   return items.map((i) => ({
     ...i,
     coverArtUrl: i.releaseGroupMbid
-      ? coverMap.get(i.releaseGroupMbid) ?? null
+      ? resolveExternalCoverNow(i.releaseGroupMbid)
       : null,
   }));
 }
@@ -92,7 +85,7 @@ const searchRoutes: FastifyPluginAsync = async (fastify) => {
         return { recordings: [], artists: [], releases: [] };
 
       const releases = await searchReleasesByQuery(parts.join(" AND "), limit);
-      const withCovers = await attachCoverArtByReleaseGroup(releases);
+      const withCovers = attachCoverArtByReleaseGroup(releases);
       return { recordings: [], artists: [], releases: withCovers };
     }
 

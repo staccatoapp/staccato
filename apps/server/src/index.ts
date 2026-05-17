@@ -1,5 +1,5 @@
+import "./env.js";
 import Fastify from "fastify";
-import dotenvFlow from "dotenv-flow";
 import sessionPlugin, { requireAuth } from "./plugins/session.js";
 import authRoutes from "./routes/auth.js";
 import scanRoutes from "./routes/scan.js";
@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import { artistImagesDir, coversDir, metadataDir } from "./paths.js";
 import libraryRoutes from "./routes/library.js";
 import albumRoutes from "./routes/albums.js";
+import artistRoutes from "./routes/artists.js";
 import playbackRoutes from "./routes/playback.js";
 import tracksRoutes from "./routes/tracks.js";
 import playlistRoutes from "./routes/playlists.js";
@@ -25,12 +26,6 @@ import recommendationRoutes from "./routes/recommendations.js";
 import downloadRoutes from "./routes/downloads.js";
 import { startLidarrPoller } from "./lidarr/poller.js";
 import { logger } from "./logger.js";
-
-if (process.env.STACCATO_ENV !== "production") {
-  dotenvFlow.config({
-    node_env: process.env.STACCATO_ENV ?? "development",
-  });
-}
 
 const app = Fastify({ loggerInstance: logger });
 
@@ -59,6 +54,7 @@ app.register(async (protectedApp) => {
   protectedApp.register(resolutionRoutes, { prefix: "/api/library" });
   protectedApp.register(libraryRoutes, { prefix: "/api/library" });
   protectedApp.register(albumRoutes, { prefix: "/api/albums" });
+  protectedApp.register(artistRoutes, { prefix: "/api/artists" });
   protectedApp.register(playbackRoutes, { prefix: "/api/playback" });
   protectedApp.register(tracksRoutes, { prefix: "/api" });
   protectedApp.register(playlistRoutes, { prefix: "/api/playlists" });

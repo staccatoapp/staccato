@@ -39,6 +39,30 @@ export function getAlbumsByArtistId(artistId: string) {
 }
 export type AlbumByArtistId = ReturnType<typeof getAlbumsByArtistId>[number];
 
+export type DiscographyAlbumRow = {
+  id: string;
+  title: string;
+  releaseYear: number | null;
+  releaseGroupMbid: string | null;
+  coverArtUrl: string | null;
+};
+
+export function getDiscographyAlbumsByArtistId(
+  artistId: string,
+): DiscographyAlbumRow[] {
+  return db
+    .select({
+      id: albums.id,
+      title: sql<string>`COALESCE(${albums.canonicalTitle}, ${albums.title})`,
+      releaseYear: albums.releaseYear,
+      releaseGroupMbid: albums.releaseGroupMbid,
+      coverArtUrl: albums.coverArtUrl,
+    })
+    .from(albums)
+    .where(eq(albums.artistId, artistId))
+    .all();
+}
+
 export function getAlbumIdByTitleAndArtistId(title: string, artistId: string) {
   return db
     .select({ id: albums.id })

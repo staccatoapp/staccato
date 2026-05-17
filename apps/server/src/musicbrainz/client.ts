@@ -6,6 +6,8 @@ import { logger } from "../logger.js";
 
 const log = logger.child({ module: "musicbrainz" });
 import {
+  MBArtistLookupSchema,
+  MBArtistReleaseGroupsSchema,
   MBArtistSearchResponseSchema,
   MBExternalRecordingSearchResponseSchema,
   MBRecordingLookupSchema,
@@ -505,6 +507,141 @@ export async function searchReleaseGroupCandidates(
       "mb release-group search failed",
     );
     return [];
+  }
+}
+
+export interface ExternalArtistDetail {
+  artistMbid: string;
+  name: string;
+  disambiguation: string | null;
+}
+
+export interface ArtistReleaseGroup {
+  releaseGroupMbid: string;
+  title: string;
+  firstReleaseDate: string | null;
+  primaryType: string | null;
+  secondaryTypes: string[];
+}
+
+const artistDetailCache = new Map<string, ExternalArtistDetail | null>();
+const artistDetailInflight = new Map<
+  string,
+  Promise<ExternalArtistDetail | null>
+>();
+
+export async function lookupExternalArtist(
+  artistMbid: string,
+): Promise<ExternalArtistDetail | null> {
+  if (artistDetailCache.has(artistMbid)) {
+    return artistDetailCache.get(artistMbid) ?? null;
+  }
+  const existing = artistDetailInflight.get(artistMbid);
+  if (existing) return existing;
+
+  const promise = (async (): Promise<ExternalArtistDetail | null> => {
+    try {
+      const response = await throttledFetch(
+        `${MB_BASE}/artist/${artistMbid}?fmt=json`,
+      );
+      if (!response.ok) {
+        log.warn(
+          { status: response.status, operation: "lookupExternalArtist", artistMbid },
+          "mb artist lookup non-ok response",
+        );
+        return null;
+      }
+      const data = MBArtistLookupSchema.parse(await response.json());
+      return {
+        artistMbid: data.id,
+        name: data.name,
+        disambiguation: data.disambiguation ?? null,
+      };
+    } catch (err) {
+      log.warn(
+        { err, operation: "lookupExternalArtist", artistMbid },
+        "mb artist lookup failed",
+      );
+      return null;
+    }
+  })();
+
+  artistDetailInflight.set(artistMbid, promise);
+  try {
+    const result = await promise;
+    artistDetailCache.set(artistMbid, result);
+    return result;
+  } finally {
+    artistDetailInflight.delete(artistMbid);
+  }
+}
+
+const artistReleaseGroupsCache = new Map<string, ArtistReleaseGroup[]>();
+const artistReleaseGroupsInflight = new Map<
+  string,
+  Promise<ArtistReleaseGroup[]>
+>();
+
+const MB_RG_PAGE_LIMIT = 100;
+const MB_RG_MAX_PAGES = 5;
+
+export async function getArtistReleaseGroups(
+  artistMbid: string,
+): Promise<ArtistReleaseGroup[]> {
+  const cached = artistReleaseGroupsCache.get(artistMbid);
+  if (cached) return cached;
+  const existing = artistReleaseGroupsInflight.get(artistMbid);
+  if (existing) return existing;
+
+  const promise = (async (): Promise<ArtistReleaseGroup[]> => {
+    const all: ArtistReleaseGroup[] = [];
+    try {
+      for (let page = 0; page < MB_RG_MAX_PAGES; page++) {
+        const params = new URLSearchParams({
+          artist: artistMbid,
+          type: "album|ep",
+          fmt: "json",
+          limit: String(MB_RG_PAGE_LIMIT),
+          offset: String(page * MB_RG_PAGE_LIMIT),
+        });
+        const response = await throttledFetch(
+          `${MB_BASE}/release-group?${params}`,
+        );
+        if (!response.ok) {
+          log.warn(
+            { status: response.status, operation: "getArtistReleaseGroups", artistMbid, page },
+            "mb artist release-groups non-ok response",
+          );
+          break;
+        }
+        const data = MBArtistReleaseGroupsSchema.parse(await response.json());
+        for (const rg of data["release-groups"]) {
+          all.push({
+            releaseGroupMbid: rg.id,
+            title: rg.title,
+            firstReleaseDate: rg["first-release-date"] ?? null,
+            primaryType: rg["primary-type"] ?? null,
+            secondaryTypes: rg["secondary-types"] ?? [],
+          });
+        }
+        if (data["release-groups"].length < MB_RG_PAGE_LIMIT) break;
+      }
+    } catch (err) {
+      log.warn(
+        { err, operation: "getArtistReleaseGroups", artistMbid },
+        "mb artist release-groups failed",
+      );
+    }
+    return all;
+  })();
+
+  artistReleaseGroupsInflight.set(artistMbid, promise);
+  try {
+    const result = await promise;
+    artistReleaseGroupsCache.set(artistMbid, result);
+    return result;
+  } finally {
+    artistReleaseGroupsInflight.delete(artistMbid);
   }
 }
 

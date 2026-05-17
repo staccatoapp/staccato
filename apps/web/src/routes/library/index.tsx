@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { PlaybackSession } from "@staccato/shared";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { Plus, Search, X } from "lucide-react";
 import type {
   AlbumListItem,
@@ -201,7 +201,13 @@ function LibraryPage() {
   );
   const renderArtist = useCallback(
     (artist: Artist) => (
-      <ArtistCard artist={artist} albumCount={artist.albumCount} />
+      <Link
+        to="/artists/$artistKey"
+        params={{ artistKey: artist.id }}
+        className="block"
+      >
+        <ArtistCard artist={artist} albumCount={artist.albumCount} />
+      </Link>
     ),
     [],
   );
@@ -328,7 +334,14 @@ function LibraryPage() {
                   }}
                 >
                   {searchResultsQuery.data!.artists.map((artist) => (
-                    <ArtistCard key={artist.id} artist={artist} />
+                    <Link
+                      key={artist.id}
+                      to="/artists/$artistKey"
+                      params={{ artistKey: artist.id }}
+                      className="block"
+                    >
+                      <ArtistCard artist={artist} />
+                    </Link>
                   ))}
                 </div>
               </div>

@@ -78,10 +78,7 @@ export async function ensureCoverOnDisk(
 
       return localCoverUrl(releaseGroupMbid);
     } catch (err) {
-      log.warn(
-        { err, releaseGroupMbid },
-        "cover art persist failed",
-      );
+      log.warn({ err, releaseGroupMbid }, "cover art persist failed");
       return null;
     }
   })();
@@ -94,11 +91,26 @@ export async function ensureCoverOnDisk(
   }
 }
 
-// Returns the URL to serve in the current response. If the stored value is
-// already a local /covers/ path, returns it verbatim. Otherwise schedules a
-// background download + DB update so the next request serves locally, and
-// returns the existing (possibly stale archive.org) URL for THIS request so
-// the user doesn't see a broken image.
+// Non-blocking cover resolver for release-groups not in the local DB (e.g.
+// external discography items on the artist page). Returns the local URL if the
+// file already lives on disk; otherwise returns the upstream CAA URL for THIS
+// response and schedules a background download so the NEXT response serves
+// locally. No DB write — these MBIDs may never become library albums.
+export function resolveExternalCoverNow(releaseGroupMbid: string): string {
+  ensureCoversDir();
+  const filePath = path.join(coversDir, `${releaseGroupMbid}.jpg`);
+  if (fs.existsSync(filePath)) return localCoverUrl(releaseGroupMbid);
+
+  void ensureCoverOnDisk(releaseGroupMbid).catch((err) => {
+    log.warn(
+      { err, releaseGroupMbid },
+      "background external cover fetch failed",
+    );
+  });
+
+  return `https://coverartarchive.org/release-group/${releaseGroupMbid}/front`;
+}
+
 export function resolveAlbumCoverNow(row: {
   albumId: string;
   releaseGroupMbid: string | null;

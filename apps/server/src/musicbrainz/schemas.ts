@@ -131,6 +131,25 @@ export const MBReleaseGroupSearchResponseSchema = z.object({
   ),
 });
 
+export const MBArtistLookupSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  disambiguation: z.string().nullish(),
+});
+
+export const MBArtistReleaseGroupsSchema = z.object({
+  "release-groups": z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      "first-release-date": z.string().nullish(),
+      "primary-type": z.string().nullish(),
+      "secondary-types": z.array(z.string()).nullish(),
+    }),
+  ),
+  "release-group-count": z.number().nullish(),
+});
+
 export const MBReleaseGroupLookupSchema = z.object({
   title: z.string(),
   "primary-type": z.string().nullish(),

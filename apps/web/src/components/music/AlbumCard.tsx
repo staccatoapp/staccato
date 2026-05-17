@@ -12,14 +12,14 @@ export const AlbumCard = memo(function AlbumCard({
   href,
 }: {
   title: string;
-  artistName: string;
+  artistName?: string | null;
   releaseYear?: number | null;
   coverArtUrl?: string | null;
   href: string;
 }) {
   const [imgFailed, setImgFailed] = useState(false);
   const gradient = useMemo(
-    () => generateAlbumGradient(title, artistName),
+    () => generateAlbumGradient(title, artistName ?? ""),
     [title, artistName],
   );
   const showGradient = !coverArtUrl || imgFailed;
@@ -58,10 +58,13 @@ export const AlbumCard = memo(function AlbumCard({
       <p className="text-[0.8125rem] font-semibold text-foreground truncate leading-snug">
         {title}
       </p>
-      <p className="text-[0.72rem] text-muted-foreground truncate mt-0.5">
-        {artistName}
-        {releaseYear && <span> · {releaseYear}</span>}
-      </p>
+      {(artistName || releaseYear) && (
+        <p className="text-[0.72rem] text-muted-foreground truncate mt-0.5">
+          {artistName}
+          {artistName && releaseYear && <span> · </span>}
+          {releaseYear && <span>{releaseYear}</span>}
+        </p>
+      )}
     </Link>
   );
 });

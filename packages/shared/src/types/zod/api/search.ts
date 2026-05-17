@@ -29,6 +29,7 @@ export const ExternalReleaseResultSchema = z.object({
   artistMbid: z.string().nullable(),
   releaseYear: z.number().nullable(),
   releaseType: z.string().nullable(),
+  coverArtUrl: z.string().nullable(),
 });
 export type ExternalReleaseResult = z.infer<typeof ExternalReleaseResultSchema>;
 
