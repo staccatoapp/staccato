@@ -1,8 +1,10 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
+import { parsePagination } from "@staccato/shared";
 import {
   PlaylistRow,
   addTrackToPlaylist,
+  countUserPlaylists,
   createPlaylist,
   deletePlaylist,
   deletePlaylistTracks,
@@ -32,10 +34,14 @@ function requireOwnPlaylist(
 const playlistRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/", async (req) => {
     const userId = req.userId;
+    const paginationOptions = parsePagination(
+      req.query as Record<string, unknown>,
+    );
 
-    const userPlaylists = getUserPlaylists(userId);
+    const userPlaylists = getUserPlaylists(userId, paginationOptions);
+    const total = countUserPlaylists(userId);
 
-    if (userPlaylists.length === 0) return { items: [] };
+    if (userPlaylists.length === 0) return { items: [], total };
 
     const playlistIds = userPlaylists.map((p) => p.id);
 
@@ -68,6 +74,7 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
         coverArtUrl: artByPlaylist.get(p.id) ?? null,
         updatedAt: p.updatedAt?.toISOString() ?? null,
       })),
+      total,
     };
   });
 

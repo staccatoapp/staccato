@@ -1,5 +1,13 @@
+import path from "node:path";
 import { throttledFetch } from "../musicbrainz/client.js";
 import { logger } from "../logger.js";
+
+// Wikimedia's Special:FilePath returns the original asset (often multi-MB)
+// when no `?width=` is supplied. Artist cards display in a ~140px circle, so
+// request a thumbnail sized for 2x DPR. SVG sources are left untouched —
+// Wikimedia rasterises them inconsistently and <img> handles them natively.
+const THUMBNAIL_WIDTH = 320;
+const RASTER_EXTS = new Set([".jpg", ".jpeg", ".png", ".webp"]);
 
 const log = logger.child({ module: "artistimage-client" });
 
@@ -59,10 +67,10 @@ export async function lookupArtistImageSource(
       wdData.entities[qid]?.claims?.P18?.[0]?.mainsnak?.datavalue?.value;
     if (!filename) return null;
 
-    return {
-      filename,
-      url: `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(filename)}`,
-    };
+    const base = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(filename)}`;
+    const ext = path.extname(filename).toLowerCase();
+    const url = RASTER_EXTS.has(ext) ? `${base}?width=${THUMBNAIL_WIDTH}` : base;
+    return { filename, url };
   } catch (err) {
     log.warn({ err, artistMbid }, "artist image source lookup failed");
     return null;

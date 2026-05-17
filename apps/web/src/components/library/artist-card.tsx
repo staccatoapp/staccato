@@ -1,27 +1,33 @@
+import { memo, useMemo } from "react";
 import { User } from "lucide-react";
 import { generateAlbumGradient } from "@/lib/music";
 
-export function ArtistCard({
+export const ArtistCard = memo(function ArtistCard({
   artist,
   albumCount,
 }: {
   artist: { id: string; name: string; imageUrl: string | null };
   albumCount?: number;
 }) {
+  const gradient = useMemo(
+    () => generateAlbumGradient(artist.name, ""),
+    [artist.name],
+  );
+
   return (
     <div className="group cursor-pointer min-w-0 text-center">
       <div
         className="relative aspect-square w-full rounded-full overflow-hidden mb-2.5 shadow-md"
         style={{
-          background: artist.imageUrl
-            ? undefined
-            : generateAlbumGradient(artist.name, ""),
+          background: artist.imageUrl ? undefined : gradient,
         }}
       >
         {artist.imageUrl ? (
           <img
             src={artist.imageUrl}
             alt={artist.name}
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover"
           />
         ) : (
@@ -40,4 +46,4 @@ export function ArtistCard({
       )}
     </div>
   );
-}
+});

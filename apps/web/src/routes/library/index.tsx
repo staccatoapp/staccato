@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { PlaybackSession } from "@staccato/shared";
 import { createFileRoute } from "@tanstack/react-router";
 import { Plus, Search, X } from "lucide-react";
 import type {
@@ -9,7 +10,6 @@ import type {
   PlaylistListItem,
   TrackListItem,
 } from "@staccato/shared";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -24,16 +24,12 @@ import { ArtistCard } from "@/components/library/artist-card";
 import { PlaylistCard } from "@/components/library/playlist-card";
 import { SectionHeader } from "@/components/library/section-header";
 import { TrackList } from "@/components/library/track-list";
+import { InfiniteGrid } from "@/components/library/infinite-grid";
+import { useInfiniteList } from "@/hooks/useInfiniteList";
 
 export const Route = createFileRoute("/library/")({
   component: LibraryPage,
 });
-
-function formatTotalDuration(totalSeconds: number): string {
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.floor((totalSeconds % 3600) / 60);
-  return h > 0 ? `${h} hr ${m} min` : `${m} min`;
-}
 
 function LibraryPage() {
   const queryClient = useQueryClient();
@@ -53,44 +49,28 @@ function LibraryPage() {
 
   const isSearchMode = debouncedSearch.length >= 2;
 
-  const albumsQuery = useQuery({
+  const albumsQuery = useInfiniteList<AlbumListItem>({
     queryKey: ["albums"],
-    queryFn: async (): Promise<{ items: AlbumListItem[]; total: number }> => {
-      const res = await fetch("/api/library/albums?limit=500");
-      if (!res.ok) throw new Error("Failed to fetch albums");
-      return res.json();
-    },
-    staleTime: 30_000,
+    endpoint: "/api/library/albums",
+    enabled: !isSearchMode && activeTab === "albums",
   });
 
-  const tracksQuery = useQuery({
-    queryKey: ["tracks"],
-    queryFn: async (): Promise<{ items: TrackListItem[]; total: number }> => {
-      const res = await fetch("/api/library/tracks?limit=1000");
-      if (!res.ok) throw new Error("Failed to fetch tracks");
-      return res.json();
-    },
-    staleTime: 30_000,
-  });
-
-  const artistsQuery = useQuery({
+  const artistsQuery = useInfiniteList<Artist>({
     queryKey: ["artists"],
-    queryFn: async (): Promise<{ items: Artist[]; total: number }> => {
-      const res = await fetch("/api/library/artists?limit=500");
-      if (!res.ok) throw new Error("Failed to fetch artists");
-      return res.json();
-    },
-    staleTime: 30_000,
+    endpoint: "/api/library/artists",
+    enabled: !isSearchMode && activeTab === "artists",
   });
 
-  const playlistsQuery = useQuery({
-    queryKey: ["playlists"],
-    queryFn: async (): Promise<{ items: PlaylistListItem[] }> => {
-      const res = await fetch("/api/playlists");
-      if (!res.ok) throw new Error("Failed to fetch playlists");
-      return res.json();
-    },
-    staleTime: 30_000,
+  const tracksQuery = useInfiniteList<TrackListItem>({
+    queryKey: ["tracks"],
+    endpoint: "/api/library/tracks",
+    enabled: !isSearchMode && activeTab === "tracks",
+  });
+
+  const playlistsQuery = useInfiniteList<PlaylistListItem>({
+    queryKey: ["playlists", "infinite"],
+    endpoint: "/api/playlists",
+    enabled: isSearchMode || activeTab === "playlists",
   });
 
   const searchResultsQuery = useQuery({
@@ -106,33 +86,22 @@ function LibraryPage() {
     staleTime: 30_000,
   });
 
-  const albumCountByArtistId = useMemo(() => {
-    const map = new Map<string, number>();
-    albumsQuery.data?.items.forEach((a) =>
-      map.set(a.artistId, (map.get(a.artistId) ?? 0) + 1),
-    );
-    return map;
-  }, [albumsQuery.data]);
+  const fetchSession = useCallback(async (): Promise<PlaybackSession> => {
+    const res = await fetch("/api/playback/session");
+    if (!res.ok) throw new Error("Failed to fetch session");
+    return res.json();
+  }, []);
 
-  const totalDurationSeconds = useMemo(
-    () =>
-      tracksQuery.data?.items.reduce(
-        (s, t) => s + (t.durationSeconds ?? 0),
-        0,
-      ) ?? 0,
-    [tracksQuery.data],
-  );
-
-  const { data: playbackSession } = useQuery({
+  const { data: activeTrackId } = useQuery({
     queryKey: ["playback-session"],
-    queryFn: async () => {
-      const res = await fetch("/api/playback/session");
-      if (!res.ok) throw new Error("Failed to fetch session");
-      return res.json();
-    },
+    queryFn: fetchSession,
+    select: (s) => s?.trackQueue?.[s.currentTrackIndex]?.id,
   });
-  const activeTrackId = playbackSession?.currentTrack?.id as string | undefined;
-  const isPlaying = playbackSession?.isPlaying as boolean | undefined;
+  const { data: isPlaying } = useQuery({
+    queryKey: ["playback-session"],
+    queryFn: fetchSession,
+    select: (s) => Boolean(s?.isPlaying),
+  });
 
   const playMutation = useMutation({
     mutationFn: async ({
@@ -181,44 +150,79 @@ function LibraryPage() {
   const countLabel = (() => {
     switch (activeTab) {
       case "albums":
-        return albumsQuery.data
-          ? `${albumsQuery.data.total} albums`
-          : "Loading…";
+        return albumsQuery.isSuccess ? `${albumsQuery.total} albums` : "Loading…";
       case "artists":
-        return artistsQuery.data
-          ? `${artistsQuery.data.total} artists`
+        return artistsQuery.isSuccess
+          ? `${artistsQuery.total} artists`
           : "Loading…";
       case "tracks":
-        return tracksQuery.data
-          ? `${tracksQuery.data.total} tracks`
-          : "Loading…";
+        return tracksQuery.isSuccess ? `${tracksQuery.total} tracks` : "Loading…";
       case "playlists":
-        return playlistsQuery.data
-          ? `${playlistsQuery.data.items.length} playlists`
+        return playlistsQuery.isSuccess
+          ? `${playlistsQuery.total} playlists`
           : "Loading…";
     }
   })();
 
-  const matchedPlaylists =
-    isSearchMode && playlistsQuery.data
-      ? playlistsQuery.data.items.filter((p) =>
-          p.name.toLowerCase().includes(debouncedSearch.toLowerCase()),
-        )
-      : [];
+  const matchedPlaylists = useMemo(
+    () =>
+      isSearchMode
+        ? playlistsQuery.items.filter((p) =>
+            p.name.toLowerCase().includes(debouncedSearch.toLowerCase()),
+          )
+        : [],
+    [isSearchMode, debouncedSearch, playlistsQuery.items],
+  );
 
-  const tracks = tracksQuery.data?.items ?? [];
+  const fetchNextAlbums = useCallback(() => {
+    albumsQuery.fetchNextPage();
+  }, [albumsQuery.fetchNextPage]);
+  const fetchNextArtists = useCallback(() => {
+    artistsQuery.fetchNextPage();
+  }, [artistsQuery.fetchNextPage]);
+  const fetchNextTracks = useCallback(() => {
+    tracksQuery.fetchNextPage();
+  }, [tracksQuery.fetchNextPage]);
+  const fetchNextPlaylists = useCallback(() => {
+    playlistsQuery.fetchNextPage();
+  }, [playlistsQuery.fetchNextPage]);
+
+  const renderAlbum = useCallback(
+    (album: AlbumListItem) => (
+      <AlbumCard
+        title={album.title}
+        artistName={album.artistName}
+        releaseYear={album.releaseYear}
+        coverArtUrl={album.coverArtUrl}
+        href={`/library/albums/${album.id}`}
+      />
+    ),
+    [],
+  );
+  const renderArtist = useCallback(
+    (artist: Artist) => (
+      <ArtistCard artist={artist} albumCount={artist.albumCount} />
+    ),
+    [],
+  );
+  const renderPlaylist = useCallback(
+    (pl: PlaylistListItem) => <PlaylistCard playlist={pl} />,
+    [],
+  );
+  const renderAlbumSkeleton = useCallback(() => <AlbumCardSkeleton />, []);
+
+  const playTracks = useCallback(
+    (i: number) => handlePlayTracks(tracksQuery.items, i),
+    // handlePlayTracks captures playMutation which is stable from useMutation
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tracksQuery.items],
+  );
 
   return (
     <div className="p-7 pb-24 min-h-full">
       {/* Header */}
       <div className="flex items-baseline justify-between mb-5">
         <h1 className="text-2xl font-bold tracking-tight">Library</h1>
-        {albumsQuery.data && tracksQuery.data && (
-          <span className="text-sm text-muted-foreground">
-            {formatTotalDuration(totalDurationSeconds)} ·{" "}
-            {albumsQuery.data.total} albums
-          </span>
-        )}
       </div>
 
       {/* Search bar */}
@@ -324,11 +328,7 @@ function LibraryPage() {
                   }}
                 >
                   {searchResultsQuery.data!.artists.map((artist) => (
-                    <ArtistCard
-                      key={artist.id}
-                      artist={artist}
-                      albumCount={albumCountByArtistId.get(artist.id)}
-                    />
+                    <ArtistCard key={artist.id} artist={artist} />
                   ))}
                 </div>
               </div>
@@ -371,6 +371,7 @@ function LibraryPage() {
                   tracks={searchResultsQuery.data!.tracks as TrackListItem[]}
                   activeTrackId={activeTrackId}
                   isPlaying={isPlaying}
+                  virtualize={false}
                   onPlayTrack={(i) =>
                     handlePlayTracks(
                       searchResultsQuery.data!.tracks as TrackListItem[],
@@ -396,84 +397,48 @@ function LibraryPage() {
         /* Tab content */
         <>
           {activeTab === "albums" && (
-            <div
-              className="grid gap-x-4 gap-y-6"
-              style={{
-                gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
-              }}
-            >
-              {albumsQuery.isLoading
-                ? Array.from({ length: 18 }).map((_, i) => (
-                    <AlbumCardSkeleton key={i} />
-                  ))
-                : albumsQuery.data?.items.map((album) => (
-                    <AlbumCard
-                      key={album.id}
-                      title={album.title}
-                      artistName={album.artistName}
-                      releaseYear={album.releaseYear}
-                      coverArtUrl={album.coverArtUrl}
-                      href={`/library/albums/${album.id}`}
-                    />
-                  ))}
-            </div>
+            <InfiniteGrid<AlbumListItem>
+              items={albumsQuery.items}
+              isLoading={albumsQuery.isLoading}
+              isFetchingNextPage={albumsQuery.isFetchingNextPage}
+              onEndReached={fetchNextAlbums}
+              renderItem={renderAlbum}
+              renderSkeleton={renderAlbumSkeleton}
+            />
           )}
 
           {activeTab === "artists" && (
-            <div
-              className="grid gap-x-4 gap-y-6"
-              style={{
-                gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
-              }}
-            >
-              {artistsQuery.isLoading
-                ? Array.from({ length: 18 }).map((_, i) => (
-                    <AlbumCardSkeleton key={i} />
-                  ))
-                : artistsQuery.data?.items.map((artist) => (
-                    <ArtistCard
-                      key={artist.id}
-                      artist={artist}
-                      albumCount={albumCountByArtistId.get(artist.id)}
-                    />
-                  ))}
-            </div>
+            <InfiniteGrid<Artist>
+              items={artistsQuery.items}
+              isLoading={artistsQuery.isLoading}
+              isFetchingNextPage={artistsQuery.isFetchingNextPage}
+              onEndReached={fetchNextArtists}
+              renderItem={renderArtist}
+              renderSkeleton={renderAlbumSkeleton}
+            />
           )}
 
           {activeTab === "tracks" && (
-            <>
-              {tracksQuery.isLoading ? (
-                <div className="space-y-2">
-                  {Array.from({ length: 12 }).map((_, i) => (
-                    <Skeleton key={i} className="h-12 w-full rounded-lg" />
-                  ))}
-                </div>
-              ) : (
-                <TrackList
-                  tracks={tracks}
-                  activeTrackId={activeTrackId}
-                  isPlaying={isPlaying}
-                  onPlayTrack={(i) => handlePlayTracks(tracks, i)}
-                />
-              )}
-            </>
+            <TrackList
+              tracks={tracksQuery.items}
+              activeTrackId={activeTrackId}
+              isPlaying={isPlaying}
+              onPlayTrack={playTracks}
+              onEndReached={fetchNextTracks}
+              isFetchingNextPage={tracksQuery.isFetchingNextPage}
+            />
           )}
 
           {activeTab === "playlists" && (
-            <div
-              className="grid gap-x-4 gap-y-6"
-              style={{
-                gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
-              }}
-            >
-              {playlistsQuery.isLoading
-                ? Array.from({ length: 8 }).map((_, i) => (
-                    <AlbumCardSkeleton key={i} />
-                  ))
-                : playlistsQuery.data?.items.map((pl) => (
-                    <PlaylistCard key={pl.id} playlist={pl} />
-                  ))}
-            </div>
+            <InfiniteGrid<PlaylistListItem>
+              items={playlistsQuery.items}
+              isLoading={playlistsQuery.isLoading}
+              isFetchingNextPage={playlistsQuery.isFetchingNextPage}
+              onEndReached={fetchNextPlaylists}
+              renderItem={renderPlaylist}
+              renderSkeleton={renderAlbumSkeleton}
+              skeletonCount={8}
+            />
           )}
         </>
       )}

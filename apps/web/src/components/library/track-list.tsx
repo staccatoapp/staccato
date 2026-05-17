@@ -1,11 +1,14 @@
 import { useState } from "react";
+import { Virtuoso } from "react-virtuoso";
 import { Clock, Music2, Pause, Play } from "lucide-react";
 import type { TrackListItem } from "@staccato/shared";
 import { formatTime, generateAlbumGradient } from "@/lib/music";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { useScrollParent } from "@/lib/scroll-parent";
 import { AddToPlaylistDropdown } from "./add-to-playlist-dropdown";
 
-function TrackRow({
+export function TrackRow({
   track,
   index,
   isActive,
@@ -122,49 +125,100 @@ function TrackRow({
   );
 }
 
+function TrackListFooterSkeletons() {
+  return (
+    <div className="space-y-2 py-2">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <Skeleton key={i} className="h-12 w-full rounded-lg" />
+      ))}
+    </div>
+  );
+}
+
+const FOOTER_COMPONENTS = { Footer: TrackListFooterSkeletons };
+const EMPTY_COMPONENTS = {};
+
+function TrackListHeader() {
+  return (
+    <div className="grid items-center gap-3 px-2 pb-2 border-b border-border mb-1 grid-cols-[2rem_2.25rem_1fr_1fr_1fr_1.5rem_4rem]">
+      <div className="text-[0.7rem] font-semibold uppercase tracking-wider text-muted-foreground text-center">
+        #
+      </div>
+      <div />
+      <div className="text-[0.7rem] font-semibold uppercase tracking-wider text-muted-foreground">
+        Title
+      </div>
+      <div className="text-[0.7rem] font-semibold uppercase tracking-wider text-muted-foreground">
+        Album
+      </div>
+      <div className="text-[0.7rem] font-semibold uppercase tracking-wider text-muted-foreground">
+        Artist
+      </div>
+      <div />
+      <div className="flex justify-end text-muted-foreground">
+        <Clock className="w-3 h-3" />
+      </div>
+    </div>
+  );
+}
+
 export function TrackList({
   tracks,
   activeTrackId,
   isPlaying,
   onPlayTrack,
+  onEndReached,
+  isFetchingNextPage,
+  virtualize = true,
 }: {
   tracks: TrackListItem[];
   activeTrackId?: string;
   isPlaying?: boolean;
   onPlayTrack: (index: number) => void;
+  onEndReached?: () => void;
+  isFetchingNextPage?: boolean;
+  virtualize?: boolean;
 }) {
+  const scrollParent = useScrollParent();
+
+  if (!virtualize || !scrollParent) {
+    return (
+      <div>
+        <TrackListHeader />
+        {tracks.map((track, i) => (
+          <TrackRow
+            key={track.id}
+            track={track}
+            index={i}
+            isActive={track.id === activeTrackId}
+            isPlaying={isPlaying ?? false}
+            onPlay={() => onPlayTrack(i)}
+          />
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div>
-      <div className="grid items-center gap-3 px-2 pb-2 border-b border-border mb-1 grid-cols-[2rem_2.25rem_1fr_1fr_1fr_1.5rem_4rem]">
-        <div className="text-[0.7rem] font-semibold uppercase tracking-wider text-muted-foreground text-center">
-          #
-        </div>
-        <div />
-        <div className="text-[0.7rem] font-semibold uppercase tracking-wider text-muted-foreground">
-          Title
-        </div>
-        <div className="text-[0.7rem] font-semibold uppercase tracking-wider text-muted-foreground">
-          Album
-        </div>
-        <div className="text-[0.7rem] font-semibold uppercase tracking-wider text-muted-foreground">
-          Artist
-        </div>
-        <div />
-        <div className="flex justify-end text-muted-foreground">
-          <Clock className="w-3 h-3" />
-        </div>
-      </div>
-
-      {tracks.map((track, i) => (
-        <TrackRow
-          key={track.id}
-          track={track}
-          index={i}
-          isActive={track.id === activeTrackId}
-          isPlaying={isPlaying ?? false}
-          onPlay={() => onPlayTrack(i)}
-        />
-      ))}
+      <TrackListHeader />
+      <Virtuoso
+        customScrollParent={scrollParent}
+        data={tracks}
+        itemContent={(i, track) => (
+          <TrackRow
+            key={track.id}
+            track={track}
+            index={i}
+            isActive={track.id === activeTrackId}
+            isPlaying={isPlaying ?? false}
+            onPlay={() => onPlayTrack(i)}
+          />
+        )}
+        endReached={onEndReached}
+        increaseViewportBy={400}
+        components={isFetchingNextPage ? FOOTER_COMPONENTS : EMPTY_COMPONENTS}
+      />
     </div>
   );
 }

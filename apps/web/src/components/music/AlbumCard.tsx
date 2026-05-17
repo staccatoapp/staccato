@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Music2, Play } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { generateAlbumGradient } from "@/lib/music";
 
-export function AlbumCard({
+export const AlbumCard = memo(function AlbumCard({
   title,
   artistName,
   releaseYear,
@@ -18,7 +18,10 @@ export function AlbumCard({
   href: string;
 }) {
   const [imgFailed, setImgFailed] = useState(false);
-  const gradient = generateAlbumGradient(title, artistName);
+  const gradient = useMemo(
+    () => generateAlbumGradient(title, artistName),
+    [title, artistName],
+  );
   const showGradient = !coverArtUrl || imgFailed;
 
   return (
@@ -34,6 +37,8 @@ export function AlbumCard({
           <img
             src={coverArtUrl}
             alt={title}
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover"
             onError={() => setImgFailed(true)}
           />
@@ -60,7 +65,7 @@ export function AlbumCard({
       </p>
     </Link>
   );
-}
+});
 
 export function AlbumCardSkeleton() {
   return (

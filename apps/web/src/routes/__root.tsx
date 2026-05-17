@@ -23,6 +23,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { PlaybackSession } from "@staccato/shared";
 import { PlayerBar } from "@/components/layout/player-bar";
+import { ScrollParentContext } from "@/lib/scroll-parent";
 
 const queryClient = new QueryClient();
 
@@ -140,12 +141,19 @@ function LayoutContent() {
     select: (d) => (d?.trackQueue?.length ?? 0) > 0,
   });
 
+  const [mainEl, setMainEl] = useState<HTMLElement | null>(null);
+
   return (
     <>
       <div className="flex h-screen">
         <Sidebar />
-        <main className={cn("flex-1 overflow-y-auto", hasQueue && "pb-20")}>
-          <Outlet />
+        <main
+          ref={setMainEl}
+          className={cn("flex-1 overflow-y-auto", hasQueue && "pb-20")}
+        >
+          <ScrollParentContext.Provider value={mainEl}>
+            <Outlet />
+          </ScrollParentContext.Provider>
         </main>
       </div>
       <PlayerBar />

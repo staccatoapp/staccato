@@ -25,6 +25,7 @@ export type ArtistRow = {
   musicbrainzId: string | null;
   imageUrl: string | null;
   createdAt: Date | null;
+  albumCount: number;
 };
 
 export function getArtists(paginationOptions: PaginationOptions): ArtistRow[] {
@@ -35,6 +36,9 @@ export function getArtists(paginationOptions: PaginationOptions): ArtistRow[] {
       musicbrainzId: artists.musicbrainzId,
       imageUrl: artists.imageUrl,
       createdAt: artists.createdAt,
+      albumCount: sql<number>`(
+        SELECT COUNT(*) FROM ${albums} WHERE ${albums.artistId} = ${artists.id}
+      )`.mapWith(Number),
     })
     .from(artists)
     .orderBy(asc(sql`COALESCE(${artists.canonicalName}, ${artists.name})`))

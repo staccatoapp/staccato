@@ -1,9 +1,19 @@
+import { memo, useMemo } from "react";
 import { Link } from "@tanstack/react-router";
 import { ListMusic, Play } from "lucide-react";
 import type { PlaylistListItem } from "@staccato/shared";
 import { generateAlbumGradient } from "@/lib/music";
 
-export function PlaylistCard({ playlist }: { playlist: PlaylistListItem }) {
+export const PlaylistCard = memo(function PlaylistCard({
+  playlist,
+}: {
+  playlist: PlaylistListItem;
+}) {
+  const gradient = useMemo(
+    () => generateAlbumGradient(playlist.name, ""),
+    [playlist.name],
+  );
+
   return (
     <Link
       to="/playlists/$playlistId"
@@ -13,15 +23,15 @@ export function PlaylistCard({ playlist }: { playlist: PlaylistListItem }) {
       <div
         className="relative aspect-square w-full rounded-lg overflow-hidden mb-2.5 shadow-md"
         style={{
-          background: playlist.coverArtUrl
-            ? undefined
-            : generateAlbumGradient(playlist.name, ""),
+          background: playlist.coverArtUrl ? undefined : gradient,
         }}
       >
         {playlist.coverArtUrl ? (
           <img
             src={playlist.coverArtUrl}
             alt={playlist.name}
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover"
           />
         ) : (
@@ -46,4 +56,4 @@ export function PlaylistCard({ playlist }: { playlist: PlaylistListItem }) {
       </p>
     </Link>
   );
-}
+});
