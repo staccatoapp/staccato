@@ -83,13 +83,13 @@ export interface MBReleaseDetails {
 
 interface MBReleaseLike {
   id: string;
-  title?: string;
-  date?: string;
-  status?: string;
-  "release-group"?: { id?: string; "primary-type"?: string };
+  title?: string | null;
+  date?: string | null;
+  status?: string | null;
+  "release-group"?: { id?: string | null; "primary-type"?: string | null } | null;
 }
 
-function parseReleaseYear(date?: string): number | null {
+function parseReleaseYear(date?: string | null): number | null {
   if (!date) return null;
   const year = parseInt(date.slice(0, 4), 10);
   return Number.isNaN(year) ? null : year;

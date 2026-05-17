@@ -15,16 +15,16 @@ const ArtistCreditSchema = z.array(
 
 const ReleaseGroupRefSchema = z
   .object({
-    id: z.string().optional(),
-    "primary-type": z.string().optional(),
+    id: z.string().nullish(),
+    "primary-type": z.string().nullish(),
   })
-  .optional();
+  .nullish();
 
 const ReleaseLikeSchema = z.object({
   id: z.string(),
-  title: z.string().optional(),
-  date: z.string().optional(),
-  status: z.string().optional(),
+  title: z.string().nullish(),
+  date: z.string().nullish(),
+  status: z.string().nullish(),
   "release-group": ReleaseGroupRefSchema,
 });
 
@@ -34,11 +34,11 @@ const ReleaseSchema = ReleaseLikeSchema.extend({
 
 const RecordingSchema = z.object({
   id: z.string(),
-  title: z.string().optional(),
+  title: z.string().nullish(),
   score: z.number(),
-  video: z.boolean().optional(),
-  releases: z.array(ReleaseSchema).optional(),
-  "artist-credit": ArtistCreditSchema.optional(),
+  video: z.boolean().nullish(),
+  releases: z.array(ReleaseSchema).nullish(),
+  "artist-credit": ArtistCreditSchema.nullish(),
 });
 
 export const MBRecordingSearchResponseSchema = z.object({
@@ -50,10 +50,10 @@ export const MBExternalRecordingSearchResponseSchema = z.object({
     z.object({
       id: z.string(),
       title: z.string(),
-      length: z.number().optional(),
-      video: z.boolean().optional(),
-      "artist-credit": ArtistCreditSchema.optional(),
-      releases: z.array(ReleaseSchema).optional(),
+      length: z.number().nullish(),
+      video: z.boolean().nullish(),
+      "artist-credit": ArtistCreditSchema.nullish(),
+      releases: z.array(ReleaseSchema).nullish(),
     }),
   ),
 });
@@ -63,8 +63,8 @@ export const MBArtistSearchResponseSchema = z.object({
     z.object({
       id: z.string(),
       name: z.string(),
-      disambiguation: z.string().optional(),
-      type: z.string().optional(),
+      disambiguation: z.string().nullish(),
+      type: z.string().nullish(),
     }),
   ),
 });
@@ -74,36 +74,36 @@ export const MBReleaseSearchResponseSchema = z.object({
     z.object({
       id: z.string(),
       title: z.string(),
-      date: z.string().optional(),
-      status: z.string().optional(),
-      "artist-credit": ArtistCreditSchema.optional(),
+      date: z.string().nullish(),
+      status: z.string().nullish(),
+      "artist-credit": ArtistCreditSchema.nullish(),
       "release-group": z
         .object({
-          id: z.string().optional(),
-          "primary-type": z.string().optional(),
+          id: z.string().nullish(),
+          "primary-type": z.string().nullish(),
         })
-        .optional(),
+        .nullish(),
     }),
   ),
 });
 
 export const MBRecordingLookupSchema = z.object({
   id: z.string(),
-  title: z.string().optional(),
-  length: z.number().optional(),
-  video: z.boolean().optional(),
-  "artist-credit": ArtistCreditSchema.optional(),
-  releases: z.array(ReleaseSchema).optional(),
+  title: z.string().nullish(),
+  length: z.number().nullish(),
+  video: z.boolean().nullish(),
+  "artist-credit": ArtistCreditSchema.nullish(),
+  releases: z.array(ReleaseSchema).nullish(),
 });
 
 export const MBReleaseLookupSchema = z.object({
-  title: z.string().optional(),
-  "artist-credit": ArtistCreditSchema.optional(),
+  title: z.string().nullish(),
+  "artist-credit": ArtistCreditSchema.nullish(),
   "release-group": z
     .object({
       id: z.string(),
     })
-    .optional(),
+    .nullish(),
   media: z.array(
     z.object({
       position: z.number(),
@@ -111,10 +111,10 @@ export const MBReleaseLookupSchema = z.object({
         z.object({
           position: z.number(),
           title: z.string(),
-          length: z.number().optional(),
+          length: z.number().nullish(),
           recording: z.object({
             id: z.string(),
-            video: z.boolean().optional(),
+            video: z.boolean().nullish(),
           }),
         }),
       ),
@@ -133,15 +133,15 @@ export const MBReleaseGroupSearchResponseSchema = z.object({
 
 export const MBReleaseGroupLookupSchema = z.object({
   title: z.string(),
-  "primary-type": z.string().optional(),
-  "artist-credit": ArtistCreditSchema.optional(),
+  "primary-type": z.string().nullish(),
+  "artist-credit": ArtistCreditSchema.nullish(),
   releases: z
     .array(
       z.object({
         id: z.string(),
-        date: z.string().optional(),
-        status: z.string().optional(),
+        date: z.string().nullish(),
+        status: z.string().nullish(),
       }),
     )
-    .optional(),
+    .nullish(),
 });

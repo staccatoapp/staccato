@@ -36,11 +36,11 @@ export function getArtists(paginationOptions: PaginationOptions): ArtistRow[] {
       musicbrainzId: artists.musicbrainzId,
       imageUrl: artists.imageUrl,
       createdAt: artists.createdAt,
-      albumCount: sql<number>`(
-        SELECT COUNT(*) FROM ${albums} WHERE ${albums.artistId} = ${artists.id}
-      )`.mapWith(Number),
+      albumCount: sql<number>`COUNT(${albums.id})`.mapWith(Number),
     })
     .from(artists)
+    .leftJoin(albums, eq(albums.artistId, artists.id))
+    .groupBy(artists.id)
     .orderBy(asc(sql`COALESCE(${artists.canonicalName}, ${artists.name})`))
     .limit(paginationOptions.limit)
     .offset(paginationOptions.offset)
@@ -215,7 +215,11 @@ export function upsertArtist(name: string, mbid?: string | null): string {
 
   return db
     .insert(artists)
-    .values({ name, normalizedName: normalizedInput, musicbrainzId: mbid ?? null })
+    .values({
+      name,
+      normalizedName: normalizedInput,
+      musicbrainzId: mbid ?? null,
+    })
     .onConflictDoUpdate({
       target: artists.name,
       set: { name, normalizedName: normalizedInput },
@@ -226,7 +230,10 @@ export function upsertArtist(name: string, mbid?: string | null): string {
 
 function trySetArtistMbid(artistId: string, mbid: string): void {
   try {
-    db.update(artists).set({ musicbrainzId: mbid }).where(eq(artists.id, artistId)).run();
+    db.update(artists)
+      .set({ musicbrainzId: mbid })
+      .where(eq(artists.id, artistId))
+      .run();
   } catch {
     // unique constraint: mbid belongs to another artist — leave it for resolver dedup
   }
