@@ -140,7 +140,7 @@ Song requesting, download status tracking.
 
 All IDs are text (cuid2 via `@paralleldrive/cuid2`, not auto-increment). cuid2 IDs are 24 chars, URL-safe, and monotonically ordered — preferred over UUIDs for user-facing routes. Timestamps are integer (unix epoch).
 
-DB file location is controlled by the `DB_PATH` env var; default is `./data/staccato.db`. The `drizzle/` folder contains committed SQL migration files. Migrations run automatically on server startup (before accepting requests) via `drizzle-orm/better-sqlite3/migrator`; applied migrations are tracked in `__drizzle_migrations`. The Dockerfile must copy `drizzle/` alongside `dist/` — see Key Design Decisions.
+All on-disk state lives under a single data root, controlled by the `STACCATO_DATA_DIR` env var (default `./data` resolved against `process.cwd()`). The DB sits at `${STACCATO_DATA_DIR}/data/staccato.db` and the metadata cache (cover art, artist images) sits at `${STACCATO_DATA_DIR}/metadata/...`. All path derivation lives in `apps/server/src/paths.ts`; `drizzle.config.ts` imports `dbPath` from there so dev tooling and the running server resolve the same file. In Docker, `docker-compose.yml` mounts the host directory `${DATA_PATH}` to `/data` inside the container and sets `STACCATO_DATA_DIR=/data`. The `drizzle/` folder contains committed SQL migration files. Migrations run automatically on server startup (before accepting requests) via `drizzle-orm/better-sqlite3/migrator`; applied migrations are tracked in `__drizzle_migrations`. The Dockerfile must copy `drizzle/` alongside `dist/` — see Key Design Decisions.
 
 ### Shared Tables
 

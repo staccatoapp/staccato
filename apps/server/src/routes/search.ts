@@ -6,6 +6,40 @@ import {
   searchReleasesByQuery,
 } from "../musicbrainz/client.js";
 import { getLocalTrackMbidsByMbids } from "../db/queries/tracks.js";
+import { ensureCoverOnDisk } from "../coverart/store.js";
+import { ensureArtistImageOnDisk } from "../artistimage/store.js";
+
+async function attachCoverArtByReleaseGroup<
+  T extends { releaseGroupMbid: string | null },
+>(items: T[]): Promise<Array<T & { coverArtUrl: string | null }>> {
+  const rgMbids = Array.from(
+    new Set(items.map((i) => i.releaseGroupMbid).filter((m): m is string => !!m)),
+  );
+  const covers = await Promise.all(
+    rgMbids.map(async (m) => [m, await ensureCoverOnDisk(m)] as const),
+  );
+  const coverMap = new Map(covers);
+  return items.map((i) => ({
+    ...i,
+    coverArtUrl: i.releaseGroupMbid
+      ? coverMap.get(i.releaseGroupMbid) ?? null
+      : null,
+  }));
+}
+
+async function attachArtistImagesByMbid<T extends { artistMbid: string }>(
+  items: T[],
+): Promise<Array<T & { imageUrl: string | null }>> {
+  const mbids = Array.from(new Set(items.map((i) => i.artistMbid)));
+  const images = await Promise.all(
+    mbids.map(async (m) => [m, await ensureArtistImageOnDisk(m)] as const),
+  );
+  const imageMap = new Map(images);
+  return items.map((i) => ({
+    ...i,
+    imageUrl: imageMap.get(i.artistMbid) ?? null,
+  }));
+}
 
 const searchRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/external", async (request) => {
@@ -39,6 +73,8 @@ const searchRoutes: FastifyPluginAsync = async (fastify) => {
       );
       const mbids = recordings.map((r) => r.recordingMbid);
       const localMbids = new Set(getLocalTrackMbidsByMbids(mbids));
+      // recording results carry releaseMbid (not release-group), so they're
+      // returned without cover art — the album lookup endpoint resolves it.
       return {
         recordings: recordings.map((r) => ({
           ...r,
@@ -57,7 +93,8 @@ const searchRoutes: FastifyPluginAsync = async (fastify) => {
         return { recordings: [], artists: [], releases: [] };
 
       const releases = await searchReleasesByQuery(parts.join(" AND "), limit);
-      return { recordings: [], artists: [], releases };
+      const withCovers = await attachCoverArtByReleaseGroup(releases);
+      return { recordings: [], artists: [], releases: withCovers };
     }
 
     if (type === "artist") {
@@ -66,7 +103,8 @@ const searchRoutes: FastifyPluginAsync = async (fastify) => {
         `artist:"${artist.trim()}"`,
         limit,
       );
-      return { recordings: [], artists, releases: [] };
+      const withImages = await attachArtistImagesByMbid(artists);
+      return { recordings: [], artists: withImages, releases: [] };
     }
 
     return { recordings: [], artists: [], releases: [] };
@@ -74,12 +112,15 @@ const searchRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.get("/external/albums/:rgMbid", async (request, reply) => {
     const { rgMbid } = request.params as { rgMbid: string };
-    const album = await lookupExternalAlbum(rgMbid);
+    const [album, coverArtUrl] = await Promise.all([
+      lookupExternalAlbum(rgMbid),
+      ensureCoverOnDisk(rgMbid),
+    ]);
     if (!album) {
       request.log.warn({ releaseGroupMbid: rgMbid }, "external album lookup returned nothing");
       return reply.status(404).send({ error: "Not found" });
     }
-    return album;
+    return { ...album, coverArtUrl };
   });
 };
 

@@ -22,6 +22,7 @@ import { normalizeString } from "../../musicbrainz/client.js";
 export type ArtistRow = {
   id: string;
   name: string;
+  musicbrainzId: string | null;
   imageUrl: string | null;
   createdAt: Date | null;
 };
@@ -31,6 +32,7 @@ export function getArtists(paginationOptions: PaginationOptions): ArtistRow[] {
     .select({
       id: artists.id,
       name: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
+      musicbrainzId: artists.musicbrainzId,
       imageUrl: artists.imageUrl,
       createdAt: artists.createdAt,
     })
@@ -44,6 +46,7 @@ export function getArtists(paginationOptions: PaginationOptions): ArtistRow[] {
 export type ArtistSearchRow = {
   id: string;
   name: string;
+  musicbrainzId: string | null;
   imageUrl: string | null;
 };
 
@@ -55,6 +58,7 @@ export function searchArtists(
     .select({
       id: artists.id,
       name: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
+      musicbrainzId: artists.musicbrainzId,
       imageUrl: artists.imageUrl,
     })
     .from(artists)
@@ -78,7 +82,17 @@ export function getResolvedArtistsWithoutCoverArt() {
   return db
     .select({ id: artists.id, musicbrainzId: artists.musicbrainzId })
     .from(artists)
-    .where(and(isNotNull(artists.musicbrainzId), isNull(artists.imageUrl)))
+    .where(
+      and(
+        isNotNull(artists.musicbrainzId),
+        or(
+          isNull(artists.imageUrl),
+          // also re-process rows holding stale wikimedia URLs from before
+          // we moved artist images onto the local disk store
+          sql`${artists.imageUrl} NOT LIKE '/metadata/artists/%'`,
+        ),
+      ),
+    )
     .all();
 }
 export type ResolvedArtistWithoutCoverArt = ReturnType<

@@ -25,6 +25,7 @@ export type AlbumWithArtistDetailsRow = {
   artistId: string;
   artistName: string;
   releaseYear: number | null;
+  releaseGroupMbid: string | null;
   coverArtUrl: string | null;
   createdAt: Date | null;
 };
@@ -59,6 +60,7 @@ export function getAlbumsWithArtistDetails(
       artistId: albums.artistId,
       artistName: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
       releaseYear: albums.releaseYear,
+      releaseGroupMbid: albums.releaseGroupMbid,
       coverArtUrl: albums.coverArtUrl,
       createdAt: albums.createdAt,
     })
@@ -83,6 +85,7 @@ export function getAlbumWithArtistDetails(
       artistId: albums.artistId,
       artistName: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
       releaseYear: albums.releaseYear,
+      releaseGroupMbid: albums.releaseGroupMbid,
       coverArtUrl: albums.coverArtUrl,
       createdAt: albums.createdAt,
     })
@@ -103,6 +106,7 @@ export function searchAlbums(
       artistId: albums.artistId,
       artistName: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
       releaseYear: albums.releaseYear,
+      releaseGroupMbid: albums.releaseGroupMbid,
       coverArtUrl: albums.coverArtUrl,
       createdAt: albums.createdAt,
     })
@@ -151,7 +155,18 @@ export function getResolvedAlbumsWithoutCoverArt() {
       releaseGroupMbid: albums.releaseGroupMbid,
     })
     .from(albums)
-    .where(and(isNotNull(albums.releaseGroupMbid), or(isNull(albums.coverArtUrl), eq(albums.coverArtUrl, ""))))
+    .where(
+      and(
+        isNotNull(albums.releaseGroupMbid),
+        or(
+          isNull(albums.coverArtUrl),
+          eq(albums.coverArtUrl, ""),
+          // also re-process rows holding stale archive.org URLs from before
+          // we moved cover art onto the local disk store
+          sql`${albums.coverArtUrl} NOT LIKE '/metadata/covers/%'`,
+        ),
+      ),
+    )
     .all();
 }
 export type ResolvedAlbumWithoutCoverArt = ReturnType<

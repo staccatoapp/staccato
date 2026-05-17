@@ -17,6 +17,7 @@ import {
   touchPlaylist,
   updatePlaylist,
 } from "../db/queries/playlists.js";
+import { resolveAlbumCoverNow } from "../coverart/store.js";
 
 function requireOwnPlaylist(
   playlistId: string,
@@ -47,7 +48,14 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
     const artByPlaylist = new Map<string, string | null>();
     for (const row of artRows) {
       if (!artByPlaylist.has(row.playlistId)) {
-        artByPlaylist.set(row.playlistId, row.coverArtUrl);
+        artByPlaylist.set(
+          row.playlistId,
+          resolveAlbumCoverNow({
+            albumId: row.albumId,
+            releaseGroupMbid: row.releaseGroupMbid,
+            coverArtUrl: row.coverArtUrl,
+          }),
+        );
       }
     }
 
@@ -107,7 +115,14 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
       name: result.name,
       description: result.description,
       updatedAt: result.updatedAt?.toISOString() ?? null,
-      tracks: trackRows,
+      tracks: trackRows.map((t) => ({
+        ...t,
+        coverArtUrl: resolveAlbumCoverNow({
+          albumId: t.albumId,
+          releaseGroupMbid: t.releaseGroupMbid,
+          coverArtUrl: t.coverArtUrl,
+        }),
+      })),
     };
   });
 

@@ -12,13 +12,6 @@ const throttledCaaFetch = throttle({ limit: 5, interval: 1000 })(
 const coverArtCache = new Map<string, string | null>();
 const coverArtInflight = new Map<string, Promise<string | null>>();
 
-export async function fetchCoverArtUrl(
-  musicbrainzId: string,
-): Promise<string | null> {
-  return caaFetch(`${CAA_BASE}/release/${musicbrainzId}/front`);
-}
-
-// fallback for release groups - CAA sometimes has cover art here even when individual releases dont
 export async function fetchCoverArtUrlForGroup(
   releaseGroupMbid: string,
 ): Promise<string | null> {

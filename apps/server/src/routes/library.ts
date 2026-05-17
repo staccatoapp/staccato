@@ -18,6 +18,8 @@ import {
   getTracksInAlbum,
 } from "../db/queries/tracks.js";
 import { db } from "../db/client.js";
+import { resolveAlbumCoverNow } from "../coverart/store.js";
+import { resolveArtistImageNow } from "../artistimage/store.js";
 
 const libraryRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/artists", async (request) => {
@@ -31,6 +33,11 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
     return {
       items: items.map((r) => ({
         ...r,
+        imageUrl: resolveArtistImageNow({
+          artistId: r.id,
+          musicbrainzId: r.musicbrainzId,
+          imageUrl: r.imageUrl,
+        }),
         createdAt: r.createdAt?.toISOString() ?? null,
       })),
       total,
@@ -48,6 +55,11 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
     return {
       items: items.map((r) => ({
         ...r,
+        coverArtUrl: resolveAlbumCoverNow({
+          albumId: r.id,
+          releaseGroupMbid: r.releaseGroupMbid,
+          coverArtUrl: r.coverArtUrl,
+        }),
         createdAt: r.createdAt?.toISOString() ?? null,
       })),
       total,
@@ -66,7 +78,15 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
 
     const albumTracks = getTracksInAlbum(albumId);
     return {
-      album: { ...album, createdAt: album.createdAt?.toISOString() ?? null },
+      album: {
+        ...album,
+        coverArtUrl: resolveAlbumCoverNow({
+          albumId: album.id,
+          releaseGroupMbid: album.releaseGroupMbid,
+          coverArtUrl: album.coverArtUrl,
+        }),
+        createdAt: album.createdAt?.toISOString() ?? null,
+      },
       tracks: albumTracks,
     };
   });
@@ -79,7 +99,19 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
     const items = getLibraryTracks(paginationOptions);
     const total = countTracks();
 
-    return { items, total };
+    return {
+      items: items.map((r) => ({
+        ...r,
+        coverArtUrl: r.albumId
+          ? resolveAlbumCoverNow({
+              albumId: r.albumId,
+              releaseGroupMbid: r.releaseGroupMbid,
+              coverArtUrl: r.coverArtUrl,
+            })
+          : r.coverArtUrl,
+      })),
+      total,
+    };
   });
 
   fastify.get("/search", async (request) => {
@@ -103,6 +135,7 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
               ar.name       AS artist_name,
               al.id         AS album_id,
               al.title      AS album_title,
+              al.release_group_mbid AS release_group_mbid,
               t.duration_seconds,
               al.cover_art_url
             FROM tracks_fts f
@@ -120,6 +153,7 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
               ar.name       AS artist_name,
               al.id         AS album_id,
               al.title      AS album_title,
+              al.release_group_mbid AS release_group_mbid,
               t.duration_seconds,
               al.cover_art_url
             FROM tracks t
@@ -137,14 +171,27 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
       artist_name: string;
       album_id: string | null;
       album_title: string | null;
+      release_group_mbid: string | null;
       duration_seconds: number | null;
       cover_art_url: string | null;
     }>;
 
     return {
-      artists: artistResults,
+      artists: artistResults.map((r) => ({
+        ...r,
+        imageUrl: resolveArtistImageNow({
+          artistId: r.id,
+          musicbrainzId: r.musicbrainzId,
+          imageUrl: r.imageUrl,
+        }),
+      })),
       albums: albumResults.map((r) => ({
         ...r,
+        coverArtUrl: resolveAlbumCoverNow({
+          albumId: r.id,
+          releaseGroupMbid: r.releaseGroupMbid,
+          coverArtUrl: r.coverArtUrl,
+        }),
         createdAt: r.createdAt?.toISOString() ?? null,
       })),
       tracks: trackRows.map((r) => ({
@@ -154,7 +201,13 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
         albumId: r.album_id,
         albumTitle: r.album_title,
         durationSeconds: r.duration_seconds,
-        coverArtUrl: r.cover_art_url,
+        coverArtUrl: r.album_id
+          ? resolveAlbumCoverNow({
+              albumId: r.album_id,
+              releaseGroupMbid: r.release_group_mbid,
+              coverArtUrl: r.cover_art_url,
+            })
+          : r.cover_art_url,
       })),
     };
   });

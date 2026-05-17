@@ -10,7 +10,9 @@ import { startScan } from "./scanner/index.js";
 import { startWatcher } from "./scanner/watcher.js";
 import { reconcileWithFilesystem } from "./scanner/startup-diff.js";
 import path from "node:path";
+import fs from "node:fs";
 import { fileURLToPath } from "node:url";
+import { artistImagesDir, coversDir, metadataDir } from "./paths.js";
 import libraryRoutes from "./routes/library.js";
 import playbackRoutes from "./routes/playback.js";
 import tracksRoutes from "./routes/tracks.js";
@@ -32,6 +34,17 @@ if (process.env.STACCATO_ENV !== "production") {
 const app = Fastify({ loggerInstance: logger });
 
 app.register(sessionPlugin);
+
+fs.mkdirSync(metadataDir, { recursive: true });
+fs.mkdirSync(coversDir, { recursive: true });
+fs.mkdirSync(artistImagesDir, { recursive: true });
+app.register(fastifyStatic, {
+  root: metadataDir,
+  prefix: "/metadata/",
+  decorateReply: false,
+  maxAge: "1y",
+  immutable: true,
+});
 
 app.get("/api/health", async () => {
   return { status: "ok" };

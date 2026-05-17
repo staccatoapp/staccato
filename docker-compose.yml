@@ -4,11 +4,13 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./data:/app/data
-      - ./music:/music:ro
+      - ${DATA_PATH}:/data
+      - ${MUSIC_PATH}:/music:ro
     environment:
       - STACCATO_ENV=production
       - PORT=8080
+      - STACCATO_DATA_DIR=/data
+      - MUSIC_DIR=/music
 
   redis:
     image: redis:7-alpine

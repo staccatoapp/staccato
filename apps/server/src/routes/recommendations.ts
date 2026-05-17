@@ -21,7 +21,7 @@ import {
   lookupRecording,
   type MBRecordingDetail,
 } from "../musicbrainz/client.js";
-import { fetchCoverArtUrlForGroup } from "../coverart/client.js";
+import { ensureCoverOnDisk } from "../coverart/store.js";
 import { resolvePreview } from "../preview/index.js";
 import { playlistCache, trackCache } from "../recommendations/cache.js";
 
@@ -108,7 +108,7 @@ const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
       }
       const rgList = [...rgSet];
       const coverArtResults = await Promise.all(
-        rgList.map(fetchCoverArtUrlForGroup),
+        rgList.map(ensureCoverOnDisk),
       );
       const coverArtMap = new Map(
         rgList.map((rg, i) => [rg, coverArtResults[i] ?? null]),
@@ -230,7 +230,7 @@ const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
               rec.title,
             ),
             rec.releaseGroupMbid
-              ? fetchCoverArtUrlForGroup(rec.releaseGroupMbid)
+              ? ensureCoverOnDisk(rec.releaseGroupMbid)
               : Promise.resolve<string | null>(null),
           ]);
           return {

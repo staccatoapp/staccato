@@ -25,6 +25,7 @@ import {
 } from "../db/queries/track-lyrics.js";
 import { fetchLyrics, parseSyncedLyrics } from "../lyrics/client.js";
 import type { TrackLyrics } from "@staccato/shared";
+import { resolveAlbumCoverNow } from "../coverart/store.js";
 
 const playbackRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/session", async (req) => {
@@ -216,7 +217,18 @@ function orderTracksByQueue(
 
 function buildSessionResponse(session: PlaybackSessionRow) {
   const sessionTracks = getPlaybackTracksByIds(session.trackQueue);
-  const orderedTracks = orderTracksByQueue(session.trackQueue, sessionTracks);
+  const orderedTracks = orderTracksByQueue(session.trackQueue, sessionTracks).map(
+    (t) => ({
+      ...t,
+      coverArtUrl: t.albumId
+        ? resolveAlbumCoverNow({
+            albumId: t.albumId,
+            releaseGroupMbid: t.releaseGroupMbid,
+            coverArtUrl: t.coverArtUrl,
+          })
+        : t.coverArtUrl,
+    }),
+  );
 
   return {
     trackQueue: orderedTracks,

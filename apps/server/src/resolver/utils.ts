@@ -2,7 +2,7 @@ import {
   type MBReleaseTrack,
   normalizeString,
 } from "../musicbrainz/client.js";
-import { fetchCoverArtUrlForGroup } from "../coverart/client.js";
+import { ensureCoverOnDisk } from "../coverart/store.js";
 import {
   getArtistIdByMbid,
   deleteArtist,
@@ -47,10 +47,10 @@ export async function fetchAndStoreCoverArt(
   releaseGroupMbid: string | null | undefined,
 ): Promise<void> {
   if (!releaseGroupMbid) return;
-  const url = await fetchCoverArtUrlForGroup(releaseGroupMbid);
+  const localUrl = await ensureCoverOnDisk(releaseGroupMbid);
   updateAlbumByAlbumId(albumId, {
     releaseGroupMbid,
-    ...(url !== null ? { coverArtUrl: url } : {}),
+    ...(localUrl !== null ? { coverArtUrl: localUrl } : {}),
   });
 }
 

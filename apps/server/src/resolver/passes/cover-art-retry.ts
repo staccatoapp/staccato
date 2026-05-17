@@ -1,4 +1,4 @@
-import { fetchCoverArtUrlForGroup } from "../../coverart/client.js";
+import { ensureCoverOnDisk } from "../../coverart/store.js";
 import {
   getResolvedAlbumsWithoutCoverArt,
   updateAlbumByAlbumId,
@@ -15,9 +15,9 @@ export async function runCoverArtRetryPass(): Promise<void> {
 
   for (const album of needsRetry) {
     if (!album.releaseGroupMbid) continue;
-    const url = await fetchCoverArtUrlForGroup(album.releaseGroupMbid);
-    if (url !== null && url !== "") {
-      updateAlbumByAlbumId(album.albumId, { coverArtUrl: url });
+    const localUrl = await ensureCoverOnDisk(album.releaseGroupMbid);
+    if (localUrl !== null) {
+      updateAlbumByAlbumId(album.albumId, { coverArtUrl: localUrl });
     }
   }
 }

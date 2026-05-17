@@ -20,6 +20,7 @@ export type PlaylistTrackRow = {
   artistName: string;
   albumTitle: string;
   albumId: string;
+  releaseGroupMbid: string | null;
   coverArtUrl: string | null;
   durationSeconds: number | null;
   trackNumber: number | null;
@@ -82,11 +83,19 @@ export function getPlaylistTrackCounts(
 
 export function getPlaylistCoverArtUrls(
   playlistIds: string[],
-): { playlistId: string; coverArtUrl: string | null; position: number }[] {
+): {
+  playlistId: string;
+  albumId: string;
+  releaseGroupMbid: string | null;
+  coverArtUrl: string | null;
+  position: number;
+}[] {
   if (playlistIds.length === 0) return [];
   return db
     .select({
       playlistId: playlistTracks.playlistId,
+      albumId: albums.id,
+      releaseGroupMbid: albums.releaseGroupMbid,
       coverArtUrl: albums.coverArtUrl,
       position: playlistTracks.position,
     })
@@ -107,6 +116,7 @@ export function getPlaylistTracks(playlistId: string): PlaylistTrackRow[] {
       artistName: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
       albumTitle: sql<string>`COALESCE(${albums.canonicalTitle}, ${albums.title})`,
       albumId: albums.id,
+      releaseGroupMbid: albums.releaseGroupMbid,
       coverArtUrl: albums.coverArtUrl,
       durationSeconds: tracks.durationSeconds,
       trackNumber: tracks.trackNumber,

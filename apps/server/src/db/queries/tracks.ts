@@ -57,6 +57,7 @@ export type LibraryTrackRow = {
   artistName: string;
   albumId: string | null;
   albumTitle: string | null;
+  releaseGroupMbid: string | null;
   coverArtUrl: string | null;
   durationSeconds: number | null;
   fileFormat: string | null;
@@ -71,6 +72,7 @@ export function getLibraryTracks(opts: PaginationOptions): LibraryTrackRow[] {
       artistName: resolvedArtistName,
       albumId: tracks.albumId,
       albumTitle: resolvedAlbumTitle,
+      releaseGroupMbid: albums.releaseGroupMbid,
       coverArtUrl: albums.coverArtUrl,
       durationSeconds: tracks.durationSeconds,
       fileFormat: tracks.fileFormat,
@@ -103,6 +105,8 @@ export type PlaybackTrackRow = {
   trackNumber: number | null;
   discNumber: number | null;
   artistName: string | null;
+  albumId: string | null;
+  releaseGroupMbid: string | null;
   coverArtUrl: string | null;
   durationSeconds: number | null;
 };
@@ -126,6 +130,8 @@ export function getPlaybackTracksByIds(ids: string[]): PlaybackTrackRow[] {
       trackNumber: tracks.trackNumber,
       discNumber: tracks.discNumber,
       artistName: resolvedArtistName,
+      albumId: albums.id,
+      releaseGroupMbid: albums.releaseGroupMbid,
       coverArtUrl: albums.coverArtUrl,
       durationSeconds: tracks.durationSeconds,
     })
