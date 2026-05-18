@@ -17,10 +17,9 @@ import {
   useRecommendedTracks,
 } from "@/hooks/useRecommendations";
 import { usePreviewAudio } from "@/hooks/usePreviewAudio";
-import {
-  useRequestDownload,
-  useRetryDownload,
-} from "@/hooks/useRequestDownload";
+import { useRetryDownload } from "@/hooks/useRequestDownload";
+import { useRequestDownloadDialog } from "@/hooks/useRequestDownloadDialog";
+import { RequestDownloadDialog } from "@/components/downloads/RequestDownloadDialog";
 import { toUiStatus, useDownloads } from "@/hooks/useDownloads";
 
 export const Route = createFileRoute("/explore/")({ component: ExplorePage });
@@ -71,7 +70,7 @@ function ExplorePage() {
   const { data: recPlaylists, isLoading: recPlaylistsLoading } =
     useRecommendedPlaylists();
   const { byReleaseGroup } = useDownloads();
-  const requestDownload = useRequestDownload();
+  const requestDialog = useRequestDownloadDialog();
   const retryDownload = useRetryDownload();
 
   useEffect(() => {
@@ -114,11 +113,15 @@ function ExplorePage() {
     if (!track.releaseGroupMbid || !track.artistMbid || !track.artistName) {
       return;
     }
-    requestDownload.mutate({
-      releaseGroupMbid: track.releaseGroupMbid,
-      artistMbid: track.artistMbid,
-      artistName: track.artistName,
-      albumTitle: track.albumTitle,
+    requestDialog.openSingle({
+      subject: "track",
+      subjectName: track.title,
+      payload: {
+        releaseGroupMbid: track.releaseGroupMbid,
+        artistMbid: track.artistMbid,
+        artistName: track.artistName,
+        albumTitle: track.albumTitle,
+      },
     });
   }
 
@@ -438,6 +441,8 @@ function ExplorePage() {
           </section>
         </div>
       )}
+
+      <RequestDownloadDialog {...requestDialog.dialogProps} />
     </div>
   );
 }

@@ -25,10 +25,9 @@ import { AlbumHeader } from "@/components/music/AlbumHeader";
 import { AlbumDetailSkeleton } from "@/components/music/AlbumDetailSkeleton";
 import { TrackList } from "@/components/music/TrackList";
 import { toUiStatus, useDownloads } from "@/hooks/useDownloads";
-import {
-  useRequestDownload,
-  useRetryDownload,
-} from "@/hooks/useRequestDownload";
+import { useRetryDownload } from "@/hooks/useRequestDownload";
+import { useRequestDownloadDialog } from "@/hooks/useRequestDownloadDialog";
+import { RequestDownloadDialog } from "@/components/downloads/RequestDownloadDialog";
 
 export const Route = createFileRoute("/albums/$albumKey")({
   component: AlbumDetailPage,
@@ -276,7 +275,7 @@ function ExternalAlbumView({
   const [playingMbid, setPlayingMbid] = useState<string | null>(null);
 
   const { byReleaseGroup } = useDownloads();
-  const requestDownload = useRequestDownload();
+  const requestDialog = useRequestDownloadDialog();
   const retryDownload = useRetryDownload();
 
   useEffect(() => {
@@ -317,11 +316,15 @@ function ExternalAlbumView({
 
   function addAlbum() {
     if (!album.artistMbid) return;
-    requestDownload.mutate({
-      releaseGroupMbid: album.releaseGroupMbid,
-      artistMbid: album.artistMbid,
-      artistName: album.artistName,
-      albumTitle: album.title,
+    requestDialog.openSingle({
+      subject: "release",
+      subjectName: album.title,
+      payload: {
+        releaseGroupMbid: album.releaseGroupMbid,
+        artistMbid: album.artistMbid,
+        artistName: album.artistName,
+        albumTitle: album.title,
+      },
     });
   }
 
@@ -382,6 +385,7 @@ function ExternalAlbumView({
         />
       </div>
       <audio ref={audioRef} />
+      <RequestDownloadDialog {...requestDialog.dialogProps} />
     </div>
   );
 }

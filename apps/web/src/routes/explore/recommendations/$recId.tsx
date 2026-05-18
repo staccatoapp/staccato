@@ -13,6 +13,8 @@ import {
   useRequestDownload,
   useRetryDownload,
 } from "@/hooks/useRequestDownload";
+import { useRequestDownloadDialog } from "@/hooks/useRequestDownloadDialog";
+import { RequestDownloadDialog } from "@/components/downloads/RequestDownloadDialog";
 import { toUiStatus, useDownloads } from "@/hooks/useDownloads";
 import {
   RecommendedTrackListHeader,
@@ -49,7 +51,8 @@ function RecommendationDetailPage() {
 
   const { audioRef, playingMbid, handlePreview } = usePreviewAudio();
   const { byReleaseGroup } = useDownloads();
-  const requestDownload = useRequestDownload();
+  const requestDialog = useRequestDownloadDialog();
+  const bulkRequest = useRequestDownload();
   const retryDownload = useRetryDownload();
 
   const gradient = generateAlbumGradient(recId, "recommendation");
@@ -123,30 +126,41 @@ function RecommendationDetailPage() {
     },
   });
 
-  function addAll() {
-    const seen = new Set<string>();
-    for (const t of visibleTracks) {
-      if (t.inLibrary) continue;
-      if (!t.releaseGroupMbid || !t.artistMbid || !t.artistName) continue;
-      if (byReleaseGroup.has(t.releaseGroupMbid)) continue;
-      if (seen.has(t.releaseGroupMbid)) continue;
-      seen.add(t.releaseGroupMbid);
-      requestDownload.mutate({
-        releaseGroupMbid: t.releaseGroupMbid,
-        artistMbid: t.artistMbid,
-        artistName: t.artistName,
-        albumTitle: t.albumTitle,
-      });
-    }
+  function openAddAllDialog() {
+    if (!playlist) return;
+    requestDialog.openBulk({
+      subject: "playlist",
+      subjectName: playlist.name,
+      run: async () => {
+        const seen = new Set<string>();
+        for (const t of visibleTracks) {
+          if (t.inLibrary) continue;
+          if (!t.releaseGroupMbid || !t.artistMbid || !t.artistName) continue;
+          if (byReleaseGroup.has(t.releaseGroupMbid)) continue;
+          if (seen.has(t.releaseGroupMbid)) continue;
+          seen.add(t.releaseGroupMbid);
+          await bulkRequest.mutateAsync({
+            releaseGroupMbid: t.releaseGroupMbid,
+            artistMbid: t.artistMbid,
+            artistName: t.artistName,
+            albumTitle: t.albumTitle,
+          });
+        }
+      },
+    });
   }
 
   function addOne(track: RecommendedPlaylistTrack) {
     if (!track.releaseGroupMbid || !track.artistMbid || !track.artistName) return;
-    requestDownload.mutate({
-      releaseGroupMbid: track.releaseGroupMbid,
-      artistMbid: track.artistMbid,
-      artistName: track.artistName,
-      albumTitle: track.albumTitle,
+    requestDialog.openSingle({
+      subject: "track",
+      subjectName: track.title,
+      payload: {
+        releaseGroupMbid: track.releaseGroupMbid,
+        artistMbid: track.artistMbid,
+        artistName: track.artistName,
+        albumTitle: track.albumTitle,
+      },
     });
   }
 
@@ -288,7 +302,7 @@ function RecommendationDetailPage() {
             </div>
           ) : (
             <button
-              onClick={addAll}
+              onClick={openAddAllDialog}
               className="inline-flex items-center gap-2 h-[38px] px-[18px] rounded-[22px] bg-white text-[oklch(0.15_0_0)] text-sm font-semibold"
               style={{ boxShadow: "0 2px 12px oklch(0 0 0 / 35%)" }}
             >
@@ -360,6 +374,8 @@ function RecommendationDetailPage() {
           })
         )}
       </div>
+
+      <RequestDownloadDialog {...requestDialog.dialogProps} />
     </div>
   );
 }
