@@ -1,7 +1,10 @@
 import { z } from "zod";
 
 export const CreateDownloadRequestSchema = z.object({
-  recordingMbid: z.string().min(1),
+  releaseGroupMbid: z.string().min(1),
+  artistMbid: z.string().min(1),
+  artistName: z.string().min(1),
+  albumTitle: z.string().nullable(),
 });
 export type CreateDownloadRequest = z.infer<typeof CreateDownloadRequestSchema>;
 

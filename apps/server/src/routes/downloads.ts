@@ -3,7 +3,6 @@ import {
   CreateDownloadRequestSchema,
   DownloadRequest,
 } from "@staccato/shared";
-import { lookupRecording, MB_PRIORITY } from "../musicbrainz/client.js";
 import {
   createDownloadRequest,
   deleteDownloadRequest,
@@ -16,12 +15,13 @@ import { submitToLidarr } from "../lidarr/submit.js";
 function toDto(row: DownloadRequestRow): DownloadRequest {
   return {
     id: row.id,
-    recordingMbid: row.musicbrainzRecordingId,
+    releaseGroupMbid: row.musicbrainzReleaseGroupId,
+    artistMbid: row.musicbrainzArtistId,
     artistName: row.artistName,
-    trackTitle: row.trackTitle,
     albumTitle: row.albumTitle,
     status: row.status,
     errorMessage: row.errorMessage,
+    lidarrAlbumId: row.lidarrAlbumId,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -29,30 +29,21 @@ function toDto(row: DownloadRequestRow): DownloadRequest {
 
 const downloadRoutes: FastifyPluginAsync = async (app) => {
   app.post("/", async (req, reply) => {
-    const { recordingMbid } = CreateDownloadRequestSchema.parse(req.body);
+    const body = CreateDownloadRequestSchema.parse(req.body);
 
-    const existing = findExistingActiveRequest(recordingMbid);
+    const existing = findExistingActiveRequest(req.userId, body.releaseGroupMbid);
     if (existing) {
       return reply
         .status(409)
         .send({ error: "Request already active", request: toDto(existing) });
     }
 
-    const recording = await lookupRecording(recordingMbid, MB_PRIORITY.PAGE_LOAD);
-    if (!recording) {
-      return reply
-        .status(404)
-        .send({ error: "Recording not found in MusicBrainz" });
-    }
-
     const row = createDownloadRequest({
       userId: req.userId,
-      musicbrainzRecordingId: recordingMbid,
-      musicbrainzReleaseGroupId: recording.releaseGroupMbid,
-      musicbrainzArtistId: recording.artistMbid,
-      artistName: recording.artistName ?? "",
-      trackTitle: recording.title,
-      albumTitle: recording.releaseName,
+      musicbrainzReleaseGroupId: body.releaseGroupMbid,
+      musicbrainzArtistId: body.artistMbid,
+      artistName: body.artistName,
+      albumTitle: body.albumTitle,
       status: "requested",
     });
 

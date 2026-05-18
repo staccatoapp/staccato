@@ -33,14 +33,16 @@ export function getActiveDownloadRequests(): DownloadRequestRow[] {
 }
 
 export function findExistingActiveRequest(
-  recordingMbid: string,
+  userId: string,
+  releaseGroupMbid: string,
 ): DownloadRequestRow | undefined {
   return db
     .select()
     .from(downloadRequests)
     .where(
       and(
-        eq(downloadRequests.musicbrainzRecordingId, recordingMbid),
+        eq(downloadRequests.userId, userId),
+        eq(downloadRequests.musicbrainzReleaseGroupId, releaseGroupMbid),
         or(
           eq(downloadRequests.status, "requested"),
           eq(downloadRequests.status, "sent_to_lidarr"),

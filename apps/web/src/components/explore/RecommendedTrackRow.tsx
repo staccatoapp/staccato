@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Check, Clock, Pause, Play, Plus, X } from "lucide-react";
+import { Check, Clock, Download, Pause, Play, Plus, RotateCw, X } from "lucide-react";
 import { generateAlbumGradient, formatMs } from "@/lib/music";
+import type { UiDownloadStatus } from "@/hooks/useDownloads";
 
 export interface TrackRowData {
   recordingMbid: string | null;
@@ -42,16 +43,22 @@ export function RecommendedTrackRow({
   index,
   isPlaying,
   inLibrary,
+  downloadStatus,
+  addDisabledReason,
   onPlay,
   onAddToLibrary,
+  onRetry,
   onDismiss,
 }: {
   track: TrackRowData;
   index: number;
   isPlaying: boolean;
   inLibrary: boolean;
+  downloadStatus?: UiDownloadStatus | null;
+  addDisabledReason?: string | null;
   onPlay?: (track: TrackRowData) => void;
   onAddToLibrary?: () => void;
+  onRetry?: () => void;
   onDismiss?: () => void;
 }) {
   const [hovered, setHovered] = useState(false);
@@ -147,33 +154,16 @@ export function RecommendedTrackRow({
         {formatMs(track.durationMs)}
       </div>
 
-      {/* Add to library / In library badge */}
+      {/* Status / Add */}
       {showActions && (
-        inLibrary ? (
-          <div
-            className="w-7 h-7 rounded-[7px] flex items-center justify-center"
-            style={{
-              background: "oklch(1 0 0 / 10%)",
-              color: "oklch(0.75 0.18 55)",
-            }}
-            title="In your library"
-          >
-            <Check className="w-3 h-3" strokeWidth={2.5} />
-          </div>
-        ) : (
-          <button
-            className="w-7 h-7 rounded-[7px] flex items-center justify-center transition-colors"
-            style={{
-              color: "oklch(0.55 0 0)",
-              opacity: hovered ? 1 : 0,
-              transition: "opacity 0.15s",
-            }}
-            title="Add to library"
-            onClick={onAddToLibrary}
-          >
-            <Plus className="w-3 h-3" />
-          </button>
-        )
+        <DownloadCell
+          inLibrary={inLibrary}
+          downloadStatus={downloadStatus ?? null}
+          hovered={hovered}
+          addDisabledReason={addDisabledReason ?? null}
+          onAddToLibrary={onAddToLibrary}
+          onRetry={onRetry}
+        />
       )}
 
       {/* Dismiss */}
@@ -194,5 +184,93 @@ export function RecommendedTrackRow({
         </button>
       )}
     </div>
+  );
+}
+
+function DownloadCell({
+  inLibrary,
+  downloadStatus,
+  hovered,
+  addDisabledReason,
+  onAddToLibrary,
+  onRetry,
+}: {
+  inLibrary: boolean;
+  downloadStatus: UiDownloadStatus | null;
+  hovered: boolean;
+  addDisabledReason: string | null;
+  onAddToLibrary?: () => void;
+  onRetry?: () => void;
+}) {
+  if (inLibrary || downloadStatus === "completed") {
+    return (
+      <div
+        className="w-7 h-7 rounded-[7px] flex items-center justify-center"
+        style={{
+          background: "oklch(1 0 0 / 10%)",
+          color: "oklch(0.75 0.18 55)",
+        }}
+        title="In your library"
+      >
+        <Check className="w-3 h-3" strokeWidth={2.5} />
+      </div>
+    );
+  }
+  if (downloadStatus === "pending") {
+    return (
+      <div
+        className="w-7 h-7 rounded-[7px] flex items-center justify-center"
+        style={{ background: "oklch(1 0 0 / 6%)", color: "oklch(0.65 0 0)" }}
+        title="Queued for download"
+      >
+        <Clock className="w-3 h-3" />
+      </div>
+    );
+  }
+  if (downloadStatus === "downloading") {
+    return (
+      <div
+        className="w-7 h-7 rounded-[7px] flex items-center justify-center"
+        style={{
+          background: "oklch(0.7 0.15 250 / 12%)",
+          color: "oklch(0.72 0.15 250)",
+        }}
+        title="Downloading from Lidarr"
+      >
+        <Download className="w-3 h-3" />
+      </div>
+    );
+  }
+  if (downloadStatus === "failed") {
+    return (
+      <button
+        className="w-7 h-7 rounded-[7px] flex items-center justify-center"
+        style={{
+          background: "oklch(0.65 0.22 25 / 15%)",
+          color: "oklch(0.7 0.22 25)",
+        }}
+        title="Download failed — click to retry"
+        onClick={onRetry}
+      >
+        <RotateCw className="w-3 h-3" />
+      </button>
+    );
+  }
+  const disabled = !!addDisabledReason;
+  return (
+    <button
+      className="w-7 h-7 rounded-[7px] flex items-center justify-center transition-colors"
+      style={{
+        color: "oklch(0.55 0 0)",
+        opacity: hovered || disabled ? (disabled ? 0.3 : 1) : 0,
+        transition: "opacity 0.15s",
+        cursor: disabled ? "not-allowed" : "pointer",
+      }}
+      title={disabled ? addDisabledReason! : "Add to library"}
+      onClick={disabled ? undefined : onAddToLibrary}
+      disabled={disabled}
+    >
+      <Plus className="w-3 h-3" />
+    </button>
   );
 }

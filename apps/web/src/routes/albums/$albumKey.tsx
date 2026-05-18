@@ -1,6 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ChevronLeft, Play, Plus } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  Clock,
+  Download,
+  Play,
+  Plus,
+  RotateCw,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -16,6 +24,11 @@ import type {
 import { AlbumHeader } from "@/components/music/AlbumHeader";
 import { AlbumDetailSkeleton } from "@/components/music/AlbumDetailSkeleton";
 import { TrackList } from "@/components/music/TrackList";
+import { toUiStatus, useDownloads } from "@/hooks/useDownloads";
+import {
+  useRequestDownload,
+  useRetryDownload,
+} from "@/hooks/useRequestDownload";
 
 export const Route = createFileRoute("/albums/$albumKey")({
   component: AlbumDetailPage,
@@ -262,6 +275,10 @@ function ExternalAlbumView({
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playingMbid, setPlayingMbid] = useState<string | null>(null);
 
+  const { byReleaseGroup } = useDownloads();
+  const requestDownload = useRequestDownload();
+  const retryDownload = useRetryDownload();
+
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -294,6 +311,33 @@ function ExternalAlbumView({
   );
   const discCount = new Set(tracks.map((t) => t.discPosition)).size;
 
+  const download = byReleaseGroup.get(album.releaseGroupMbid);
+  const downloadStatus = download ? toUiStatus(download.status) : null;
+  const canAdd = !!album.artistMbid;
+
+  function addAlbum() {
+    if (!album.artistMbid) return;
+    requestDownload.mutate({
+      releaseGroupMbid: album.releaseGroupMbid,
+      artistMbid: album.artistMbid,
+      artistName: album.artistName,
+      albumTitle: album.title,
+    });
+  }
+
+  function retryAlbum() {
+    if (!album.artistMbid || !download) return;
+    retryDownload.mutate({
+      requestId: download.id,
+      payload: {
+        releaseGroupMbid: album.releaseGroupMbid,
+        artistMbid: album.artistMbid,
+        artistName: album.artistName,
+        albumTitle: album.title,
+      },
+    });
+  }
+
   return (
     <div>
       <AlbumHeader
@@ -305,9 +349,12 @@ function ExternalAlbumView({
         totalSeconds={totalSeconds}
         backLink={<BackLink source="external" />}
       >
-        <Button variant="outline" disabled>
-          Add to library
-        </Button>
+        <ExternalAlbumDownloadAction
+          status={downloadStatus}
+          canAdd={canAdd}
+          onAdd={addAlbum}
+          onRetry={retryAlbum}
+        />
       </AlbumHeader>
 
       <div className="px-6 pb-8">
@@ -336,5 +383,69 @@ function ExternalAlbumView({
       </div>
       <audio ref={audioRef} />
     </div>
+  );
+}
+
+type ExternalAlbumStatus =
+  | "pending"
+  | "downloading"
+  | "completed"
+  | "failed"
+  | null;
+
+function ExternalAlbumDownloadAction({
+  status,
+  canAdd,
+  onAdd,
+  onRetry,
+}: {
+  status: ExternalAlbumStatus;
+  canAdd: boolean;
+  onAdd: () => void;
+  onRetry: () => void;
+}) {
+  if (status === "completed") {
+    return (
+      <Button variant="outline" disabled className="gap-2">
+        <Check className="w-4 h-4" />
+        In library
+      </Button>
+    );
+  }
+  if (status === "pending") {
+    return (
+      <Button variant="outline" disabled className="gap-2">
+        <Clock className="w-4 h-4" />
+        Queued
+      </Button>
+    );
+  }
+  if (status === "downloading") {
+    return (
+      <Button variant="outline" disabled className="gap-2">
+        <Download className="w-4 h-4" />
+        Downloading
+      </Button>
+    );
+  }
+  if (status === "failed") {
+    return (
+      <Button variant="destructive" onClick={onRetry} className="gap-2">
+        <RotateCw className="w-4 h-4" />
+        Failed — retry
+      </Button>
+    );
+  }
+  return (
+    <Button
+      variant="outline"
+      onClick={onAdd}
+      disabled={!canAdd}
+      title={canAdd ? undefined : "Insufficient metadata"}
+      className="gap-2"
+    >
+      <Plus className="w-4 h-4" />
+      Add to library
+    </Button>
   );
 }

@@ -68,7 +68,11 @@ export async function submitToLidarr(
 
   if (!req.musicbrainzArtistId || !req.musicbrainzReleaseGroupId) {
     log.warn(
-      { requestId, artistMbid: req.musicbrainzArtistId, releaseGroupMbid: req.musicbrainzReleaseGroupId },
+      {
+        requestId,
+        artistMbid: req.musicbrainzArtistId,
+        releaseGroupMbid: req.musicbrainzReleaseGroupId,
+      },
       "[lidarr] missing MBIDs, marking failed",
     );
     updateDownloadRequest(requestId, {
@@ -117,7 +121,10 @@ export async function submitToLidarr(
     );
     if (!album) {
       log.warn(
-        { lidarrArtistId: lidarrArtist.id, releaseGroupMbid: req.musicbrainzReleaseGroupId },
+        {
+          lidarrArtistId: lidarrArtist.id,
+          releaseGroupMbid: req.musicbrainzReleaseGroupId,
+        },
         "[lidarr] album not found after waitForAlbum, marking failed",
       );
       updateDownloadRequest(requestId, {

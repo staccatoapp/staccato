@@ -52,13 +52,15 @@ function refreshPlaylistsInLibrary(
     }
   }
   if (allMbids.length === 0) return playlists;
-  const localSet = new Set(getLocalTrackMbidsByMbids(allMbids));
+  const localMap = getTracksByMusicbrainzIds(allMbids);
   return playlists.map((p) => ({
     ...p,
-    tracks: p.tracks.map((t) => ({
-      ...t,
-      inLibrary: t.recordingMbid ? localSet.has(t.recordingMbid) : false,
-    })),
+    tracks: p.tracks.map((t) => {
+      if (!t.recordingMbid) return t;
+      const local = localMap.get(t.recordingMbid);
+      if (!local) return { ...t, inLibrary: false, localTrackId: null };
+      return { ...t, inLibrary: true, localTrackId: local.trackId };
+    }),
   }));
 }
 
@@ -125,10 +127,13 @@ const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
                 recordingMbid: null,
                 title: t.title,
                 artistName: t.artistName,
+                artistMbid: null,
                 albumTitle: t.albumTitle,
+                releaseGroupMbid: null,
                 durationMs: t.durationMs,
                 coverArtUrl: null,
                 inLibrary: false,
+                localTrackId: null,
               };
             }
             const local = localMap.get(t.recordingMbid);
@@ -137,10 +142,13 @@ const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
                 recordingMbid: t.recordingMbid,
                 title: t.title,
                 artistName: t.artistName ?? local.artistName,
+                artistMbid: local.artistMbid,
                 albumTitle: t.albumTitle ?? local.albumTitle,
+                releaseGroupMbid: local.releaseGroupMbid,
                 durationMs: t.durationMs ?? local.durationMs,
                 coverArtUrl: local.coverArtUrl,
                 inLibrary: true,
+                localTrackId: local.trackId,
               };
             }
             const rec = recMap.get(t.recordingMbid);
@@ -151,10 +159,13 @@ const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
               recordingMbid: t.recordingMbid,
               title: t.title,
               artistName: t.artistName,
+              artistMbid: rec?.artistMbid ?? null,
               albumTitle: t.albumTitle,
+              releaseGroupMbid: rec?.releaseGroupMbid ?? null,
               durationMs: t.durationMs,
               coverArtUrl: trackCoverArtUrl,
               inLibrary: false,
+              localTrackId: null,
             };
           });
 
@@ -255,6 +266,7 @@ const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
               recordingMbid: mbid,
               title: local.title,
               artistName: local.artistName,
+              artistMbid: local.artistMbid,
               albumTitle: local.albumTitle,
               releaseGroupMbid: local.releaseGroupMbid,
               coverArtUrl: local.coverArtUrl,
@@ -270,6 +282,7 @@ const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
             recordingMbid: mbid,
             title: rec.title,
             artistName: rec.artistName,
+            artistMbid: rec.artistMbid,
             albumTitle: rec.releaseName,
             releaseGroupMbid: rec.releaseGroupMbid,
             coverArtUrl: enr?.coverArtUrl ?? null,

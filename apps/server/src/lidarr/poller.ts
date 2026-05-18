@@ -21,7 +21,11 @@ async function pollLidarrRequests(): Promise<void> {
     .filter((id): id is number => id != null);
   if (albumIds.length === 0) return;
 
-  const client = new LidarrClient(settings.lidarrUrl, settings.lidarrApiKey);
+  const client = new LidarrClient(
+    settings.lidarrUrl,
+    settings.lidarrApiKey,
+    logger,
+  );
   const [albums, queue] = await Promise.all([
     client.getAlbumsByIds(albumIds),
     client.getQueue(),
@@ -51,7 +55,10 @@ async function pollLidarrRequests(): Promise<void> {
       continue;
     }
 
-    if (req.status === "sent_to_lidarr" && queuedAlbumIds.has(req.lidarrAlbumId)) {
+    if (
+      req.status === "sent_to_lidarr" &&
+      queuedAlbumIds.has(req.lidarrAlbumId)
+    ) {
       log.info(
         { requestId: req.id, lidarrAlbumId: req.lidarrAlbumId },
         "download entered lidarr queue",

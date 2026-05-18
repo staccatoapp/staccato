@@ -1,13 +1,12 @@
-import { forwardRef, useMemo } from "react";
+import { Fragment, useRef } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import { VirtuosoGrid } from "react-virtuoso";
-import type { GridComponents, GridListProps, GridItemProps } from "react-virtuoso";
-import { useScrollParent } from "@/lib/scroll-parent";
+import { useInfiniteScrollSentinel } from "@/hooks/useInfiniteScrollSentinel";
 
 interface InfiniteGridProps<T> {
   items: T[];
   isLoading: boolean;
   isFetchingNextPage: boolean;
+  hasNextPage?: boolean;
   onEndReached: () => void;
   renderItem: (item: T) => ReactNode;
   renderSkeleton: () => ReactNode;
@@ -15,13 +14,6 @@ interface InfiniteGridProps<T> {
   minColumnWidth?: number;
   footerSkeletonCount?: number;
 }
-
-type GridContext = {
-  gridStyle: CSSProperties;
-  isFetchingNextPage: boolean;
-  footerSkeletonCount: number;
-  renderSkeleton: () => ReactNode;
-};
 
 function buildGridStyle(minColumnWidth: number): CSSProperties {
   return {
@@ -31,58 +23,11 @@ function buildGridStyle(minColumnWidth: number): CSSProperties {
   };
 }
 
-const ITEM_STYLE: CSSProperties = { minWidth: 0 };
-
-const ListContainer = forwardRef<
-  HTMLDivElement,
-  GridListProps & { context?: GridContext }
->(function ListContainer({ style, children, context, ...props }, ref) {
-  const merged = useMemo<CSSProperties>(
-    () => ({ ...context?.gridStyle, ...style }),
-    [context?.gridStyle, style],
-  );
-  return (
-    <div ref={ref} {...props} style={merged}>
-      {children}
-    </div>
-  );
-});
-
-function ItemContainer({
-  children,
-  context: _ctx,
-  ...props
-}: GridItemProps & { context?: GridContext }) {
-  return (
-    <div {...props} style={ITEM_STYLE}>
-      {children}
-    </div>
-  );
-}
-
-function GridFooter({ context }: { context?: GridContext }) {
-  if (!context?.isFetchingNextPage) return null;
-  return (
-    <div className="mt-6" style={context.gridStyle}>
-      {Array.from({ length: context.footerSkeletonCount }).map((_, i) => (
-        <div key={i} style={ITEM_STYLE}>
-          {context.renderSkeleton()}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-const gridComponents: GridComponents<GridContext> = {
-  List: ListContainer,
-  Item: ItemContainer,
-  Footer: GridFooter,
-};
-
-export function InfiniteGrid<T>({
+export function InfiniteGrid<T extends { id?: string }>({
   items,
   isLoading,
   isFetchingNextPage,
+  hasNextPage = true,
   onEndReached,
   renderItem,
   renderSkeleton,
@@ -90,42 +35,39 @@ export function InfiniteGrid<T>({
   minColumnWidth = 140,
   footerSkeletonCount = 6,
 }: InfiniteGridProps<T>) {
-  const scrollParent = useScrollParent();
-  const gridStyle = useMemo(() => buildGridStyle(minColumnWidth), [minColumnWidth]);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  const context = useMemo<GridContext>(
-    () => ({
-      gridStyle,
-      isFetchingNextPage,
-      footerSkeletonCount,
-      renderSkeleton,
-    }),
-    [gridStyle, isFetchingNextPage, footerSkeletonCount, renderSkeleton],
-  );
+  useInfiniteScrollSentinel({
+    ref: sentinelRef,
+    onIntersect: onEndReached,
+    enabled: hasNextPage && !isFetchingNextPage && items.length > 0,
+  });
 
-  if (items.length === 0 || !scrollParent) {
+  const gridStyle = buildGridStyle(minColumnWidth);
+
+  if (items.length === 0) {
     if (!isLoading) return null;
     return (
       <div style={gridStyle}>
         {Array.from({ length: skeletonCount }).map((_, i) => (
-          <div key={i} style={ITEM_STYLE}>
-            {renderSkeleton()}
-          </div>
+          <Fragment key={i}>{renderSkeleton()}</Fragment>
         ))}
       </div>
     );
   }
 
   return (
-    <VirtuosoGrid<T, GridContext>
-      customScrollParent={scrollParent}
-      initialItemCount={Math.min(items.length, 24)}
-      data={items}
-      context={context}
-      components={gridComponents}
-      itemContent={(_, item) => renderItem(item)}
-      endReached={onEndReached}
-      increaseViewportBy={1600}
-    />
+    <>
+      <div style={gridStyle}>
+        {items.map((item, i) => (
+          <Fragment key={item.id ?? i}>{renderItem(item)}</Fragment>
+        ))}
+        {isFetchingNextPage &&
+          Array.from({ length: footerSkeletonCount }).map((_, i) => (
+            <Fragment key={`skel-${i}`}>{renderSkeleton()}</Fragment>
+          ))}
+      </div>
+      <div ref={sentinelRef} aria-hidden style={{ height: 1 }} />
+    </>
   );
 }

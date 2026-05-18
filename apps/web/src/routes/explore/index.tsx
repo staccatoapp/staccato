@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import type { ExternalSearchResults } from "@staccato/shared";
+import type { ExternalSearchResults, RecommendedTrack } from "@staccato/shared";
 import { AlbumCard } from "@/components/music/AlbumCard";
 import { RecommendationTile } from "@/components/explore/RecommendationTile";
 import {
@@ -17,7 +17,11 @@ import {
   useRecommendedTracks,
 } from "@/hooks/useRecommendations";
 import { usePreviewAudio } from "@/hooks/usePreviewAudio";
-import { useRequestDownload } from "@/hooks/useRequestDownload";
+import {
+  useRequestDownload,
+  useRetryDownload,
+} from "@/hooks/useRequestDownload";
+import { toUiStatus, useDownloads } from "@/hooks/useDownloads";
 
 export const Route = createFileRoute("/explore/")({ component: ExplorePage });
 
@@ -60,14 +64,15 @@ function ExplorePage() {
   const [tab, setTab] = useState<Tab>("tracks");
   const [fields, setFields] = useState({ track: "", album: "", artist: "" });
   const [debounced, setDebounced] = useState(fields);
-  const [recTrackStates, setRecTrackStates] = useState<Record<string, boolean>>({});
   const [recDismissed, setRecDismissed] = useState<Set<string>>(new Set());
 
   const { data: recTracks, isLoading: recTracksLoading } =
     useRecommendedTracks();
   const { data: recPlaylists, isLoading: recPlaylistsLoading } =
     useRecommendedPlaylists();
+  const { byReleaseGroup } = useDownloads();
   const requestDownload = useRequestDownload();
+  const retryDownload = useRetryDownload();
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(fields), 300);
@@ -104,6 +109,33 @@ function ExplorePage() {
     if (!track.recordingMbid) return;
     handlePreview(track.recordingMbid, track.artistName ?? "", track.title);
   };
+
+  function addTrackToLibrary(track: RecommendedTrack) {
+    if (!track.releaseGroupMbid || !track.artistMbid || !track.artistName) {
+      return;
+    }
+    requestDownload.mutate({
+      releaseGroupMbid: track.releaseGroupMbid,
+      artistMbid: track.artistMbid,
+      artistName: track.artistName,
+      albumTitle: track.albumTitle,
+    });
+  }
+
+  function retryTrack(track: RecommendedTrack, requestId: string) {
+    if (!track.releaseGroupMbid || !track.artistMbid || !track.artistName) {
+      return;
+    }
+    retryDownload.mutate({
+      requestId,
+      payload: {
+        releaseGroupMbid: track.releaseGroupMbid,
+        artistMbid: track.artistMbid,
+        artistName: track.artistName,
+        albumTitle: track.albumTitle,
+      },
+    });
+  }
 
   const isSearchActive =
     fields.track.length > 0 ||
@@ -368,38 +400,39 @@ function ExplorePage() {
                 <RecommendedTrackListHeader />
                 {recTracks
                   .filter((t) => !recDismissed.has(t.recordingMbid))
-                  .map((track, i) => (
-                    <RecommendedTrackRow
-                      key={track.recordingMbid}
-                      track={track}
-                      index={i}
-                      isPlaying={playingMbid === track.recordingMbid}
-                      inLibrary={track.inLibrary || (recTrackStates[track.recordingMbid] ?? false)}
-                      onPlay={handleRecommendedTrackPlay}
-                      onAddToLibrary={() => {
-                        setRecTrackStates((s) => ({
-                          ...s,
-                          [track.recordingMbid]: true,
-                        }));
-                        requestDownload.mutate(
-                          { recordingMbid: track.recordingMbid },
-                          {
-                            onError: (err) => {
-                              setRecTrackStates((s) => {
-                                const next = { ...s };
-                                delete next[track.recordingMbid];
-                                return next;
-                              });
-                              alert(`Download request failed: ${err.message}`);
-                            },
-                          },
-                        );
-                      }}
-                      onDismiss={() =>
-                        setRecDismissed((s) => new Set(s).add(track.recordingMbid))
-                      }
-                    />
-                  ))}
+                  .map((track, i) => {
+                    const download = track.releaseGroupMbid
+                      ? byReleaseGroup.get(track.releaseGroupMbid)
+                      : undefined;
+                    const downloadStatus = download
+                      ? toUiStatus(download.status)
+                      : null;
+                    const addDisabledReason =
+                      !track.releaseGroupMbid ||
+                      !track.artistMbid ||
+                      !track.artistName
+                        ? "Insufficient metadata"
+                        : null;
+                    return (
+                      <RecommendedTrackRow
+                        key={track.recordingMbid}
+                        track={track}
+                        index={i}
+                        isPlaying={playingMbid === track.recordingMbid}
+                        inLibrary={track.inLibrary}
+                        downloadStatus={downloadStatus}
+                        addDisabledReason={addDisabledReason}
+                        onPlay={handleRecommendedTrackPlay}
+                        onAddToLibrary={() => addTrackToLibrary(track)}
+                        onRetry={
+                          download ? () => retryTrack(track, download.id) : undefined
+                        }
+                        onDismiss={() =>
+                          setRecDismissed((s) => new Set(s).add(track.recordingMbid))
+                        }
+                      />
+                    );
+                  })}
               </>
             )}
           </section>

@@ -7,12 +7,13 @@ export type DownloadRequestStatus =
 
 export type DownloadRequest = {
   id: string;
-  recordingMbid: string;
+  releaseGroupMbid: string;
+  artistMbid: string;
   artistName: string;
-  trackTitle: string;
   albumTitle: string | null;
   status: DownloadRequestStatus;
   errorMessage: string | null;
+  lidarrAlbumId: number | null;
   createdAt: Date | null;
   updatedAt: Date | null;
 };

@@ -384,7 +384,6 @@ function LibraryPage() {
                   tracks={searchResultsQuery.data!.tracks as TrackListItem[]}
                   activeTrackId={activeTrackId}
                   isPlaying={isPlaying}
-                  virtualize={false}
                   onPlayTrack={(i) =>
                     handlePlayTracks(
                       searchResultsQuery.data!.tracks as TrackListItem[],
@@ -414,6 +413,7 @@ function LibraryPage() {
               items={albumsQuery.items}
               isLoading={albumsQuery.isLoading}
               isFetchingNextPage={albumsQuery.isFetchingNextPage}
+              hasNextPage={albumsQuery.hasNextPage}
               onEndReached={fetchNextAlbums}
               renderItem={renderAlbum}
               renderSkeleton={renderAlbumSkeleton}
@@ -425,6 +425,7 @@ function LibraryPage() {
               items={artistsQuery.items}
               isLoading={artistsQuery.isLoading}
               isFetchingNextPage={artistsQuery.isFetchingNextPage}
+              hasNextPage={artistsQuery.hasNextPage}
               onEndReached={fetchNextArtists}
               renderItem={renderArtist}
               renderSkeleton={renderAlbumSkeleton}
@@ -439,6 +440,7 @@ function LibraryPage() {
               onPlayTrack={playTracks}
               onEndReached={fetchNextTracks}
               isFetchingNextPage={tracksQuery.isFetchingNextPage}
+              hasNextPage={tracksQuery.hasNextPage}
             />
           )}
 
@@ -447,6 +449,7 @@ function LibraryPage() {
               items={playlistsQuery.items}
               isLoading={playlistsQuery.isLoading}
               isFetchingNextPage={playlistsQuery.isFetchingNextPage}
+              hasNextPage={playlistsQuery.hasNextPage}
               onEndReached={fetchNextPlaylists}
               renderItem={renderPlaylist}
               renderSkeleton={renderAlbumSkeleton}

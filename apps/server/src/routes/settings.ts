@@ -1,6 +1,10 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { UpdateUserSettingsSchema, UpdateLidarrSettingsSchema, LidarrSettings } from "@staccato/shared";
+import {
+  UpdateUserSettingsSchema,
+  UpdateLidarrSettingsSchema,
+  LidarrSettings,
+} from "@staccato/shared";
 import { validateToken } from "../listenbrainz/client.js";
 import {
   getOrCreateUserSettings,
@@ -33,7 +37,10 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
     ) {
       const token = await validateToken(cleanedUpdates.listenbrainzToken);
       if (!token.valid) {
-        req.log.warn({ userId: req.userId }, "invalid listenbrainz token submitted");
+        req.log.warn(
+          { userId: req.userId },
+          "invalid listenbrainz token submitted",
+        );
         return reply.status(400).send({ error: "Invalid ListenBrainz token" });
       }
       cleanedUpdates.musicbrainzUsername = token.userName ?? null;
@@ -45,7 +52,8 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
 
     const tokenChanged =
       cleanedUpdates.listenbrainzToken !== undefined &&
-      cleanedUpdates.listenbrainzToken !== currentUserSettings.listenbrainzToken;
+      cleanedUpdates.listenbrainzToken !==
+        currentUserSettings.listenbrainzToken;
     const usernameChanged =
       cleanedUpdates.musicbrainzUsername !== undefined &&
       cleanedUpdates.musicbrainzUsername !==

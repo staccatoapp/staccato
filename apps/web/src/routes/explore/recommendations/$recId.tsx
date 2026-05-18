@@ -1,15 +1,31 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Check, ChevronLeft, Plus } from "lucide-react";
+import { Check, ChevronLeft, Play, Plus } from "lucide-react";
+import type {
+  PlaylistListItem,
+  RecommendedPlaylistTrack,
+} from "@staccato/shared";
 import { generateAlbumGradient } from "@/lib/music";
 import { useRecommendedPlaylists } from "@/hooks/useRecommendations";
 import { usePreviewAudio } from "@/hooks/usePreviewAudio";
-import { useRequestDownload } from "@/hooks/useRequestDownload";
+import {
+  useRequestDownload,
+  useRetryDownload,
+} from "@/hooks/useRequestDownload";
+import { toUiStatus, useDownloads } from "@/hooks/useDownloads";
 import {
   RecommendedTrackListHeader,
   RecommendedTrackRow,
   type TrackRowData,
 } from "@/components/explore/RecommendedTrackRow";
+import { buttonVariants } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export const Route = createFileRoute("/explore/recommendations/$recId")({
   component: RecommendationDetailPage,
@@ -28,10 +44,13 @@ function fmtTotal(ms: number): string {
 
 function RecommendationDetailPage() {
   const { recId } = Route.useParams();
+  const queryClient = useQueryClient();
   const { data: playlists, isLoading } = useRecommendedPlaylists();
 
   const { audioRef, playingMbid, handlePreview } = usePreviewAudio();
+  const { byReleaseGroup } = useDownloads();
   const requestDownload = useRequestDownload();
+  const retryDownload = useRetryDownload();
 
   const gradient = generateAlbumGradient(recId, "recommendation");
 
@@ -40,17 +59,8 @@ function RecommendationDetailPage() {
       ? null
       : (playlists.find((p) => p.id === recId) ?? null);
 
-  const tracks: TrackRowData[] = (playlist?.tracks ?? []).map((t) => ({
-    recordingMbid: t.recordingMbid,
-    title: t.title,
-    artistName: t.artistName ?? "Unknown Artist",
-    albumTitle: t.albumTitle ?? "—",
-    durationMs: t.durationMs,
-    coverArtUrl: t.coverArtUrl,
-    inLibrary: t.inLibrary,
-  }));
+  const tracks: RecommendedPlaylistTrack[] = playlist?.tracks ?? [];
 
-  const [trackStates, setTrackStates] = useState<Record<string, boolean>>({});
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
   const visibleTracks = tracks.filter(
@@ -58,20 +68,106 @@ function RecommendationDetailPage() {
   );
   const allInLibrary =
     visibleTracks.length > 0 &&
-    visibleTracks.every(
-      (t) =>
-        t.recordingMbid &&
-        ((t.inLibrary ?? false) || (trackStates[t.recordingMbid] ?? false)),
-    );
+    visibleTracks.every((t) => t.inLibrary && t.localTrackId);
   const totalDurationMs = tracks.reduce((s, t) => s + (t.durationMs ?? 0), 0);
 
+  const { data: playlistsData } = useQuery({
+    queryKey: ["playlists"],
+    queryFn: async (): Promise<{ items: PlaylistListItem[] }> => {
+      const res = await fetch("/api/playlists");
+      if (!res.ok) throw new Error("Failed to fetch playlists");
+      return res.json();
+    },
+    enabled: allInLibrary,
+  });
+
+  const playMutation = useMutation({
+    mutationFn: async ({
+      trackIds,
+      startIndex,
+    }: {
+      trackIds: string[];
+      startIndex: number;
+    }) => {
+      const res = await fetch("/api/playback/session/play", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trackIds, startIndex }),
+      });
+      if (!res.ok) throw new Error("Failed to start playback");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["playback-session"] });
+    },
+  });
+
+  const addToPlaylistMutation = useMutation({
+    mutationFn: async ({
+      playlistId,
+      trackIds,
+    }: {
+      playlistId: string;
+      trackIds: string[];
+    }) => {
+      const res = await fetch(`/api/playlists/${playlistId}/tracks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trackIds }),
+      });
+      if (!res.ok) throw new Error("Failed to add to playlist");
+    },
+    onSuccess: (_data, { playlistId }) => {
+      queryClient.invalidateQueries({ queryKey: ["playlist", playlistId] });
+      queryClient.invalidateQueries({ queryKey: ["playlists"] });
+    },
+  });
+
   function addAll() {
-    const next: Record<string, boolean> = {};
-    for (const t of tracks) {
-      if (t.recordingMbid) next[t.recordingMbid] = true;
+    const seen = new Set<string>();
+    for (const t of visibleTracks) {
+      if (t.inLibrary) continue;
+      if (!t.releaseGroupMbid || !t.artistMbid || !t.artistName) continue;
+      if (byReleaseGroup.has(t.releaseGroupMbid)) continue;
+      if (seen.has(t.releaseGroupMbid)) continue;
+      seen.add(t.releaseGroupMbid);
+      requestDownload.mutate({
+        releaseGroupMbid: t.releaseGroupMbid,
+        artistMbid: t.artistMbid,
+        artistName: t.artistName,
+        albumTitle: t.albumTitle,
+      });
     }
-    setTrackStates(next);
   }
+
+  function addOne(track: RecommendedPlaylistTrack) {
+    if (!track.releaseGroupMbid || !track.artistMbid || !track.artistName) return;
+    requestDownload.mutate({
+      releaseGroupMbid: track.releaseGroupMbid,
+      artistMbid: track.artistMbid,
+      artistName: track.artistName,
+      albumTitle: track.albumTitle,
+    });
+  }
+
+  function retryOne(track: RecommendedPlaylistTrack, requestId: string) {
+    if (!track.releaseGroupMbid || !track.artistMbid || !track.artistName) return;
+    retryDownload.mutate({
+      requestId,
+      payload: {
+        releaseGroupMbid: track.releaseGroupMbid,
+        artistMbid: track.artistMbid,
+        artistName: track.artistName,
+        albumTitle: track.albumTitle,
+      },
+    });
+  }
+
+  const localTrackIds: string[] = visibleTracks
+    .map((t) => t.localTrackId)
+    .filter((id): id is string => !!id);
+
+  const hasPlaylists = (playlistsData?.items.length ?? 0) > 0;
 
   return (
     <div className="pb-24">
@@ -138,15 +234,58 @@ function RecommendationDetailPage() {
             {tracks.length} tracks · {fmtTotal(totalDurationMs)}
           </p>
 
-          {/* Add all / all added */}
+          {/* Actions */}
           {allInLibrary ? (
-            <span
-              className="inline-flex items-center gap-2 text-[0.8rem] font-medium"
-              style={{ color: "oklch(1 0 0 / 60%)" }}
-            >
-              <Check className="w-3.5 h-3.5" />
-              All tracks in your library
-            </span>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() =>
+                  playMutation.mutate({ trackIds: localTrackIds, startIndex: 0 })
+                }
+                disabled={
+                  playMutation.isPending || localTrackIds.length === 0
+                }
+                className="inline-flex items-center gap-2 h-[38px] px-[18px] rounded-[22px] bg-white text-[oklch(0.15_0_0)] text-sm font-semibold disabled:opacity-60"
+                style={{ boxShadow: "0 2px 12px oklch(0 0 0 / 35%)" }}
+              >
+                <Play className="w-3.5 h-3.5" />
+                Play
+              </button>
+              {hasPlaylists && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    className={buttonVariants({
+                      variant: "outline",
+                      className: "gap-2 h-[38px]",
+                    })}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add to Playlist
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    {playlistsData?.items.map((p) => (
+                      <DropdownMenuItem
+                        key={p.id}
+                        onClick={() =>
+                          addToPlaylistMutation.mutate({
+                            playlistId: p.id,
+                            trackIds: localTrackIds,
+                          })
+                        }
+                      >
+                        {p.name}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              <span
+                className="inline-flex items-center gap-1.5 text-[0.75rem]"
+                style={{ color: "oklch(1 0 0 / 55%)" }}
+              >
+                <Check className="w-3 h-3" />
+                All tracks in your library
+              </span>
+            </div>
           ) : (
             <button
               onClick={addAll}
@@ -173,49 +312,52 @@ function RecommendationDetailPage() {
             {tracks.length === 0 ? "No tracks found." : "All tracks dismissed."}
           </p>
         ) : (
-          visibleTracks.map((track, i) => (
-            <RecommendedTrackRow
-              key={track.recordingMbid ?? `track-${i}`}
-              track={track}
-              index={i}
-              isPlaying={
-                !!track.recordingMbid && playingMbid === track.recordingMbid
-              }
-              inLibrary={
-                (track.inLibrary ?? false) ||
-                (!!track.recordingMbid &&
-                  (trackStates[track.recordingMbid] ?? false))
-              }
-              onPlay={(t) => {
-                if (t.recordingMbid) {
-                  handlePreview(t.recordingMbid, t.artistName ?? "", t.title);
+          visibleTracks.map((track, i) => {
+            const rowData: TrackRowData = {
+              recordingMbid: track.recordingMbid,
+              title: track.title,
+              artistName: track.artistName ?? "Unknown Artist",
+              albumTitle: track.albumTitle ?? "—",
+              durationMs: track.durationMs,
+              coverArtUrl: track.coverArtUrl,
+              inLibrary: track.inLibrary,
+            };
+            const download = track.releaseGroupMbid
+              ? byReleaseGroup.get(track.releaseGroupMbid)
+              : undefined;
+            const downloadStatus = download ? toUiStatus(download.status) : null;
+            const addDisabledReason =
+              !track.releaseGroupMbid ||
+              !track.artistMbid ||
+              !track.artistName
+                ? "Insufficient metadata"
+                : null;
+            return (
+              <RecommendedTrackRow
+                key={track.recordingMbid ?? `track-${i}`}
+                track={rowData}
+                index={i}
+                isPlaying={
+                  !!track.recordingMbid && playingMbid === track.recordingMbid
                 }
-              }}
-              onAddToLibrary={() => {
-                if (!track.recordingMbid) return;
-                const mbid = track.recordingMbid;
-                setTrackStates((s) => ({ ...s, [mbid]: true }));
-                requestDownload.mutate(
-                  { recordingMbid: mbid },
-                  {
-                    onError: (err) => {
-                      setTrackStates((s) => {
-                        const next = { ...s };
-                        delete next[mbid];
-                        return next;
-                      });
-                      alert(`Download request failed: ${err.message}`);
-                    },
-                  },
-                );
-              }}
-              onDismiss={() => {
-                if (track.recordingMbid) {
-                  setDismissed((s) => new Set(s).add(track.recordingMbid!));
-                }
-              }}
-            />
-          ))
+                inLibrary={track.inLibrary}
+                downloadStatus={downloadStatus}
+                addDisabledReason={addDisabledReason}
+                onPlay={(t) => {
+                  if (t.recordingMbid) {
+                    handlePreview(t.recordingMbid, t.artistName ?? "", t.title);
+                  }
+                }}
+                onAddToLibrary={() => addOne(track)}
+                onRetry={download ? () => retryOne(track, download.id) : undefined}
+                onDismiss={() => {
+                  if (track.recordingMbid) {
+                    setDismissed((s) => new Set(s).add(track.recordingMbid!));
+                  }
+                }}
+              />
+            );
+          })
         )}
       </div>
     </div>

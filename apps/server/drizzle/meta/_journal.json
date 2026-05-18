@@ -176,6 +176,13 @@
       "when": 1778029775137,
       "tag": "0024_brave_tyger_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1779098217457,
+      "tag": "0025_little_lionheart",
+      "breakpoints": true
     }
   ]
 }

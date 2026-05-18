@@ -4,6 +4,7 @@ export const RecommendedTrackSchema = z.object({
   recordingMbid: z.string(),
   title: z.string(),
   artistName: z.string().nullable(),
+  artistMbid: z.string().nullable(),
   albumTitle: z.string().nullable(),
   releaseGroupMbid: z.string().nullable(),
   coverArtUrl: z.string().nullable(),
@@ -16,10 +17,13 @@ export const RecommendedPlaylistTrackSchema = z.object({
   recordingMbid: z.string().nullable(),
   title: z.string(),
   artistName: z.string().nullable(),
+  artistMbid: z.string().nullable(),
   albumTitle: z.string().nullable(),
+  releaseGroupMbid: z.string().nullable(),
   durationMs: z.number().nullable(),
   coverArtUrl: z.string().nullable(),
   inLibrary: z.boolean(),
+  localTrackId: z.string().nullable(),
 });
 
 export const RecommendedPlaylistSchema = z.object({

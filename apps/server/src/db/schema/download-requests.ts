@@ -9,12 +9,9 @@ export const downloadRequests = sqliteTable("download_requests", {
   userId: text("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  musicbrainzRecordingId: text("musicbrainz_recording_id").notNull(),
-  musicbrainzReleaseId: text("musicbrainz_release_id"),
-  musicbrainzReleaseGroupId: text("musicbrainz_release_group_id"),
-  musicbrainzArtistId: text("musicbrainz_artist_id"),
+  musicbrainzReleaseGroupId: text("musicbrainz_release_group_id").notNull(),
+  musicbrainzArtistId: text("musicbrainz_artist_id").notNull(),
   artistName: text("artist_name").notNull(),
-  trackTitle: text("track_title").notNull(),
   albumTitle: text("album_title"),
   lidarrAlbumId: integer("lidarr_album_id"),
   status: text("status", {

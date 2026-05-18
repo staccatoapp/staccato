@@ -1,11 +1,10 @@
-import { useState } from "react";
-import { Virtuoso } from "react-virtuoso";
+import { useRef, useState } from "react";
 import { Clock, Music2, Pause, Play } from "lucide-react";
 import type { TrackListItem } from "@staccato/shared";
 import { formatTime, generateAlbumGradient } from "@/lib/music";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { useScrollParent } from "@/lib/scroll-parent";
+import { useInfiniteScrollSentinel } from "@/hooks/useInfiniteScrollSentinel";
 import { AddToPlaylistDropdown } from "./add-to-playlist-dropdown";
 
 export function TrackRow({
@@ -135,9 +134,6 @@ function TrackListFooterSkeletons() {
   );
 }
 
-const FOOTER_COMPONENTS = { Footer: TrackListFooterSkeletons };
-const EMPTY_COMPONENTS = {};
-
 function TrackListHeader() {
   return (
     <div className="grid items-center gap-3 px-2 pb-2 border-b border-border mb-1 grid-cols-[2rem_2.25rem_1fr_1fr_1fr_1.5rem_4rem]">
@@ -169,7 +165,7 @@ export function TrackList({
   onPlayTrack,
   onEndReached,
   isFetchingNextPage,
-  virtualize = true,
+  hasNextPage = true,
 }: {
   tracks: TrackListItem[];
   activeTrackId?: string;
@@ -177,48 +173,33 @@ export function TrackList({
   onPlayTrack: (index: number) => void;
   onEndReached?: () => void;
   isFetchingNextPage?: boolean;
-  virtualize?: boolean;
+  hasNextPage?: boolean;
 }) {
-  const scrollParent = useScrollParent();
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  if (!virtualize || !scrollParent) {
-    return (
-      <div>
-        <TrackListHeader />
-        {tracks.map((track, i) => (
-          <TrackRow
-            key={track.id}
-            track={track}
-            index={i}
-            isActive={track.id === activeTrackId}
-            isPlaying={isPlaying ?? false}
-            onPlay={() => onPlayTrack(i)}
-          />
-        ))}
-      </div>
-    );
-  }
+  useInfiniteScrollSentinel({
+    ref: sentinelRef,
+    onIntersect: () => onEndReached?.(),
+    enabled: !!onEndReached && hasNextPage && !isFetchingNextPage,
+  });
 
   return (
     <div>
       <TrackListHeader />
-      <Virtuoso
-        customScrollParent={scrollParent}
-        data={tracks}
-        itemContent={(i, track) => (
-          <TrackRow
-            key={track.id}
-            track={track}
-            index={i}
-            isActive={track.id === activeTrackId}
-            isPlaying={isPlaying ?? false}
-            onPlay={() => onPlayTrack(i)}
-          />
-        )}
-        endReached={onEndReached}
-        increaseViewportBy={400}
-        components={isFetchingNextPage ? FOOTER_COMPONENTS : EMPTY_COMPONENTS}
-      />
+      {tracks.map((track, i) => (
+        <TrackRow
+          key={track.id}
+          track={track}
+          index={i}
+          isActive={track.id === activeTrackId}
+          isPlaying={isPlaying ?? false}
+          onPlay={() => onPlayTrack(i)}
+        />
+      ))}
+      {isFetchingNextPage && <TrackListFooterSkeletons />}
+      {onEndReached && (
+        <div ref={sentinelRef} aria-hidden style={{ height: 1 }} />
+      )}
     </div>
   );
 }

@@ -162,8 +162,10 @@ export function getTrackForScrobble(id: string):
 }
 
 export type LocalTrackDetail = {
+  trackId: string;
   title: string;
   artistName: string;
+  artistMbid: string | null;
   albumTitle: string | null;
   releaseGroupMbid: string | null;
   coverArtUrl: string | null;
@@ -175,8 +177,10 @@ export function getTrackByMusicbrainzId(
 ): LocalTrackDetail | undefined {
   const row = db
     .select({
+      trackId: tracks.id,
       title: resolvedTitle,
       artistName: resolvedArtistName,
+      artistMbid: artists.musicbrainzId,
       albumTitle: resolvedAlbumTitle,
       releaseGroupMbid: albums.releaseGroupMbid,
       coverArtUrl: albums.coverArtUrl,
@@ -189,8 +193,10 @@ export function getTrackByMusicbrainzId(
     .get();
   if (!row) return undefined;
   return {
+    trackId: row.trackId,
     title: row.title,
     artistName: row.artistName,
+    artistMbid: row.artistMbid,
     albumTitle: row.albumTitle,
     releaseGroupMbid: row.releaseGroupMbid,
     coverArtUrl: row.coverArtUrl,
@@ -205,9 +211,11 @@ export function getTracksByMusicbrainzIds(
   if (recordingMbids.length === 0) return result;
   const rows = db
     .select({
+      trackId: tracks.id,
       mbid: tracks.musicbrainzId,
       title: resolvedTitle,
       artistName: resolvedArtistName,
+      artistMbid: artists.musicbrainzId,
       albumTitle: resolvedAlbumTitle,
       releaseGroupMbid: albums.releaseGroupMbid,
       coverArtUrl: albums.coverArtUrl,
@@ -221,8 +229,10 @@ export function getTracksByMusicbrainzIds(
   for (const row of rows) {
     if (!row.mbid) continue;
     result.set(row.mbid, {
+      trackId: row.trackId,
       title: row.title,
       artistName: row.artistName,
+      artistMbid: row.artistMbid,
       albumTitle: row.albumTitle,
       releaseGroupMbid: row.releaseGroupMbid,
       coverArtUrl: row.coverArtUrl,
