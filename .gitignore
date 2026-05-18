@@ -57,3 +57,6 @@ data/
 .playwright-mcp/
 .claudeignore
 .superpowers/
+
+# Openspec
+openspec/

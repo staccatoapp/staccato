@@ -344,13 +344,20 @@ function ExplorePage() {
             <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-3">
               Recommended for you
             </h2>
-            {recPlaylistsLoading ? (
+            {recPlaylistsLoading || !recPlaylists ? (
               <p className="text-sm text-muted-foreground">Loading…</p>
-            ) : !recPlaylists || "error" in recPlaylists ? (
+            ) : recPlaylists.status === "no-token" ? (
               <p className="text-sm text-muted-foreground">
-                {!recPlaylists || recPlaylists.error === "no-id"
-                  ? "Connect your ListenBrainz account in Settings to get playlist recommendations."
-                  : "Not enough listening history yet. Keep listening!"}
+                Connect your ListenBrainz account in Settings to get playlist
+                recommendations.
+              </p>
+            ) : recPlaylists.status === "warming" ? (
+              <p className="text-sm text-muted-foreground">
+                Generating recommendations…
+              </p>
+            ) : recPlaylists.status === "error" && !recPlaylists.data ? (
+              <p className="text-sm text-muted-foreground">
+                Couldn't load recommendations. We'll retry shortly.
               </p>
             ) : (
               <div
@@ -359,7 +366,7 @@ function ExplorePage() {
                   gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
                 }}
               >
-                {recPlaylists.map((playlist) => (
+                {(recPlaylists.data ?? []).map((playlist) => (
                   <RecommendationTile
                     key={playlist.id}
                     rec={{
@@ -390,18 +397,29 @@ function ExplorePage() {
             <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-3">
               Tracks you'll like
             </h2>
-            {recTracksLoading ? (
+            {recTracksLoading || !recTracks ? (
               <p className="text-sm text-muted-foreground">Loading…</p>
-            ) : !recTracks || "error" in recTracks ? (
+            ) : recTracks.status === "no-token" ? (
               <p className="text-sm text-muted-foreground">
-                {!recTracks || recTracks.error === "no-id"
-                  ? "Connect your ListenBrainz account in Settings to get track recommendations."
-                  : "Not enough listening history yet. Keep listening!"}
+                Connect your ListenBrainz account in Settings to get track
+                recommendations.
+              </p>
+            ) : recTracks.status === "warming" ? (
+              <p className="text-sm text-muted-foreground">
+                Generating recommendations…
+              </p>
+            ) : recTracks.status === "error" && !recTracks.data ? (
+              <p className="text-sm text-muted-foreground">
+                Couldn't load recommendations. We'll retry shortly.
+              </p>
+            ) : recTracks.status === "ready" && recTracks.data.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Not enough listening history yet. Keep listening!
               </p>
             ) : (
               <>
                 <RecommendedTrackListHeader />
-                {recTracks
+                {(recTracks.data ?? [])
                   .filter((t) => !recDismissed.has(t.recordingMbid))
                   .map((track, i) => {
                     const download = track.releaseGroupMbid

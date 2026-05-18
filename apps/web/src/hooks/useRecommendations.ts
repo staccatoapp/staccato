@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import type {
-  RecommendationError,
+  RecommendationsResponse,
   RecommendedPlaylist,
   RecommendedTrack,
 } from "@staccato/shared";
 
-type TracksResponse = RecommendedTrack[] | RecommendationError;
-type PlaylistsResponse = RecommendedPlaylist[] | RecommendationError;
+type TracksResponse = RecommendationsResponse<RecommendedTrack[]>;
+type PlaylistsResponse = RecommendationsResponse<RecommendedPlaylist[]>;
 
 async function fetchJson<T>(url: string): Promise<T> {
   const res = await fetch(url);
@@ -14,18 +14,28 @@ async function fetchJson<T>(url: string): Promise<T> {
   return res.json();
 }
 
-export function useRecommendedTracks() {
-  return useQuery<TracksResponse>({
-    queryKey: ["recommendations", "tracks"],
-    queryFn: () => fetchJson("/api/recommendations/tracks"),
+function useRecommendationQuery<T>(key: string, url: string) {
+  return useQuery<RecommendationsResponse<T>>({
+    queryKey: ["recommendations", key],
+    queryFn: () => fetchJson<RecommendationsResponse<T>>(url),
     staleTime: 10 * 60 * 1000,
+    refetchInterval: (query) =>
+      query.state.data?.status === "warming" ? 5000 : false,
   });
 }
 
-export function useRecommendedPlaylists() {
-  return useQuery<PlaylistsResponse>({
-    queryKey: ["recommendations", "playlists"],
-    queryFn: () => fetchJson("/api/recommendations/playlists"),
-    staleTime: 10 * 60 * 1000,
-  });
+export function useRecommendedTracks() {
+  return useRecommendationQuery<RecommendedTrack[]>(
+    "tracks",
+    "/api/recommendations/tracks",
+  );
 }
+
+export function useRecommendedPlaylists() {
+  return useRecommendationQuery<RecommendedPlaylist[]>(
+    "playlists",
+    "/api/recommendations/playlists",
+  );
+}
+
+export type { TracksResponse, PlaylistsResponse };

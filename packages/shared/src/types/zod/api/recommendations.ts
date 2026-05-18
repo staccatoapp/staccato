@@ -46,3 +46,16 @@ export type RecommendedPlaylistTrack = z.infer<
 >;
 export type RecommendedPlaylist = z.infer<typeof RecommendedPlaylistSchema>;
 export type RecommendationError = z.infer<typeof RecommendationErrorSchema>;
+
+export type RecommendationsResponse<T> =
+  | { status: "no-token" }
+  | { status: "warming" }
+  | { status: "ready"; data: T }
+  | { status: "error"; data: T | null };
+
+export type RecommendedTracksResponse = RecommendationsResponse<
+  RecommendedTrack[]
+>;
+export type RecommendedPlaylistsResponse = RecommendationsResponse<
+  RecommendedPlaylist[]
+>;

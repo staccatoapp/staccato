@@ -8,3 +8,4 @@ music/
 .env*
 apps/server/data/
 plans/
+openspec/

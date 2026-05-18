@@ -58,9 +58,11 @@ function RecommendationDetailPage() {
   const gradient = generateAlbumGradient(recId, "recommendation");
 
   const playlist =
-    !playlists || "error" in playlists
+    !playlists ||
+    (playlists.status !== "ready" && playlists.status !== "error") ||
+    !playlists.data
       ? null
-      : (playlists.find((p) => p.id === recId) ?? null);
+      : (playlists.data.find((p) => p.id === recId) ?? null);
 
   const tracks: RecommendedPlaylistTrack[] = playlist?.tracks ?? [];
 

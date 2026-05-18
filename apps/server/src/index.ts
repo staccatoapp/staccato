@@ -26,6 +26,14 @@ import recommendationRoutes from "./routes/recommendations.js";
 import downloadRoutes from "./routes/downloads.js";
 import { startLidarrPoller } from "./lidarr/poller.js";
 import { logger } from "./logger.js";
+import {
+  findUserIdsWithListenbrainzToken,
+  resetInflightOnBoot,
+  upsertWarmingRow,
+} from "./db/queries/recommendation-cache.js";
+import { startRefresher, tick } from "./recommendations/refresher.js";
+import { listRegisteredSources } from "./recommendations/source.js";
+import "./recommendations/sources/index.js";
 
 const app = Fastify({ loggerInstance: logger });
 
@@ -85,6 +93,26 @@ if (process.env.STACCATO_ENV !== "development") {
 const start = async () => {
   runMigrations();
 
+  resetInflightOnBoot();
+
+  const tokenedUserIds = findUserIdsWithListenbrainzToken();
+  const sources = listRegisteredSources();
+  const now = Date.now();
+  for (const userId of tokenedUserIds) {
+    for (const source of sources) {
+      upsertWarmingRow(userId, source.id, source.kind, now);
+    }
+  }
+  if (tokenedUserIds.length > 0) {
+    logger.info(
+      {
+        userCount: tokenedUserIds.length,
+        sourceCount: sources.length,
+      },
+      "recommendation cache boot backfill complete",
+    );
+  }
+
   const musicDir = process.env.MUSIC_DIR ?? "./music";
   const port = Number(process.env.PORT) || 8280;
   await app.listen({ port, host: "0.0.0.0" });
@@ -96,6 +124,11 @@ const start = async () => {
 
   startWatcher(musicDir);
   startLidarrPoller();
+
+  startRefresher();
+  void tick().catch((err) =>
+    logger.error({ err }, "initial recommendation tick failed"),
+  );
 };
 
 start().catch((err) => {

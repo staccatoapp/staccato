@@ -19,7 +19,14 @@ import {
   type ServerSettingsUpdate,
 } from "../db/queries/server-settings.js";
 import { LidarrClient } from "../lidarr/client.js";
-import { playlistCache, trackCache } from "../recommendations/cache.js";
+import {
+  deleteForUser as deleteRecommendationCacheForUser,
+  resetWarmingForUser,
+  upsertWarmingRow,
+} from "../db/queries/recommendation-cache.js";
+import { listRegisteredSources } from "../recommendations/source.js";
+import { tick as recommendationTick } from "../recommendations/refresher.js";
+import "../recommendations/sources/index.js";
 
 const settingsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/", async (req) => {
@@ -47,27 +54,54 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
         );
         return reply.status(400).send({ error: "Invalid ListenBrainz token" });
       }
-      cleanedUpdates.musicbrainzUsername = token.userName ?? null;
+      if (!token.userName) {
+        req.log.warn(
+          { userId: req.userId },
+          "listenbrainz token validated without username",
+        );
+        return reply
+          .status(400)
+          .send({ error: "ListenBrainz token has no associated username" });
+      }
+      cleanedUpdates.musicbrainzUsername = token.userName;
       req.log.info(
         { userId: req.userId, username: token.userName },
         "listenbrainz token validated",
       );
     }
 
-    const tokenChanged =
+    const previousToken = currentUserSettings.listenbrainzToken;
+    const tokenCleared =
+      "listenbrainzToken" in parsedUpdates &&
+      parsedUpdates.listenbrainzToken === null &&
+      previousToken != null;
+    const tokenSetOrChanged =
       cleanedUpdates.listenbrainzToken !== undefined &&
-      cleanedUpdates.listenbrainzToken !==
-        currentUserSettings.listenbrainzToken;
-    const usernameChanged =
-      cleanedUpdates.musicbrainzUsername !== undefined &&
-      cleanedUpdates.musicbrainzUsername !==
-        currentUserSettings.musicbrainzUsername;
+      cleanedUpdates.listenbrainzToken !== previousToken;
+
+    if (tokenCleared) {
+      updateUserSettings(req.userId, {
+        listenbrainzToken: null,
+        musicbrainzUsername: null,
+      });
+      deleteRecommendationCacheForUser(req.userId);
+      return reply.status(204).send();
+    }
 
     updateUserSettings(req.userId, cleanedUpdates);
 
-    if (tokenChanged || usernameChanged) {
-      playlistCache.delete(req.userId);
-      trackCache.delete(req.userId);
+    if (tokenSetOrChanged) {
+      const sources = listRegisteredSources();
+      for (const source of sources) {
+        upsertWarmingRow(req.userId, source.id, source.kind);
+      }
+      resetWarmingForUser(req.userId);
+      void recommendationTick().catch((err) =>
+        req.log.error(
+          { err, userId: req.userId },
+          "post-settings recommendation tick failed",
+        ),
+      );
     }
 
     return reply.status(204).send();

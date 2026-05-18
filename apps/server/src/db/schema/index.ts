@@ -9,5 +9,6 @@ export * from "./users.js";
 export * from "./playback-session.js";
 export * from "./user-settings.js";
 export * from "./preview-cache.js";
+export * from "./recommendation-cache.js";
 export * from "./track-lyrics.js";
 export * from "./server-settings.js";
