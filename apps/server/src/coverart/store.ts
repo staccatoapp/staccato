@@ -6,6 +6,7 @@ import { pipeline } from "node:stream/promises";
 import { coversDir } from "../paths.js";
 import { logger } from "../logger.js";
 import { fetchCoverArtUrlForGroup } from "./client.js";
+import { MB_PRIORITY, type MbPriority } from "../musicbrainz/client.js";
 import { updateAlbumByAlbumId } from "../db/queries/albums.js";
 
 const log = logger.child({ module: "coverart-store" });
@@ -33,6 +34,7 @@ const inflight = new Map<string, Promise<string | null>>();
 
 export async function ensureCoverOnDisk(
   releaseGroupMbid: string,
+  priority: MbPriority = MB_PRIORITY.BACKGROUND,
 ): Promise<string | null> {
   if (!releaseGroupMbid) return null;
   ensureCoversDir();
@@ -48,7 +50,7 @@ export async function ensureCoverOnDisk(
 
   const promise = (async (): Promise<string | null> => {
     try {
-      const remoteUrl = await fetchCoverArtUrlForGroup(releaseGroupMbid);
+      const remoteUrl = await fetchCoverArtUrlForGroup(releaseGroupMbid, priority);
       if (!remoteUrl) return null;
 
       const res = await fetch(remoteUrl);
@@ -96,12 +98,15 @@ export async function ensureCoverOnDisk(
 // file already lives on disk; otherwise returns the upstream CAA URL for THIS
 // response and schedules a background download so the NEXT response serves
 // locally. No DB write — these MBIDs may never become library albums.
-export function resolveExternalCoverNow(releaseGroupMbid: string): string {
+export function resolveExternalCoverNow(
+  releaseGroupMbid: string,
+  priority: MbPriority = MB_PRIORITY.PAGE_LOAD,
+): string {
   ensureCoversDir();
   const filePath = path.join(coversDir, `${releaseGroupMbid}.jpg`);
   if (fs.existsSync(filePath)) return localCoverUrl(releaseGroupMbid);
 
-  void ensureCoverOnDisk(releaseGroupMbid).catch((err) => {
+  void ensureCoverOnDisk(releaseGroupMbid, priority).catch((err) => {
     log.warn(
       { err, releaseGroupMbid },
       "background external cover fetch failed",

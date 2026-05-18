@@ -1,4 +1,4 @@
-import throttle from "p-throttle";
+import PQueue from "p-queue";
 import { logger } from "../logger.js";
 
 const log = logger.child({ module: "acoustid" });
@@ -11,9 +11,18 @@ export interface AcoustIdMatch {
 }
 
 // acoustID rate limit: 3 requests per sec. pls don't change
-const throttledFetch = throttle({ limit: 3, interval: 1000 })((url: string) =>
-  fetch(url),
-);
+const acoustidQueue = new PQueue({
+  concurrency: 3,
+  intervalCap: 3,
+  interval: 1000,
+  carryoverConcurrencyCount: true,
+});
+
+async function throttledFetch(url: string): Promise<Response> {
+  const res = await acoustidQueue.add(() => fetch(url));
+  if (!res) throw new Error("acoustid queue returned no response");
+  return res;
+}
 
 export async function lookupFingerprint(
   duration: number,

@@ -1,6 +1,6 @@
 // TODO - desperately needs cleaning up and splitting out, file is messy, but i cba right now
 
-import throttle from "p-throttle";
+import PQueue from "p-queue";
 import { APP_USER_AGENT } from "../constants.js";
 import { logger } from "../logger.js";
 
@@ -88,7 +88,10 @@ interface MBReleaseLike {
   title?: string | null;
   date?: string | null;
   status?: string | null;
-  "release-group"?: { id?: string | null; "primary-type"?: string | null } | null;
+  "release-group"?: {
+    id?: string | null;
+    "primary-type"?: string | null;
+  } | null;
 }
 
 function parseReleaseYear(date?: string | null): number | null {
@@ -101,17 +104,49 @@ const MB_BASE = "https://musicbrainz.org/ws/2";
 
 const MB_INTERVAL_MS = parseInt(process.env.MB_RATE_LIMIT_MS ?? "1100", 10);
 
-export const throttledFetch = throttle({ limit: 1, interval: MB_INTERVAL_MS })(
-  async (url: string, req?: RequestInit): Promise<Response> =>
-    fetch(url, {
-      ...req,
-      headers: {
-        "User-Agent": APP_USER_AGENT,
-        Accept: "application/json",
-        ...req?.headers,
-      },
-    }),
-);
+// Priority lanes for shared external-API queues (MB + CAA). Higher number =
+// runs sooner. INTERACTIVE is reserved for the search route (user typing).
+// PAGE_LOAD covers fan-outs from album/artist/recs/downloads pages.
+// BACKGROUND is the default for resolver passes and any other non-blocking
+// work.
+export const MB_PRIORITY = {
+  INTERACTIVE: 20,
+  PAGE_LOAD: 10,
+  BACKGROUND: 0,
+} as const;
+export type MbPriority = (typeof MB_PRIORITY)[keyof typeof MB_PRIORITY];
+
+const mbQueue = new PQueue({
+  concurrency: 1,
+  intervalCap: 1,
+  interval: MB_INTERVAL_MS,
+  carryoverConcurrencyCount: true,
+});
+
+export async function throttledFetch(
+  url: string,
+  opts: { priority?: MbPriority } = {},
+): Promise<Response> {
+  const priority = opts.priority ?? MB_PRIORITY.BACKGROUND;
+  if (priority === MB_PRIORITY.INTERACTIVE && mbQueue.size > 0) {
+    log.debug(
+      { queueSize: mbQueue.size, pending: mbQueue.pending },
+      "interactive mb call queued behind backlog",
+    );
+  }
+  const res = await mbQueue.add(
+    () =>
+      fetch(url, {
+        headers: {
+          "User-Agent": APP_USER_AGENT,
+          Accept: "application/json",
+        },
+      }),
+    { priority },
+  );
+  if (!res) throw new Error("mb queue returned no response");
+  return res;
+}
 
 const TYPE_RANK: Record<string, number> = {
   Album: 0,
@@ -126,6 +161,7 @@ export async function searchRecording(
   artistName: string,
   title: string,
   hint?: { albumTitle: string; releaseYear?: number },
+  priority: MbPriority = MB_PRIORITY.BACKGROUND,
 ): Promise<RecordingMatch | null> {
   // first try match on artist + title - gets the better tagged matches out of the way faster
   // video:false excludes music-video recordings, which share artist+title with the audio recording
@@ -134,6 +170,7 @@ export async function searchRecording(
     `artist:"${artistName}" AND recording:"${title}" AND video:false`,
     85,
     hint,
+    priority,
   );
   if (artistAndTitleMatch) return artistAndTitleMatch;
 
@@ -144,6 +181,7 @@ export async function searchRecording(
       `recording:"${title}" AND release:"${hint.albumTitle}" AND video:false`,
       90,
       hint,
+      priority,
     );
   }
 
@@ -154,6 +192,7 @@ async function attemptRecordingSearch(
   queryStr: string,
   minScore: number,
   hint?: { albumTitle: string; releaseYear?: number },
+  priority: MbPriority = MB_PRIORITY.BACKGROUND,
 ): Promise<RecordingMatch | null> {
   try {
     const query = new URLSearchParams({
@@ -163,10 +202,15 @@ async function attemptRecordingSearch(
     });
     const response = await throttledFetch(
       `${MB_BASE}/recording?${query}&inc=releases+release-groups+artist-credits`,
+      { priority },
     );
     if (!response.ok) {
       log.warn(
-        { status: response.status, operation: "attemptRecordingSearch", query: queryStr },
+        {
+          status: response.status,
+          operation: "attemptRecordingSearch",
+          query: queryStr,
+        },
         "mb recording search non-ok response",
       );
       return null;
@@ -191,9 +235,9 @@ async function attemptRecordingSearch(
       const bestReleaseMbid = recording.releases?.length
         ? pickBestRelease(recording.releases, hint)
         : null;
-      const bestRelease = recording.releases?.find(
-        (rel) => rel.id === bestReleaseMbid,
-      ) ?? recording.releases?.[0];
+      const bestRelease =
+        recording.releases?.find((rel) => rel.id === bestReleaseMbid) ??
+        recording.releases?.[0];
       return {
         recordingMbid: recording.id,
         releaseMbid: bestReleaseMbid,
@@ -217,6 +261,7 @@ async function attemptRecordingSearch(
 export async function searchRecordingsByQuery(
   query: string,
   limit = 10,
+  priority: MbPriority = MB_PRIORITY.BACKGROUND,
 ): Promise<ExternalRecordingResult[]> {
   try {
     const params = new URLSearchParams({
@@ -226,10 +271,15 @@ export async function searchRecordingsByQuery(
     });
     const response = await throttledFetch(
       `${MB_BASE}/recording?${params}&inc=releases+release-groups+artist-credits`,
+      { priority },
     );
     if (!response.ok) {
       log.warn(
-        { status: response.status, operation: "searchRecordingsByQuery", query },
+        {
+          status: response.status,
+          operation: "searchRecordingsByQuery",
+          query,
+        },
         "mb external recording search non-ok response",
       );
       return [];
@@ -240,22 +290,22 @@ export async function searchRecordingsByQuery(
     return data.recordings
       .filter((r) => r.video !== true)
       .map((r) => {
-      const bestRelease = r.releases?.length
-        ? pickBestRelease(r.releases)
-        : null;
-      const releaseObj =
-        r.releases?.find((rel) => rel.id === bestRelease) ?? r.releases?.[0];
-      return {
-        recordingMbid: r.id,
-        title: r.title,
-        artistName: r["artist-credit"]?.[0]?.artist.name ?? "Unknown Artist",
-        artistMbid: r["artist-credit"]?.[0]?.artist.id ?? null,
-        releaseName: releaseObj?.title ?? null,
-        releaseMbid: releaseObj?.id ?? null,
-        releaseYear: parseReleaseYear(releaseObj?.date),
-        durationMs: r.length ?? null,
-      };
-    });
+        const bestRelease = r.releases?.length
+          ? pickBestRelease(r.releases)
+          : null;
+        const releaseObj =
+          r.releases?.find((rel) => rel.id === bestRelease) ?? r.releases?.[0];
+        return {
+          recordingMbid: r.id,
+          title: r.title,
+          artistName: r["artist-credit"]?.[0]?.artist.name ?? "Unknown Artist",
+          artistMbid: r["artist-credit"]?.[0]?.artist.id ?? null,
+          releaseName: releaseObj?.title ?? null,
+          releaseMbid: releaseObj?.id ?? null,
+          releaseYear: parseReleaseYear(releaseObj?.date),
+          durationMs: r.length ?? null,
+        };
+      });
   } catch (err) {
     log.warn(
       { err, operation: "searchRecordingsByQuery", query },
@@ -268,6 +318,7 @@ export async function searchRecordingsByQuery(
 export async function searchArtistsByQuery(
   query: string,
   limit = 5,
+  priority: MbPriority = MB_PRIORITY.BACKGROUND,
 ): Promise<ExternalArtistResult[]> {
   try {
     const params = new URLSearchParams({
@@ -275,7 +326,9 @@ export async function searchArtistsByQuery(
       fmt: "json",
       limit: String(limit),
     });
-    const response = await throttledFetch(`${MB_BASE}/artist?${params}`);
+    const response = await throttledFetch(`${MB_BASE}/artist?${params}`, {
+      priority,
+    });
     if (!response.ok) {
       log.warn(
         { status: response.status, operation: "searchArtistsByQuery", query },
@@ -302,6 +355,7 @@ export async function searchArtistsByQuery(
 export async function searchReleasesByQuery(
   query: string,
   limit = 8,
+  priority: MbPriority = MB_PRIORITY.BACKGROUND,
 ): Promise<ExternalReleaseResult[]> {
   try {
     const fetchLimit = Math.min(limit * 3, 25);
@@ -312,6 +366,7 @@ export async function searchReleasesByQuery(
     });
     const response = await throttledFetch(
       `${MB_BASE}/release?${params}&inc=artist-credits+release-groups`,
+      { priority },
     );
     if (!response.ok) {
       log.warn(
@@ -375,6 +430,7 @@ const recordingDetailInflight = new Map<
 
 export async function lookupRecording(
   mbid: string,
+  priority: MbPriority = MB_PRIORITY.BACKGROUND,
 ): Promise<MBRecordingDetail | null> {
   if (recordingDetailCache.has(mbid)) {
     return recordingDetailCache.get(mbid) ?? null;
@@ -386,10 +442,15 @@ export async function lookupRecording(
     try {
       const response = await throttledFetch(
         `${MB_BASE}/recording/${mbid}?inc=artist-credits+releases+release-groups&fmt=json`,
+        { priority },
       );
       if (!response.ok) {
         log.warn(
-          { status: response.status, operation: "lookupRecording", recordingMbid: mbid },
+          {
+            status: response.status,
+            operation: "lookupRecording",
+            recordingMbid: mbid,
+          },
           "mb recording lookup non-ok response",
         );
         return null;
@@ -432,14 +493,20 @@ export async function lookupRecording(
 
 export async function lookupReleaseDetails(
   releaseMbid: string,
+  priority: MbPriority = MB_PRIORITY.BACKGROUND,
 ): Promise<MBReleaseDetails | null> {
   try {
     const response = await throttledFetch(
       `${MB_BASE}/release/${releaseMbid}?inc=recordings+artist-credits+release-groups&fmt=json`,
+      { priority },
     );
     if (!response.ok) {
       log.warn(
-        { status: response.status, operation: "lookupReleaseDetails", releaseMbid },
+        {
+          status: response.status,
+          operation: "lookupReleaseDetails",
+          releaseMbid,
+        },
         "mb release lookup non-ok response",
       );
       return null;
@@ -474,6 +541,7 @@ export async function lookupReleaseDetails(
 export async function searchReleaseGroupCandidates(
   albumTitle: string,
   artistName: string,
+  priority: MbPriority = MB_PRIORITY.BACKGROUND,
 ): Promise<string[]> {
   try {
     const params = new URLSearchParams({
@@ -482,7 +550,12 @@ export async function searchReleaseGroupCandidates(
       fmt: "json",
       limit: "5",
     });
-    const response = await throttledFetch(`${MB_BASE}/release-group?${params}`);
+    const response = await throttledFetch(
+      `${MB_BASE}/release-group?${params}`,
+      {
+        priority,
+      },
+    );
     if (!response.ok) {
       log.warn(
         {
@@ -503,7 +576,12 @@ export async function searchReleaseGroupCandidates(
       .map((rg) => rg.id);
   } catch (err) {
     log.warn(
-      { err, operation: "searchReleaseGroupCandidates", albumTitle, artistName },
+      {
+        err,
+        operation: "searchReleaseGroupCandidates",
+        albumTitle,
+        artistName,
+      },
       "mb release-group search failed",
     );
     return [];
@@ -532,6 +610,7 @@ const artistDetailInflight = new Map<
 
 export async function lookupExternalArtist(
   artistMbid: string,
+  priority: MbPriority = MB_PRIORITY.BACKGROUND,
 ): Promise<ExternalArtistDetail | null> {
   if (artistDetailCache.has(artistMbid)) {
     return artistDetailCache.get(artistMbid) ?? null;
@@ -543,10 +622,15 @@ export async function lookupExternalArtist(
     try {
       const response = await throttledFetch(
         `${MB_BASE}/artist/${artistMbid}?fmt=json`,
+        { priority },
       );
       if (!response.ok) {
         log.warn(
-          { status: response.status, operation: "lookupExternalArtist", artistMbid },
+          {
+            status: response.status,
+            operation: "lookupExternalArtist",
+            artistMbid,
+          },
           "mb artist lookup non-ok response",
         );
         return null;
@@ -587,6 +671,7 @@ const MB_RG_MAX_PAGES = 5;
 
 export async function getArtistReleaseGroups(
   artistMbid: string,
+  priority: MbPriority = MB_PRIORITY.BACKGROUND,
 ): Promise<ArtistReleaseGroup[]> {
   const cached = artistReleaseGroupsCache.get(artistMbid);
   if (cached) return cached;
@@ -606,10 +691,16 @@ export async function getArtistReleaseGroups(
         });
         const response = await throttledFetch(
           `${MB_BASE}/release-group?${params}`,
+          { priority },
         );
         if (!response.ok) {
           log.warn(
-            { status: response.status, operation: "getArtistReleaseGroups", artistMbid, page },
+            {
+              status: response.status,
+              operation: "getArtistReleaseGroups",
+              artistMbid,
+              page,
+            },
             "mb artist release-groups non-ok response",
           );
           break;
@@ -656,14 +747,20 @@ export function normalizeString(str: string): string {
 
 export async function lookupExternalAlbum(
   rgMbid: string,
+  priority: MbPriority = MB_PRIORITY.BACKGROUND,
 ): Promise<ExternalAlbumDetail | null> {
   try {
     const res = await throttledFetch(
       `${MB_BASE}/release-group/${rgMbid}?inc=releases+artist-credits&fmt=json`,
+      { priority },
     );
     if (!res.ok) {
       log.warn(
-        { status: res.status, operation: "lookupExternalAlbum", releaseGroupMbid: rgMbid },
+        {
+          status: res.status,
+          operation: "lookupExternalAlbum",
+          releaseGroupMbid: rgMbid,
+        },
         "mb release-group lookup non-ok response",
       );
       return null;
@@ -676,7 +773,7 @@ export async function lookupExternalAlbum(
 
     const canonical = releases.find((r) => r.id === releaseMbid) ?? releases[0];
 
-    const details = await lookupReleaseDetails(releaseMbid);
+    const details = await lookupReleaseDetails(releaseMbid, priority);
     if (!details) return null;
 
     return {

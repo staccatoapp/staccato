@@ -16,6 +16,7 @@ import {
 import {
   getArtistReleaseGroups,
   lookupExternalArtist,
+  MB_PRIORITY,
   type ArtistReleaseGroup,
 } from "../musicbrainz/client.js";
 import { logger } from "../logger.js";
@@ -129,7 +130,7 @@ const artistRoutes: FastifyPluginAsync = async (fastify) => {
       logger.debug(`Local artist of ID ${localId} found`);
       const libraryAlbums = getDiscographyAlbumsByArtistId(localRow.id);
       const releaseGroups = localRow.musicbrainzId
-        ? await getArtistReleaseGroups(localRow.musicbrainzId)
+        ? await getArtistReleaseGroups(localRow.musicbrainzId, MB_PRIORITY.PAGE_LOAD)
         : [];
       const albums = mergeDiscography(releaseGroups, libraryAlbums);
 
@@ -158,9 +159,9 @@ const artistRoutes: FastifyPluginAsync = async (fastify) => {
     );
 
     const [external, releaseGroups, imageUrl] = await Promise.all([
-      lookupExternalArtist(artistKey),
-      getArtistReleaseGroups(artistKey),
-      ensureArtistImageOnDisk(artistKey),
+      lookupExternalArtist(artistKey, MB_PRIORITY.PAGE_LOAD),
+      getArtistReleaseGroups(artistKey, MB_PRIORITY.PAGE_LOAD),
+      ensureArtistImageOnDisk(artistKey, MB_PRIORITY.PAGE_LOAD),
     ]);
 
     if (!external) {

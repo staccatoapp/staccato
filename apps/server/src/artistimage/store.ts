@@ -6,6 +6,7 @@ import { pipeline } from "node:stream/promises";
 import { artistImagesDir } from "../paths.js";
 import { logger } from "../logger.js";
 import { lookupArtistImageSource } from "./client.js";
+import { MB_PRIORITY, type MbPriority } from "../musicbrainz/client.js";
 import { updateArtist } from "../db/queries/artists.js";
 
 const log = logger.child({ module: "artistimage-store" });
@@ -57,6 +58,7 @@ const inflight = new Map<string, Promise<string | null>>();
 
 export async function ensureArtistImageOnDisk(
   artistMbid: string,
+  priority: MbPriority = MB_PRIORITY.BACKGROUND,
 ): Promise<string | null> {
   if (!artistMbid) return null;
   ensureDir();
@@ -77,7 +79,7 @@ export async function ensureArtistImageOnDisk(
 
   const promise = (async (): Promise<string | null> => {
     try {
-      const source = await lookupArtistImageSource(artistMbid);
+      const source = await lookupArtistImageSource(artistMbid, priority);
       if (!source) return null;
 
       const rawExt = path.extname(source.filename).toLowerCase();

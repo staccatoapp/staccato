@@ -8,7 +8,7 @@ import {
   ensureCoverOnDisk,
   resolveAlbumCoverNow,
 } from "../coverart/store.js";
-import { lookupExternalAlbum } from "../musicbrainz/client.js";
+import { lookupExternalAlbum, MB_PRIORITY } from "../musicbrainz/client.js";
 
 const CUID2_RE = /^[a-z0-9]{24}$/;
 const MBID_RE =
@@ -56,8 +56,8 @@ const albumRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const [external, coverArtUrl] = await Promise.all([
-      lookupExternalAlbum(albumKey),
-      ensureCoverOnDisk(albumKey),
+      lookupExternalAlbum(albumKey, MB_PRIORITY.PAGE_LOAD),
+      ensureCoverOnDisk(albumKey, MB_PRIORITY.PAGE_LOAD),
     ]);
     if (!external) {
       request.log.warn({ albumKey }, "external album lookup returned nothing");

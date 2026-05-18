@@ -1,18 +1,24 @@
-import { memo, useMemo } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { ListMusic, Play } from "lucide-react";
 import type { PlaylistListItem } from "@staccato/shared";
 import { generateAlbumGradient } from "@/lib/music";
+import { cn } from "@/lib/utils";
 
 export const PlaylistCard = memo(function PlaylistCard({
   playlist,
 }: {
   playlist: PlaylistListItem;
 }) {
+  const [loaded, setLoaded] = useState(false);
   const gradient = useMemo(
     () => generateAlbumGradient(playlist.name, ""),
     [playlist.name],
   );
+
+  useEffect(() => {
+    setLoaded(false);
+  }, [playlist.coverArtUrl]);
 
   return (
     <Link
@@ -22,16 +28,18 @@ export const PlaylistCard = memo(function PlaylistCard({
     >
       <div
         className="relative aspect-square w-full rounded-lg overflow-hidden mb-2.5 shadow-md"
-        style={{
-          background: playlist.coverArtUrl ? undefined : gradient,
-        }}
+        style={{ background: gradient }}
       >
         {playlist.coverArtUrl ? (
           <img
             src={playlist.coverArtUrl}
             alt={playlist.name}
             decoding="async"
-            className="w-full h-full object-cover"
+            className={cn(
+              "w-full h-full object-cover transition-opacity duration-200",
+              loaded ? "opacity-100" : "opacity-0",
+            )}
+            onLoad={() => setLoaded(true)}
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">

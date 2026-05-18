@@ -19,6 +19,7 @@ import {
 } from "../listenbrainz/client.js";
 import {
   lookupRecording,
+  MB_PRIORITY,
   type MBRecordingDetail,
 } from "../musicbrainz/client.js";
 import { ensureCoverOnDisk } from "../coverart/store.js";
@@ -95,7 +96,9 @@ const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
       const localMap = getTracksByMusicbrainzIds(mbidList);
 
       const nonLocal = mbidList.filter((m) => !localMap.has(m));
-      const recDetails = await Promise.all(nonLocal.map(lookupRecording));
+      const recDetails = await Promise.all(
+        nonLocal.map((m) => lookupRecording(m, MB_PRIORITY.PAGE_LOAD)),
+      );
       const recMap = new Map<string, MBRecordingDetail>();
       nonLocal.forEach((mbid, i) => {
         const d = recDetails[i];
@@ -108,7 +111,7 @@ const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
       }
       const rgList = [...rgSet];
       const coverArtResults = await Promise.all(
-        rgList.map(ensureCoverOnDisk),
+        rgList.map((rg) => ensureCoverOnDisk(rg, MB_PRIORITY.PAGE_LOAD)),
       );
       const coverArtMap = new Map(
         rgList.map((rg, i) => [rg, coverArtResults[i] ?? null]),
@@ -214,7 +217,9 @@ const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
 
       const localMap = getTracksByMusicbrainzIds(mbids);
       const nonLocal = mbids.filter((m) => !localMap.has(m));
-      const recDetails = await Promise.all(nonLocal.map(lookupRecording));
+      const recDetails = await Promise.all(
+        nonLocal.map((m) => lookupRecording(m, MB_PRIORITY.PAGE_LOAD)),
+      );
       const recMap = new Map<string, MBRecordingDetail>();
       nonLocal.forEach((mbid, i) => {
         const d = recDetails[i];
@@ -230,7 +235,7 @@ const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
               rec.title,
             ),
             rec.releaseGroupMbid
-              ? ensureCoverOnDisk(rec.releaseGroupMbid)
+              ? ensureCoverOnDisk(rec.releaseGroupMbid, MB_PRIORITY.PAGE_LOAD)
               : Promise.resolve<string | null>(null),
           ]);
           return {

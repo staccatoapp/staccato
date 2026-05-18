@@ -3,7 +3,7 @@ import {
   CreateDownloadRequestSchema,
   DownloadRequest,
 } from "@staccato/shared";
-import { lookupRecording } from "../musicbrainz/client.js";
+import { lookupRecording, MB_PRIORITY } from "../musicbrainz/client.js";
 import {
   createDownloadRequest,
   deleteDownloadRequest,
@@ -38,7 +38,7 @@ const downloadRoutes: FastifyPluginAsync = async (app) => {
         .send({ error: "Request already active", request: toDto(existing) });
     }
 
-    const recording = await lookupRecording(recordingMbid);
+    const recording = await lookupRecording(recordingMbid, MB_PRIORITY.PAGE_LOAD);
     if (!recording) {
       return reply
         .status(404)

@@ -1,6 +1,7 @@
-import { memo, useMemo } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { User } from "lucide-react";
 import { generateAlbumGradient } from "@/lib/music";
+import { cn } from "@/lib/utils";
 
 export const ArtistCard = memo(function ArtistCard({
   artist,
@@ -9,25 +10,32 @@ export const ArtistCard = memo(function ArtistCard({
   artist: { id: string; name: string; imageUrl: string | null };
   albumCount?: number;
 }) {
+  const [loaded, setLoaded] = useState(false);
   const gradient = useMemo(
     () => generateAlbumGradient(artist.name, ""),
     [artist.name],
   );
 
+  useEffect(() => {
+    setLoaded(false);
+  }, [artist.imageUrl]);
+
   return (
     <div className="group cursor-pointer min-w-0 text-center">
       <div
         className="relative aspect-square w-full rounded-full overflow-hidden mb-2.5 shadow-md"
-        style={{
-          background: artist.imageUrl ? undefined : gradient,
-        }}
+        style={{ background: gradient }}
       >
         {artist.imageUrl ? (
           <img
             src={artist.imageUrl}
             alt={artist.name}
             decoding="async"
-            className="w-full h-full object-cover"
+            className={cn(
+              "w-full h-full object-cover transition-opacity duration-200",
+              loaded ? "opacity-100" : "opacity-0",
+            )}
+            onLoad={() => setLoaded(true)}
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">

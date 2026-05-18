@@ -1,8 +1,9 @@
-import { memo, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Music2, Play } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { generateAlbumGradient } from "@/lib/music";
+import { cn } from "@/lib/utils";
 
 export const AlbumCard = memo(function AlbumCard({
   title,
@@ -18,11 +19,16 @@ export const AlbumCard = memo(function AlbumCard({
   href: string;
 }) {
   const [imgFailed, setImgFailed] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const gradient = useMemo(
     () => generateAlbumGradient(title, artistName ?? ""),
     [title, artistName],
   );
-  const showGradient = !coverArtUrl || imgFailed;
+
+  useEffect(() => {
+    setImgFailed(false);
+    setLoaded(false);
+  }, [coverArtUrl]);
 
   return (
     <Link
@@ -31,14 +37,18 @@ export const AlbumCard = memo(function AlbumCard({
     >
       <div
         className="relative aspect-square w-full rounded-lg overflow-hidden mb-2.5 shadow-md"
-        style={{ background: showGradient ? gradient : undefined }}
+        style={{ background: gradient }}
       >
         {coverArtUrl && !imgFailed ? (
           <img
             src={coverArtUrl}
             alt={title}
             decoding="async"
-            className="w-full h-full object-cover"
+            className={cn(
+              "w-full h-full object-cover transition-opacity duration-200",
+              loaded ? "opacity-100" : "opacity-0",
+            )}
+            onLoad={() => setLoaded(true)}
             onError={() => setImgFailed(true)}
           />
         ) : (

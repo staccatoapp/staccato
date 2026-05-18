@@ -1,5 +1,9 @@
 import path from "node:path";
-import { throttledFetch } from "../musicbrainz/client.js";
+import {
+  MB_PRIORITY,
+  throttledFetch,
+  type MbPriority,
+} from "../musicbrainz/client.js";
 import { logger } from "../logger.js";
 
 // Wikimedia's Special:FilePath returns the original asset (often multi-MB)
@@ -20,10 +24,12 @@ export type ArtistImageSource = {
 // Wikimedia Commons image. Returns null when any step is missing or fails.
 export async function lookupArtistImageSource(
   artistMbid: string,
+  priority: MbPriority = MB_PRIORITY.BACKGROUND,
 ): Promise<ArtistImageSource | null> {
   try {
     const mbRes = await throttledFetch(
       `https://musicbrainz.org/ws/2/artist/${artistMbid}?inc=url-rels&fmt=json`,
+      { priority },
     );
     if (!mbRes.ok) {
       log.warn(
@@ -69,7 +75,9 @@ export async function lookupArtistImageSource(
 
     const base = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(filename)}`;
     const ext = path.extname(filename).toLowerCase();
-    const url = RASTER_EXTS.has(ext) ? `${base}?width=${THUMBNAIL_WIDTH}` : base;
+    const url = RASTER_EXTS.has(ext)
+      ? `${base}?width=${THUMBNAIL_WIDTH}`
+      : base;
     return { filename, url };
   } catch (err) {
     log.warn({ err, artistMbid }, "artist image source lookup failed");
