@@ -5,6 +5,7 @@ export const CreateDownloadRequestSchema = z.object({
   artistMbid: z.string().min(1),
   artistName: z.string().min(1),
   albumTitle: z.string().nullable(),
+  qualityProfileId: z.number().int().optional(),
 });
 export type CreateDownloadRequest = z.infer<typeof CreateDownloadRequestSchema>;
 
@@ -12,7 +13,16 @@ export const UpdateLidarrSettingsSchema = z
   .object({
     url: z.string().url().nullable(),
     apiKey: z.string().nullable(),
+    qualityProfileId: z.number().int().nullable(),
+    metadataProfileId: z.number().int().nullable(),
+    rootFolderPath: z.string().nullable(),
   })
   .partial()
   .strict();
 export type UpdateLidarrSettings = z.infer<typeof UpdateLidarrSettingsSchema>;
+
+export const TestLidarrConnectionSchema = z.object({
+  url: z.string().url(),
+  apiKey: z.string().min(1),
+});
+export type TestLidarrConnection = z.infer<typeof TestLidarrConnectionSchema>;

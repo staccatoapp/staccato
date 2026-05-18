@@ -41,6 +41,7 @@ async function waitForAlbum(
 export async function submitToLidarr(
   requestId: string,
   log: FastifyBaseLogger,
+  override?: { qualityProfileId?: number },
 ): Promise<void> {
   const req = getDownloadRequest(requestId);
   if (!req) throw new Error(`Download request ${requestId} not found`);
@@ -66,6 +67,31 @@ export async function submitToLidarr(
     return;
   }
 
+  const qualityProfileId =
+    override?.qualityProfileId ?? settings.lidarrQualityProfileId;
+  const metadataProfileId = settings.lidarrMetadataProfileId;
+  const rootFolderPath = settings.lidarrRootFolderPath;
+  if (
+    qualityProfileId == null ||
+    metadataProfileId == null ||
+    rootFolderPath == null
+  ) {
+    log.warn(
+      {
+        requestId,
+        qualityProfileId,
+        metadataProfileId,
+        rootFolderPath,
+      },
+      "[lidarr] defaults not configured, marking failed",
+    );
+    updateDownloadRequest(requestId, {
+      status: "failed",
+      errorMessage: "Lidarr defaults not configured",
+    });
+    return;
+  }
+
   if (!req.musicbrainzArtistId || !req.musicbrainzReleaseGroupId) {
     log.warn(
       {
@@ -85,8 +111,10 @@ export async function submitToLidarr(
   const client = new LidarrClient(settings.lidarrUrl, settings.lidarrApiKey);
 
   try {
-    const defaults = await client.getDefaults();
-    log.info({ defaults }, "[lidarr] defaults loaded");
+    log.info(
+      { qualityProfileId, metadataProfileId, rootFolderPath },
+      "[lidarr] using defaults",
+    );
 
     const artists = await client.getArtists();
     let lidarrArtist = artists.find(
@@ -101,9 +129,9 @@ export async function submitToLidarr(
       lidarrArtist = await client.addArtist({
         artistMbid: req.musicbrainzArtistId,
         artistName: req.artistName,
-        qualityProfileId: defaults.qualityProfileId,
-        metadataProfileId: defaults.metadataProfileId,
-        rootFolderPath: defaults.rootFolderPath,
+        qualityProfileId,
+        metadataProfileId,
+        rootFolderPath,
       });
       log.info({ lidarrArtistId: lidarrArtist.id }, "[lidarr] artist added");
     } else {

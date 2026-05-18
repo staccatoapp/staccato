@@ -131,7 +131,7 @@ function RecommendationDetailPage() {
     requestDialog.openBulk({
       subject: "playlist",
       subjectName: playlist.name,
-      run: async () => {
+      run: async ({ qualityProfileId }) => {
         const seen = new Set<string>();
         for (const t of visibleTracks) {
           if (t.inLibrary) continue;
@@ -144,6 +144,7 @@ function RecommendationDetailPage() {
             artistMbid: t.artistMbid,
             artistName: t.artistName,
             albumTitle: t.albumTitle,
+            ...(qualityProfileId !== null && { qualityProfileId }),
           });
         }
       },

@@ -9,11 +9,21 @@ import { CheckCircle2, RefreshCw, Sparkles, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type {
+  LidarrOptions,
   LidarrSettings,
+  LidarrTestResult,
   ResolutionProgress,
   ScanProgress,
+  TestLidarrConnection,
   UpdateLidarrSettings,
   UserSettings,
 } from "@staccato/shared";
@@ -203,7 +213,14 @@ function LidarrSection() {
   const queryClient = useQueryClient();
   const [urlInput, setUrlInput] = useState<string | null>(null);
   const [keyInput, setKeyInput] = useState<string | null>(null);
-  const [testResult, setTestResult] = useState<{ connected: boolean } | null>(
+  const [testResult, setTestResult] = useState<LidarrTestResult | null>(null);
+  const [selectedQualityId, setSelectedQualityId] = useState<number | null>(
+    null,
+  );
+  const [selectedMetadataId, setSelectedMetadataId] = useState<number | null>(
+    null,
+  );
+  const [selectedRootFolder, setSelectedRootFolder] = useState<string | null>(
     null,
   );
 
@@ -224,13 +241,77 @@ function LidarrSection() {
 
   const urlDirty = urlInput !== null && urlInput !== savedUrl;
   const keyDirty = keyInput !== null && keyInput.length > 0;
-  const isDirty = urlDirty || keyDirty;
+  const credsDirty = urlDirty || keyDirty;
+
+  const optionsQuery = useQuery({
+    queryKey: ["lidarr-options"],
+    queryFn: async (): Promise<LidarrOptions> => {
+      const res = await fetch("/api/settings/lidarr/options");
+      if (!res.ok) throw new Error("Failed to fetch Lidarr options");
+      return res.json();
+    },
+    enabled: apiKeySet && !!savedUrl,
+    staleTime: 5 * 60_000,
+  });
+
+  const effectiveOptions: LidarrOptions | null =
+    testResult?.connected && testResult.options
+      ? testResult.options
+      : (optionsQuery.data ?? null);
+
+  useEffect(() => {
+    if (!data) return;
+    if (selectedQualityId === null && data.qualityProfileId !== null) {
+      setSelectedQualityId(data.qualityProfileId);
+    }
+    if (selectedMetadataId === null && data.metadataProfileId !== null) {
+      setSelectedMetadataId(data.metadataProfileId);
+    }
+    if (selectedRootFolder === null && data.rootFolderPath !== null) {
+      setSelectedRootFolder(data.rootFolderPath);
+    }
+  }, [data, selectedQualityId, selectedMetadataId, selectedRootFolder]);
+
+  useEffect(() => {
+    if (!effectiveOptions) return;
+    if (selectedQualityId === null && effectiveOptions.qualityProfiles[0]) {
+      setSelectedQualityId(effectiveOptions.qualityProfiles[0].id);
+    }
+    if (selectedMetadataId === null && effectiveOptions.metadataProfiles[0]) {
+      setSelectedMetadataId(effectiveOptions.metadataProfiles[0].id);
+    }
+    if (selectedRootFolder === null && effectiveOptions.rootFolders[0]) {
+      setSelectedRootFolder(effectiveOptions.rootFolders[0].path);
+    }
+  }, [
+    effectiveOptions,
+    selectedQualityId,
+    selectedMetadataId,
+    selectedRootFolder,
+  ]);
+
+  const selectionsDiffer =
+    (data?.qualityProfileId ?? null) !== selectedQualityId ||
+    (data?.metadataProfileId ?? null) !== selectedMetadataId ||
+    (data?.rootFolderPath ?? null) !== selectedRootFolder;
+
+  const credsAvailable = !credsDirty || testResult?.connected === true;
+  const haveSelections =
+    selectedQualityId !== null &&
+    selectedMetadataId !== null &&
+    selectedRootFolder !== null;
+
+  const canSave =
+    haveSelections && credsAvailable && (credsDirty || selectionsDiffer);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
       const body: UpdateLidarrSettings = {};
       if (urlDirty) body.url = urlInput!.trim() || null;
       if (keyDirty) body.apiKey = keyInput!.trim() || null;
+      body.qualityProfileId = selectedQualityId;
+      body.metadataProfileId = selectedMetadataId;
+      body.rootFolderPath = selectedRootFolder;
       const res = await fetch("/api/settings/lidarr", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -246,17 +327,38 @@ function LidarrSection() {
       setKeyInput(null);
       setTestResult(null);
       queryClient.invalidateQueries({ queryKey: ["lidarr-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["lidarr-options"] });
     },
   });
 
   const testMutation = useMutation({
-    mutationFn: async (): Promise<{ connected: boolean }> => {
-      const res = await fetch("/api/settings/lidarr/test", { method: "POST" });
+    mutationFn: async (): Promise<LidarrTestResult> => {
+      const body: TestLidarrConnection = {
+        url: (urlInput ?? savedUrl).trim(),
+        apiKey: (keyInput ?? "").trim(),
+      };
+      const res = await fetch("/api/settings/lidarr/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
       if (!res.ok) throw new Error("Test failed");
       return res.json();
     },
-    onSuccess: setTestResult,
+    onSuccess: (result) => {
+      setTestResult(result);
+      if (result.connected && result.options) {
+        setSelectedQualityId(result.options.qualityProfiles[0]?.id ?? null);
+        setSelectedMetadataId(result.options.metadataProfiles[0]?.id ?? null);
+        setSelectedRootFolder(result.options.rootFolders[0]?.path ?? null);
+      }
+    },
   });
+
+  const testEnabled =
+    !testMutation.isPending &&
+    !!(urlInput ?? savedUrl).trim() &&
+    !!(keyInput ?? "").trim();
 
   return (
     <div className="space-y-3">
@@ -294,6 +396,7 @@ function LidarrSection() {
         />
         <p className="text-xs text-muted-foreground">
           Find your API key under Settings → General in your Lidarr instance.
+          {credsDirty && " Test the connection before saving."}
         </p>
       </div>
 
@@ -321,26 +424,89 @@ function LidarrSection() {
         <Button
           variant="outline"
           onClick={() => testMutation.mutate()}
-          disabled={
-            testMutation.isPending ||
-            isDirty ||
-            (!savedUrl && !urlInput) ||
-            (!apiKeySet && !keyDirty)
-          }
+          disabled={!testEnabled}
         >
           Test connection
         </Button>
         <Button
           onClick={() => saveMutation.mutate()}
-          disabled={!isDirty || saveMutation.isPending}
+          disabled={!canSave || saveMutation.isPending}
         >
           Save
         </Button>
       </div>
-      {isDirty && (
-        <p className="text-xs text-muted-foreground">
-          Save changes before testing.
-        </p>
+
+      {effectiveOptions && (
+        <div className="space-y-3 pt-2">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Quality profile</label>
+            <Select
+              value={
+                selectedQualityId !== null ? String(selectedQualityId) : ""
+              }
+              onValueChange={(v) => setSelectedQualityId(v ? Number(v) : null)}
+              items={effectiveOptions.qualityProfiles.map((p) => ({
+                value: String(p.id),
+                label: p.name,
+              }))}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {effectiveOptions.qualityProfiles.map((p) => (
+                  <SelectItem key={p.id} value={String(p.id)}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Metadata profile</label>
+            <Select
+              value={
+                selectedMetadataId !== null ? String(selectedMetadataId) : ""
+              }
+              onValueChange={(v) => setSelectedMetadataId(v ? Number(v) : null)}
+              items={effectiveOptions.metadataProfiles.map((p) => ({
+                value: String(p.id),
+                label: p.name,
+              }))}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {effectiveOptions.metadataProfiles.map((p) => (
+                  <SelectItem key={p.id} value={String(p.id)}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Root folder</label>
+            <Select
+              value={selectedRootFolder ?? ""}
+              onValueChange={(v) => setSelectedRootFolder(v || null)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {effectiveOptions.rootFolders.map((r) => (
+                  <SelectItem key={r.path} value={r.path}>
+                    {r.path}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -465,8 +631,8 @@ function SettingsPage() {
           Lidarr
         </h2>
         <p className="text-sm text-muted-foreground">
-          Connect a Lidarr instance to request downloads for songs that aren&apos;t
-          in your library yet.
+          Connect a Lidarr instance to request downloads for songs that
+          aren&apos;t in your library yet.
         </p>
         <LidarrSection />
       </section>

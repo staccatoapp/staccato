@@ -47,7 +47,11 @@ const downloadRoutes: FastifyPluginAsync = async (app) => {
       status: "requested",
     });
 
-    submitToLidarr(row.id, req.log).catch((err) =>
+    const override =
+      body.qualityProfileId !== undefined
+        ? { qualityProfileId: body.qualityProfileId }
+        : undefined;
+    submitToLidarr(row.id, req.log, override).catch((err) =>
       req.log.error({ err, requestId: row.id }, "[downloads] submitToLidarr failed"),
     );
 

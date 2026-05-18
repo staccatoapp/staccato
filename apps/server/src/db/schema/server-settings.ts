@@ -7,6 +7,9 @@ export const serverSettings = sqliteTable("server_settings", {
     .$defaultFn(() => createId()),
   lidarrUrl: text("lidarr_url"),
   lidarrApiKey: text("lidarr_api_key"),
+  lidarrQualityProfileId: integer("lidarr_quality_profile_id"),
+  lidarrMetadataProfileId: integer("lidarr_metadata_profile_id"),
+  lidarrRootFolderPath: text("lidarr_root_folder_path"),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(
     () => new Date(),
   ),

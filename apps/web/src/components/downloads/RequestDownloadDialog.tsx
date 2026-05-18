@@ -1,4 +1,4 @@
-import { ArrowUpRight, ChevronDown, Info, Loader2 } from "lucide-react";
+import { ArrowUpRight, Info, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -8,6 +8,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { LidarrProfileOption } from "@staccato/shared";
 
 export type RequestDownloadSubject = "track" | "release" | "playlist";
 
@@ -43,6 +51,10 @@ export interface RequestDownloadDialogProps {
   isSubmitting: boolean;
   errorMessage: string | null;
   onConfirm: () => void;
+  qualityProfiles: LidarrProfileOption[] | null;
+  selectedQualityProfileId: number | null;
+  onSelectedQualityProfileIdChange: (id: number) => void;
+  isLoadingProfiles: boolean;
 }
 
 export function RequestDownloadDialog({
@@ -53,8 +65,25 @@ export function RequestDownloadDialog({
   isSubmitting,
   errorMessage,
   onConfirm,
+  qualityProfiles,
+  selectedQualityProfileId,
+  onSelectedQualityProfileIdChange,
+  isLoadingProfiles,
 }: RequestDownloadDialogProps) {
   const copy = COPY[subject];
+  const hasProfiles = !!qualityProfiles && qualityProfiles.length > 0;
+  const selectValue =
+    selectedQualityProfileId !== null ? String(selectedQualityProfileId) : "";
+  const placeholder = isLoadingProfiles
+    ? "Loading…"
+    : !hasProfiles
+      ? "No profiles available"
+      : "Select a quality profile";
+  const selectItems =
+    qualityProfiles?.map((p) => ({
+      value: String(p.id),
+      label: p.name,
+    })) ?? [];
 
   return (
     <Dialog
@@ -94,16 +123,26 @@ export function RequestDownloadDialog({
           <span className="text-xs font-medium text-muted-foreground">
             Quality Profile
           </span>
-          <button
-            type="button"
-            disabled
-            aria-disabled
-            className="flex items-center justify-between w-full h-9 px-3 rounded-lg border border-input bg-input/30 text-sm text-foreground/80 disabled:cursor-not-allowed disabled:opacity-70"
-            title="Quality profile selection coming soon"
+          <Select
+            value={selectValue}
+            disabled={isLoadingProfiles || !hasProfiles || isSubmitting}
+            onValueChange={(v) => {
+              const next = Number(v);
+              if (!Number.isNaN(next)) onSelectedQualityProfileIdChange(next);
+            }}
+            items={selectItems}
           >
-            <span>Ultra-HD (Default)</span>
-            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-          </button>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder={placeholder} />
+            </SelectTrigger>
+            <SelectContent>
+              {qualityProfiles?.map((p) => (
+                <SelectItem key={p.id} value={String(p.id)}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {errorMessage && (

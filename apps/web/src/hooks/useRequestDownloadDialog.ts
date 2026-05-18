@@ -1,5 +1,10 @@
-import { useCallback, useMemo, useState } from "react";
-import type { CreateDownloadRequest } from "@staccato/shared";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import type {
+  CreateDownloadRequest,
+  LidarrOptions,
+  LidarrSettings,
+} from "@staccato/shared";
 import { useRequestDownload } from "./useRequestDownload";
 import type {
   RequestDownloadDialogProps,
@@ -17,7 +22,7 @@ type Pending =
       mode: "bulk";
       subject: RequestDownloadSubject;
       subjectName: string;
-      run: () => Promise<void> | void;
+      run: (args: { qualityProfileId: number | null }) => Promise<void> | void;
     };
 
 interface OpenSingleArgs {
@@ -29,7 +34,7 @@ interface OpenSingleArgs {
 interface OpenBulkArgs {
   subject: RequestDownloadSubject;
   subjectName: string;
-  run: () => Promise<void> | void;
+  run: (args: { qualityProfileId: number | null }) => Promise<void> | void;
 }
 
 export function useRequestDownloadDialog() {
@@ -38,29 +43,82 @@ export function useRequestDownloadDialog() {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [selectedQualityProfileId, setSelectedQualityProfileId] = useState<
+    number | null
+  >(null);
+
+  const settingsQuery = useQuery({
+    queryKey: ["lidarr-settings"],
+    queryFn: async (): Promise<LidarrSettings> => {
+      const res = await fetch("/api/settings/lidarr");
+      if (!res.ok) throw new Error("Failed to fetch Lidarr settings");
+      return res.json();
+    },
+    staleTime: 5 * 60_000,
+  });
+
+  const optionsQuery = useQuery({
+    queryKey: ["lidarr-options"],
+    queryFn: async (): Promise<LidarrOptions> => {
+      const res = await fetch("/api/settings/lidarr/options");
+      if (!res.ok) throw new Error("Failed to fetch Lidarr options");
+      return res.json();
+    },
+    enabled: !!settingsQuery.data?.apiKeySet,
+    staleTime: 5 * 60_000,
+  });
+
+  const qualityProfiles = optionsQuery.data?.qualityProfiles ?? null;
+  const defaultQualityProfileId =
+    settingsQuery.data?.qualityProfileId ??
+    qualityProfiles?.[0]?.id ??
+    null;
+
+  useEffect(() => {
+    if (!open) return;
+    if (selectedQualityProfileId !== null) return;
+    if (defaultQualityProfileId !== null) {
+      setSelectedQualityProfileId(defaultQualityProfileId);
+    }
+  }, [open, selectedQualityProfileId, defaultQualityProfileId]);
 
   const close = useCallback(() => {
     setOpen(false);
     setError(null);
+    setSelectedQualityProfileId(null);
   }, []);
 
-  const openSingle = useCallback((args: OpenSingleArgs) => {
-    setPending({ mode: "single", ...args });
-    setError(null);
-    setOpen(true);
-  }, []);
+  const openSingle = useCallback(
+    (args: OpenSingleArgs) => {
+      setPending({ mode: "single", ...args });
+      setError(null);
+      setSelectedQualityProfileId(defaultQualityProfileId);
+      setOpen(true);
+    },
+    [defaultQualityProfileId],
+  );
 
-  const openBulk = useCallback((args: OpenBulkArgs) => {
-    setPending({ mode: "bulk", ...args });
-    setError(null);
-    setOpen(true);
-  }, []);
+  const openBulk = useCallback(
+    (args: OpenBulkArgs) => {
+      setPending({ mode: "bulk", ...args });
+      setError(null);
+      setSelectedQualityProfileId(defaultQualityProfileId);
+      setOpen(true);
+    },
+    [defaultQualityProfileId],
+  );
 
   const onConfirm = useCallback(async () => {
     if (!pending) return;
     setError(null);
     if (pending.mode === "single") {
-      mutation.mutate(pending.payload, {
+      const payload: CreateDownloadRequest = {
+        ...pending.payload,
+        ...(selectedQualityProfileId !== null && {
+          qualityProfileId: selectedQualityProfileId,
+        }),
+      };
+      mutation.mutate(payload, {
         onSuccess: () => {
           close();
         },
@@ -72,14 +130,14 @@ export function useRequestDownloadDialog() {
     }
     setBulkSubmitting(true);
     try {
-      await pending.run();
+      await pending.run({ qualityProfileId: selectedQualityProfileId });
       close();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Request failed.");
     } finally {
       setBulkSubmitting(false);
     }
-  }, [pending, mutation, close]);
+  }, [pending, mutation, close, selectedQualityProfileId]);
 
   const onOpenChange = useCallback(
     (next: boolean) => {
@@ -104,8 +162,22 @@ export function useRequestDownloadDialog() {
       isSubmitting,
       errorMessage: error,
       onConfirm,
+      qualityProfiles,
+      selectedQualityProfileId,
+      onSelectedQualityProfileIdChange: setSelectedQualityProfileId,
+      isLoadingProfiles: optionsQuery.isLoading,
     }),
-    [open, onOpenChange, pending, isSubmitting, error, onConfirm],
+    [
+      open,
+      onOpenChange,
+      pending,
+      isSubmitting,
+      error,
+      onConfirm,
+      qualityProfiles,
+      selectedQualityProfileId,
+      optionsQuery.isLoading,
+    ],
   );
 
   return {

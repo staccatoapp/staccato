@@ -31,14 +31,8 @@ export type LidarrQueueItem = {
   status: string;
 };
 
-type LidarrProfile = { id: number; name: string };
-type LidarrRootFolder = { id: number; path: string };
-
-export type LidarrDefaults = {
-  qualityProfileId: number;
-  metadataProfileId: number;
-  rootFolderPath: string;
-};
+export type LidarrProfile = { id: number; name: string };
+export type LidarrRootFolder = { id: number; path: string };
 
 export class LidarrClient {
   private baseUrl: string;
@@ -82,28 +76,19 @@ export class LidarrClient {
     }
   }
 
-  private cachedDefaults: LidarrDefaults | null = null;
+  async getQualityProfiles(): Promise<LidarrProfile[]> {
+    this.logger.debug("Fetching Lidarr quality profiles");
+    return this.request<LidarrProfile[]>("GET", "/qualityprofile");
+  }
 
-  async getDefaults(): Promise<LidarrDefaults> {
-    this.logger.debug("Fetching Lidarr defaults");
-    if (this.cachedDefaults) return this.cachedDefaults;
-    const [qualityProfiles, metadataProfiles, rootFolders] = await Promise.all([
-      this.request<LidarrProfile[]>("GET", "/qualityprofile"),
-      this.request<LidarrProfile[]>("GET", "/metadataprofile"),
-      this.request<LidarrRootFolder[]>("GET", "/rootfolder"),
-    ]);
-    if (!qualityProfiles[0])
-      throw new Error("Lidarr has no quality profiles configured");
-    if (!metadataProfiles[0])
-      throw new Error("Lidarr has no metadata profiles configured");
-    if (!rootFolders[0])
-      throw new Error("Lidarr has no root folders configured");
-    this.cachedDefaults = {
-      qualityProfileId: qualityProfiles[0].id,
-      metadataProfileId: metadataProfiles[0].id,
-      rootFolderPath: rootFolders[0].path,
-    };
-    return this.cachedDefaults;
+  async getMetadataProfiles(): Promise<LidarrProfile[]> {
+    this.logger.debug("Fetching Lidarr metadata profiles");
+    return this.request<LidarrProfile[]>("GET", "/metadataprofile");
+  }
+
+  async getRootFolders(): Promise<LidarrRootFolder[]> {
+    this.logger.debug("Fetching Lidarr root folders");
+    return this.request<LidarrRootFolder[]>("GET", "/rootfolder");
   }
 
   async getArtists(): Promise<LidarrArtist[]> {
