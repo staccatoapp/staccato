@@ -13,6 +13,8 @@
   },
   "scripts": {
     "build": "tsc",
+    "dev": "tsc --watch --preserveWatchOutput",
+    "dev:remote": "tsc --watch --preserveWatchOutput",
     "check-types": "tsc --noEmit"
   },
   "dependencies": {

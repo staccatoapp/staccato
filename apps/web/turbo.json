@@ -1,0 +1,12 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "dev": {
+      "with": ["@staccato/shared#dev"]
+    },
+    "dev:remote": {
+      "with": ["@staccato/shared#dev"]
+    }
+  }
+}
