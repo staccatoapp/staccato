@@ -31,7 +31,10 @@ import "../recommendations/sources/index.js";
 const settingsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/", async (req) => {
     const settings = getOrCreateUserSettings(req.userId);
-    return { listenbrainzToken: settings.listenbrainzToken };
+    return {
+      listenbrainzToken: settings.listenbrainzToken,
+      volume: settings.volume,
+    };
   });
 
   fastify.patch("/", async (req, reply) => {
@@ -43,7 +46,7 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
     const currentUserSettings = getOrCreateUserSettings(req.userId);
 
     if (
-      cleanedUpdates.listenbrainzToken &&
+      typeof cleanedUpdates.listenbrainzToken === "string" &&
       currentUserSettings.listenbrainzToken !== cleanedUpdates.listenbrainzToken
     ) {
       const token = await validateToken(cleanedUpdates.listenbrainzToken);

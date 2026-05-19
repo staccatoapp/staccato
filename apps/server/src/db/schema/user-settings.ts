@@ -12,6 +12,7 @@ export const userSettings = sqliteTable("user_settings", {
     .references(() => users.id, { onDelete: "cascade" }),
   listenbrainzToken: text("listenbrainz_token"),
   musicbrainzUsername: text("musicbrainz_username"),
+  volume: integer("volume").notNull().default(80),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(
     () => new Date(),
   ),

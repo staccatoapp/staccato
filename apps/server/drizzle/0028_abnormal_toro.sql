@@ -1,0 +1,1 @@
+ALTER TABLE `user_settings` ADD `volume` integer DEFAULT 80 NOT NULL;

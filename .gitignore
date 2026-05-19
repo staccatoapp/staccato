@@ -51,6 +51,7 @@ issues/
 apps/server/data/
 data/
 /music/
+/notes
 
 # Claude
 .claude/

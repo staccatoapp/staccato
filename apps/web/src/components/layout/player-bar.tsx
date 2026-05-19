@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Mic2, MicOff, Music2, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { formatTime } from "@/lib/music";
+import { useVolume } from "@/hooks/useVolume";
 import { LyricsPanel } from "./lyrics-panel";
 
 function getSliderValue(
@@ -26,8 +27,14 @@ function PlayerBar() {
 
   const [currentTime, setCurrentTime] = useState(0);
   const [seekDisplay, setSeekDisplay] = useState(0);
-  const [volume, setVolume] = useState(80); // TODO - persist between sessions, no need for db persistence
+  const { volume, setVolume } = useVolume();
+  const [displayVolume, setDisplayVolume] = useState(volume);
   const [lyricsOpen, setLyricsOpen] = useState(false);
+
+  useEffect(() => {
+    setDisplayVolume(volume);
+    if (audioRef.current) audioRef.current.volume = volume / 100;
+  }, [volume]);
 
   const { data: playbackSession } = useQuery({
     queryKey: ["playback-session"],
@@ -69,6 +76,7 @@ function PlayerBar() {
     const currentTrackPosition =
       playbackSession?.currentTrackPositionInSeconds ?? 0;
     audio.src = `/api/tracks/${currentTrack.id}/stream`;
+    audio.volume = volume / 100;
     audio.currentTime = currentTrackPosition;
     accumulatedPlayTimeRef.current =
       playbackSession?.currentTrackAccumulatedPlayTimeInSeconds ?? 0;
@@ -312,11 +320,15 @@ function PlayerBar() {
   };
 
   const handleVolumeChanged = (value: number | readonly number[]) => {
-    const v = getSliderValue(value, volume);
-    setVolume(v);
+    const v = getSliderValue(value, displayVolume);
+    setDisplayVolume(v);
     if (audioRef.current) {
       audioRef.current.volume = v / 100;
     }
+  };
+
+  const handleVolumeCommitted = (value: number | readonly number[]) => {
+    setVolume(getSliderValue(value, displayVolume));
   };
 
   const handleSeekChange = (value: number | readonly number[]) => {
@@ -446,7 +458,8 @@ function PlayerBar() {
           <div className="flex justify-end items-center gap-2 w-1/6">
             <Slider
               onValueChange={handleVolumeChanged}
-              value={[volume]}
+              onValueCommitted={handleVolumeCommitted}
+              value={[displayVolume]}
               max={100}
               step={1}
               className="w-24"
