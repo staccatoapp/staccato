@@ -68,7 +68,10 @@ function scoreCandidate(
   const titleSim = stringSimilarity(candidate.title, tags.title);
   const artistSim = stringSimilarity(
     candidate.artistCredits[0]?.name ?? "",
-    tags.albumArtist ?? tags.artistName,
+    // Compare against the track artist (the performer the candidate represents),
+    // not the album artist — a mistagged albumartist would unfairly penalise the
+    // correct recording.
+    tags.artistName,
   );
   const durSim = durationAgreement(tags.durationSeconds, candidate.durationMs);
   const acoust = candidate.acoustidScore ?? 0;

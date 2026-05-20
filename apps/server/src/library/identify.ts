@@ -1,8 +1,19 @@
 import type { FastifyBaseLogger } from "fastify";
 import { db } from "../db/client.js";
-import { getAlbumById, updateAlbumByAlbumId } from "../db/queries/albums.js";
-import { getArtistDetails } from "../db/queries/artists.js";
-import { getTracksInAlbum, updateTrackByTrackId } from "../db/queries/tracks.js";
+import {
+  deleteOrphanAlbums,
+  getAlbumById,
+  updateAlbumByAlbumId,
+} from "../db/queries/albums.js";
+import {
+  deleteOrphanArtists,
+  getArtistDetails,
+} from "../db/queries/artists.js";
+import {
+  getExistingTrackIds,
+  getTracksInAlbum,
+  updateTrackByTrackId,
+} from "../db/queries/tracks.js";
 import { upsertTrackFts } from "../db/queries/tracks-fts.js";
 import { ensureCoverOnDisk } from "../coverart/store.js";
 import {
@@ -18,6 +29,7 @@ export type IdentifyApplyResult =
       releaseMbid: string;
       title: string;
       remapped: number;
+      adopted: number;
       total: number;
     }
   | { ok: false; reason: "not_found" | "mb_lookup_failed" };
@@ -38,6 +50,7 @@ export async function applyAlbumIdentification(
   albumId: string,
   releaseMbid: string,
   releaseGroupMbidHint: string | null,
+  adoptTrackIds: string[],
   log: FastifyBaseLogger,
 ): Promise<IdentifyApplyResult> {
   const album = getAlbumById(albumId);
@@ -63,13 +76,18 @@ export async function applyAlbumIdentification(
   const artistName =
     details.artistName ?? getArtistDetails(album.artistId)?.name ?? "";
 
-  const localTracks = getTracksInAlbum(albumId);
+  // Only adopt ids that actually exist; ignore the rest defensively.
+  const validAdopt =
+    adoptTrackIds.length > 0 ? [...getExistingTrackIds(adoptTrackIds)] : [];
+
   const candidateByKey = new Map<string, MBReleaseTrack>();
   for (const t of details.tracks) {
     candidateByKey.set(pairKey(t.discPosition, t.trackPosition), t);
   }
 
   let remapped = 0;
+  let adopted = 0;
+  let total = 0;
   db.transaction(() => {
     updateAlbumByAlbumId(albumId, {
       releaseMbid,
@@ -78,6 +96,16 @@ export async function applyAlbumIdentification(
       releaseYear: details.releaseYear ?? album.releaseYear,
       confidenceScore: 1.0,
     });
+
+    // Pull orphan tracks onto this album + canonical artist BEFORE pairing, so
+    // they participate in the (disc, track) remap below.
+    for (const tid of validAdopt) {
+      updateTrackByTrackId(tid, { albumId, artistId: album.artistId });
+      adopted++;
+    }
+
+    const localTracks = getTracksInAlbum(albumId);
+    total = localTracks.length;
 
     for (const local of localTracks) {
       const cand = candidateByKey.get(
@@ -96,13 +124,21 @@ export async function applyAlbumIdentification(
     }
   });
 
+  // Adoption can empty the source album row (and orphan its phantom artist) —
+  // drop them so a mistagged file no longer leaves a stray album/artist behind.
+  if (adopted > 0) {
+    deleteOrphanAlbums();
+    deleteOrphanArtists();
+  }
+
   log.info(
     {
       albumId,
       releaseMbid,
       releaseGroupMbid,
       remapped,
-      total: localTracks.length,
+      adopted,
+      total,
     },
     "album identify applied",
   );
@@ -131,6 +167,7 @@ export async function applyAlbumIdentification(
     releaseMbid,
     title,
     remapped,
-    total: localTracks.length,
+    adopted,
+    total,
   };
 }

@@ -6,6 +6,8 @@ import {
   inArray,
   isNotNull,
   lt,
+  ne,
+  or,
   sql,
 } from "drizzle-orm";
 import { db } from "../client.js";
@@ -658,4 +660,70 @@ export function getResolvedTrackMbidsByAlbumId(albumId: string): string[] {
     .where(and(eq(tracks.albumId, albumId), isNotNull(tracks.musicbrainzId)))
     .all()
     .map((t) => t.musicbrainzId!);
+}
+
+export function getTrackFilePathsInAlbum(albumId: string): string[] {
+  return db
+    .select({ filePath: tracks.filePath })
+    .from(tracks)
+    .where(eq(tracks.albumId, albumId))
+    .all()
+    .map((r) => r.filePath);
+}
+
+export type OrphanTrackRow = {
+  id: string;
+  title: string;
+  trackNumber: number | null;
+  discNumber: number | null;
+  durationSeconds: number | null;
+  filePath: string;
+  sourceAlbumId: string;
+  sourceAlbumTitle: string | null;
+  artistName: string;
+};
+
+// Escape LIKE metacharacters in a literal prefix so directory paths match
+// exactly. Uses '~' as the escape char (Windows path separators are '\', which
+// is not a LIKE metacharacter, so backslashes stay literal).
+function escapeLikePrefix(prefix: string): string {
+  return prefix.replace(/[~%_]/g, (c) => `~${c}`);
+}
+
+// Local tracks that live in one of the given directories (each must already
+// include a trailing path separator) but belong to a *different* album row.
+// Used by Identify to surface orphan tracks a mistagged file stranded in a
+// phantom album, so the user can pull them into the correct album.
+export function getOrphanTracksInDirectories(
+  directories: string[],
+  excludeAlbumId: string,
+): OrphanTrackRow[] {
+  if (directories.length === 0) return [];
+  const likeConds = directories.map(
+    (dir) => sql`${tracks.filePath} LIKE ${escapeLikePrefix(dir) + "%"} ESCAPE '~'`,
+  );
+  return db
+    .select({
+      id: tracks.id,
+      title: resolvedTitle,
+      trackNumber: tracks.trackNumber,
+      discNumber: tracks.discNumber,
+      durationSeconds: tracks.durationSeconds,
+      filePath: tracks.filePath,
+      sourceAlbumId: tracks.albumId,
+      sourceAlbumTitle: resolvedAlbumTitle,
+      artistName: resolvedArtistName,
+    })
+    .from(tracks)
+    .innerJoin(artists, eq(tracks.artistId, artists.id))
+    .leftJoin(albums, eq(tracks.albumId, albums.id))
+    .where(
+      and(
+        or(...likeConds),
+        isNotNull(tracks.albumId),
+        ne(tracks.albumId, excludeAlbumId),
+      ),
+    )
+    .orderBy(asc(tracks.discNumber), asc(tracks.trackNumber))
+    .all() as OrphanTrackRow[];
 }

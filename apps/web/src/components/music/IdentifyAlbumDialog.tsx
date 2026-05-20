@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Check,
   ChevronLeft,
   ChevronRight,
   Disc3,
@@ -12,6 +13,8 @@ import {
 import { toast } from "sonner";
 import type {
   IdentifyApplyResponse,
+  IdentifyOrphansResponse,
+  IdentifyOrphanTrack,
   IdentifyReleaseCandidate,
   IdentifyReleaseTracklist,
   IdentifySearchResponse,
@@ -53,8 +56,18 @@ function fmtTime(seconds: number | null): string {
 }
 
 const MONTHS = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
 ];
 function formatReleaseDate(d: string | null): string {
   if (!d) return "—";
@@ -293,7 +306,9 @@ function ResultRow({
         {release.country && (
           <>
             <Dot />
-            <span className="tabular-nums tracking-wide">{release.country}</span>
+            <span className="tabular-nums tracking-wide">
+              {release.country}
+            </span>
           </>
         )}
         <Dot />
@@ -332,7 +347,9 @@ function ComparisonCell({
   const durAmber =
     (state === "dur-drift" || state === "both-drift") && side === "right";
   const bg =
-    isProblem && side === "right" && (state === "dur-drift" || state === "title-drift" || state === "both-drift")
+    isProblem &&
+    side === "right" &&
+    (state === "dur-drift" || state === "title-drift" || state === "both-drift")
       ? "bg-amber-500/10"
       : state === "extra" && side === "right"
         ? "bg-orange-400/10"
@@ -369,7 +386,59 @@ function ComparisonCell({
   );
 }
 
-function ComparisonView({ rows }: { rows: CmpRow[] }) {
+// Left-column cell offering to pull a stranded orphan track (from a different
+// album row, same folder on disk) into the slot a candidate track is missing.
+function AdoptCell({
+  orphan,
+  checked,
+  onToggle,
+}: {
+  orphan: IdentifyOrphanTrack;
+  checked: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={cn(
+        "grid grid-cols-[16px_1fr] gap-2.5 items-center text-left min-h-[30px] rounded-md border px-2.5 py-1.5 transition-colors",
+        checked
+          ? "border-primary/50 bg-primary/10"
+          : "border-dashed border-border/60 bg-foreground/[0.02] hover:bg-accent/40",
+      )}
+    >
+      <span
+        className={cn(
+          "w-3.5 h-3.5 rounded-[4px] border flex items-center justify-center shrink-0",
+          checked ? "bg-primary border-primary" : "border-muted-foreground/40",
+        )}
+      >
+        {checked && <Check className="w-2.5 h-2.5 text-primary-foreground" />}
+      </span>
+      <span className="min-w-0">
+        <span className="block text-xs truncate text-foreground">
+          {orphan.title}
+        </span>
+        <span className="block text-[0.66rem] truncate text-muted-foreground">
+          pull from {orphan.sourceAlbumTitle ?? "another album"}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function ComparisonView({
+  rows,
+  orphanByKey,
+  adoptedIds,
+  onToggleAdopt,
+}: {
+  rows: CmpRow[];
+  orphanByKey: Map<string, IdentifyOrphanTrack>;
+  adoptedIds: Set<string>;
+  onToggleAdopt: (id: string) => void;
+}) {
   const colClass =
     "min-w-0 rounded-xl border border-border bg-muted/30 px-3.5 py-3.5";
   const headClass =
@@ -384,14 +453,28 @@ function ComparisonView({ rows }: { rows: CmpRow[] }) {
           </span>
         </div>
         <div className="flex flex-col gap-0.5">
-          {rows.map((r) => (
-            <ComparisonCell
-              key={`l-${r.key}`}
-              track={r.cur}
-              side="left"
-              state={r.state}
-            />
-          ))}
+          {rows.map((r) => {
+            const orphan =
+              r.state === "extra" ? orphanByKey.get(r.key) : undefined;
+            if (orphan) {
+              return (
+                <AdoptCell
+                  key={`l-${r.key}`}
+                  orphan={orphan}
+                  checked={adoptedIds.has(orphan.id)}
+                  onToggle={() => onToggleAdopt(orphan.id)}
+                />
+              );
+            }
+            return (
+              <ComparisonCell
+                key={`l-${r.key}`}
+                track={r.cur}
+                side="left"
+                state={r.state}
+              />
+            );
+          })}
         </div>
       </div>
 
@@ -466,6 +549,7 @@ export function IdentifyAlbumDialog({
   const [selected, setSelected] = useState<IdentifyReleaseCandidate | null>(
     null,
   );
+  const [adoptedIds, setAdoptedIds] = useState<Set<string>>(new Set());
 
   // Reset to a clean search state whenever the dialog (re)opens.
   useEffect(() => {
@@ -477,6 +561,21 @@ export function IdentifyAlbumDialog({
     setPage(0);
     setSelected(null);
   }, [open, album.title, album.artistName]);
+
+  // Orphan adoption is keyed to the chosen release's missing slots — clear the
+  // selection whenever the chosen release changes (including back to none).
+  useEffect(() => {
+    setAdoptedIds(new Set());
+  }, [selected?.releaseMbid]);
+
+  const toggleAdopt = (id: string) => {
+    setAdoptedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const searchEnabled =
     open && (query.release.trim() !== "" || query.artist.trim() !== "");
@@ -514,6 +613,27 @@ export function IdentifyAlbumDialog({
     },
   });
 
+  // Tracks stranded in a different album row but sharing this album's folder —
+  // candidates to pull in when a mistagged file fractured the folder.
+  const orphansQuery = useQuery({
+    queryKey: ["identify-orphans", album.id],
+    enabled: open,
+    staleTime: 60_000,
+    queryFn: async (): Promise<IdentifyOrphansResponse> => {
+      const res = await fetch(`/api/albums/${album.id}/identify/orphans`);
+      if (!res.ok) throw new Error("Failed to load orphans");
+      return res.json();
+    },
+  });
+
+  const orphanByKey = useMemo(() => {
+    const m = new Map<string, IdentifyOrphanTrack>();
+    for (const o of orphansQuery.data?.orphans ?? []) {
+      m.set(`${o.discNumber ?? 1}:${o.trackNumber ?? 0}`, o);
+    }
+    return m;
+  }, [orphansQuery.data]);
+
   const applyMutation = useMutation({
     mutationFn: async (
       rel: IdentifyReleaseCandidate,
@@ -524,6 +644,7 @@ export function IdentifyAlbumDialog({
         body: JSON.stringify({
           releaseMbid: rel.releaseMbid,
           releaseGroupMbid: rel.releaseGroupMbid,
+          adoptTrackIds: [...adoptedIds],
         }),
       });
       if (!res.ok) {
@@ -535,8 +656,14 @@ export function IdentifyAlbumDialog({
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["album", albumKey] });
       queryClient.invalidateQueries({ queryKey: ["library"] });
+      queryClient.invalidateQueries({ queryKey: ["artists"] });
+      queryClient.invalidateQueries({
+        queryKey: ["identify-orphans", album.id],
+      });
       toast.success(`Album re-identified as "${data.title}"`, {
-        description: `${data.remapped} of ${data.total} tracks updated.`,
+        description: `${data.remapped} of ${data.total} tracks updated${
+          data.adopted > 0 ? `, ${data.adopted} pulled in` : ""
+        }.`,
       });
       onOpenChange(false);
     },
@@ -554,7 +681,8 @@ export function IdentifyAlbumDialog({
   const isCurrent = (r: IdentifyReleaseCandidate) =>
     album.releaseMbid
       ? r.releaseMbid === album.releaseMbid
-      : !!album.releaseGroupMbid && r.releaseGroupMbid === album.releaseGroupMbid;
+      : !!album.releaseGroupMbid &&
+        r.releaseGroupMbid === album.releaseGroupMbid;
 
   const currentCmp: CmpTrack[] = useMemo(
     () =>
@@ -777,17 +905,24 @@ export function IdentifyAlbumDialog({
                     Loading tracklist…
                   </div>
                 ) : (
-                  <ComparisonView rows={rows} />
+                  <ComparisonView
+                    rows={rows}
+                    orphanByKey={orphanByKey}
+                    adoptedIds={adoptedIds}
+                    onToggleAdopt={toggleAdopt}
+                  />
                 )}
               </div>
 
               <div className="flex items-center justify-between gap-2.5 px-5 py-3 border-t border-border bg-muted/40">
                 <div className="text-xs text-muted-foreground">
-                  {stats.drift + stats.missing > 0
-                    ? "Some tracks don't match — verify before applying."
-                    : stats.extra > 0
-                      ? `Candidate includes ${stats.extra} bonus track${stats.extra > 1 ? "s" : ""}.`
-                      : "Tracks match. Safe to apply."}
+                  {adoptedIds.size > 0
+                    ? `Pulling in ${adoptedIds.size} orphaned track${adoptedIds.size > 1 ? "s" : ""} from this folder.`
+                    : stats.drift + stats.missing > 0
+                      ? "Some tracks don't match — verify before applying."
+                      : stats.extra > 0
+                        ? `Candidate includes ${stats.extra} bonus track${stats.extra > 1 ? "s" : ""}.`
+                        : "Tracks match. Safe to apply."}
                 </div>
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={() => setSelected(null)}>

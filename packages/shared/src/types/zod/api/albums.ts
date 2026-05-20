@@ -89,9 +89,33 @@ export type IdentifyReleaseTracklist = z.infer<
   typeof IdentifyReleaseTracklistSchema
 >;
 
+// Local tracks stranded in a *different* album row but living in the same
+// folder on disk as the album being identified — candidates to pull in (adopt)
+// when a mistagged file fractured one folder into multiple album rows.
+export const IdentifyOrphanTrackSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  trackNumber: z.number().nullable(),
+  discNumber: z.number().nullable(),
+  durationSeconds: z.number().nullable(),
+  sourceAlbumId: z.string(),
+  sourceAlbumTitle: z.string().nullable(),
+  artistName: z.string(),
+});
+export type IdentifyOrphanTrack = z.infer<typeof IdentifyOrphanTrackSchema>;
+
+export const IdentifyOrphansResponseSchema = z.object({
+  orphans: z.array(IdentifyOrphanTrackSchema),
+});
+export type IdentifyOrphansResponse = z.infer<
+  typeof IdentifyOrphansResponseSchema
+>;
+
 export const IdentifyApplyRequestSchema = z.object({
   releaseMbid: z.string(),
   releaseGroupMbid: z.string().nullable(),
+  // Track ids from other album rows to pull into this album before remapping.
+  adoptTrackIds: z.array(z.string()).optional().default([]),
 });
 export type IdentifyApplyRequest = z.infer<typeof IdentifyApplyRequestSchema>;
 
@@ -101,6 +125,7 @@ export const IdentifyApplyResponseSchema = z.object({
   releaseMbid: z.string(),
   title: z.string(),
   remapped: z.number(),
+  adopted: z.number(),
   total: z.number(),
 });
 export type IdentifyApplyResponse = z.infer<typeof IdentifyApplyResponseSchema>;

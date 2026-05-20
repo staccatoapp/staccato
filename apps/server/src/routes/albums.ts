@@ -1,3 +1,4 @@
+import path from "node:path";
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { IdentifyApplyRequestSchema } from "@staccato/shared";
@@ -5,7 +6,11 @@ import {
   getAlbumByMbid,
   getAlbumWithArtistDetails,
 } from "../db/queries/albums.js";
-import { getTracksInAlbum } from "../db/queries/tracks.js";
+import {
+  getOrphanTracksInDirectories,
+  getTrackFilePathsInAlbum,
+  getTracksInAlbum,
+} from "../db/queries/tracks.js";
 import {
   ensureCoverOnDisk,
   resolveAlbumCoverNow,
@@ -72,6 +77,29 @@ const albumRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 
+  // ─── Identify Album: orphan tracks in the same folder, stranded elsewhere ─
+  fastify.get("/:albumId/identify/orphans", async (request, reply) => {
+    const { albumId } = request.params as { albumId: string };
+    if (!CUID2_RE.test(albumId)) {
+      return reply.status(404).send({ error: "Album not found" });
+    }
+    const filePaths = getTrackFilePathsInAlbum(albumId);
+    const dirs = [
+      ...new Set(filePaths.map((p) => path.dirname(p) + path.sep)),
+    ];
+    const orphans = getOrphanTracksInDirectories(dirs, albumId).map((o) => ({
+      id: o.id,
+      title: o.title,
+      trackNumber: o.trackNumber,
+      discNumber: o.discNumber,
+      durationSeconds: o.durationSeconds,
+      sourceAlbumId: o.sourceAlbumId,
+      sourceAlbumTitle: o.sourceAlbumTitle,
+      artistName: o.artistName,
+    }));
+    return { orphans };
+  });
+
   // ─── Identify Album: apply the chosen release to a local album ───────────
   fastify.post("/:albumId/identify", async (request, reply) => {
     const { albumId } = request.params as { albumId: string };
@@ -86,6 +114,7 @@ const albumRoutes: FastifyPluginAsync = async (fastify) => {
       albumId,
       parsed.data.releaseMbid,
       parsed.data.releaseGroupMbid,
+      parsed.data.adoptTrackIds,
       request.log,
     );
     if (!result.ok) {
