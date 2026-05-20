@@ -5,6 +5,7 @@ export * from "./listening-history.js";
 export * from "./playlist-tracks.js";
 export * from "./playlists.js";
 export * from "./tracks.js";
+export * from "./track-artists.js";
 export * from "./users.js";
 export * from "./playback-session.js";
 export * from "./user-settings.js";

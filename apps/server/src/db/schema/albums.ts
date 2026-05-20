@@ -1,6 +1,7 @@
 import { createId } from "@paralleldrive/cuid2";
 import {
   integer,
+  real,
   sqliteTable,
   text,
   uniqueIndex,
@@ -23,14 +24,16 @@ export const albums = sqliteTable(
     releaseGroupMbid: text("release_group_mbid"),
     coverArtUrl: text("cover_art_url"),
     releaseYear: integer("release_year"),
+    confidenceScore: real("confidence_score"),
     createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(
       () => new Date(),
     ),
   },
   (table) => [
-    uniqueIndex("albums_title_artist_id_unique").on(
+    uniqueIndex("albums_title_artist_id_release_mbid_unique").on(
       table.title,
       table.artistId,
+      table.releaseMbid,
     ),
   ],
 );

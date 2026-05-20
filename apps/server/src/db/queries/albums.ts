@@ -3,7 +3,6 @@ import {
   asc,
   count,
   eq,
-  isNotNull,
   isNull,
   like,
   notExists,
@@ -177,76 +176,6 @@ export function getAlbumByArtist(artistId: string): { id: string } | undefined {
     .get();
 }
 
-export function getUnresolvedAlbums() {
-  return db
-    .select({
-      albumId: albums.id,
-      title: albums.title,
-      artistId: albums.artistId,
-      artistName: artists.name,
-    })
-    .from(albums)
-    .innerJoin(artists, eq(albums.artistId, artists.id))
-    .where(isNull(albums.releaseGroupMbid))
-    .all();
-}
-export type UnresolvedAlbumRow = ReturnType<typeof getUnresolvedAlbums>[number];
-
-export function getResolvedAlbumsWithoutCoverArt() {
-  return db
-    .select({
-      albumId: albums.id,
-      releaseGroupMbid: albums.releaseGroupMbid,
-    })
-    .from(albums)
-    .where(
-      and(
-        isNotNull(albums.releaseGroupMbid),
-        or(
-          isNull(albums.coverArtUrl),
-          eq(albums.coverArtUrl, ""),
-          // also re-process rows holding stale archive.org URLs from before
-          // we moved cover art onto the local disk store
-          sql`${albums.coverArtUrl} NOT LIKE '/metadata/covers/%'`,
-        ),
-      ),
-    )
-    .all();
-}
-export type ResolvedAlbumWithoutCoverArt = ReturnType<
-  typeof getResolvedAlbumsWithoutCoverArt
->[number];
-
-export function getUnresolvedAlbumsContainingResolvedTracks() {
-  return db
-    .selectDistinct({
-      albumId: albums.id,
-      title: albums.title,
-    })
-    .from(albums)
-    .innerJoin(tracks, eq(tracks.albumId, albums.id))
-    .where(and(isNull(albums.releaseGroupMbid), isNotNull(tracks.musicbrainzId)))
-    .all();
-}
-export type UnresolvedAlbumContainingResolvedTracks = ReturnType<
-  typeof getUnresolvedAlbumsContainingResolvedTracks
->[number];
-
-export function getAlbumsNeedingTagResolution() {
-  return db
-    .select({
-      albumId: albums.id,
-      releaseMbid: albums.releaseMbid,
-      artistId: albums.artistId,
-    })
-    .from(albums)
-    .where(and(isNotNull(albums.releaseMbid), isNull(albums.releaseGroupMbid)))
-    .all();
-}
-export type AlbumNeedingTagResolution = ReturnType<
-  typeof getAlbumsNeedingTagResolution
->[number];
-
 export function countAlbums(): number {
   const result = db.select({ count: count() }).from(albums).get();
   return result?.count || 0;
@@ -273,15 +202,6 @@ export function updateAlbumByAlbumId(
   return updateAlbumBaseQuery(albumUpdate).where(eq(albums.id, albumId)).run();
 }
 
-export function updateUnresolvedAlbum(
-  albumId: string,
-  albumUpdate: AlbumUpdate,
-): RunResult {
-  return updateAlbumBaseQuery(albumUpdate)
-    .where(and(eq(albums.id, albumId), isNull(albums.releaseGroupMbid)))
-    .run();
-}
-
 export function updateAlbumByArtistId(
   artistId: string,
   albumUpdate: AlbumUpdate,
@@ -300,72 +220,75 @@ export function deleteAlbum(albumId: string) {
   db.delete(albums).where(eq(albums.id, albumId)).run();
 }
 
-export function upsertAlbum(
+export type AlbumRow = typeof albums.$inferSelect;
+
+// Discovery-time upsert: file's raw album tag becomes a row. release_mbid is
+// usually NULL at this point. Multiple unresolved rows with the same
+// (title, artistId, NULL) are tolerated — the unique index treats NULLs as
+// distinct in SQLite, but we deduplicate manually here to avoid creating
+// duplicate placeholder rows. The pipeline later assigns the real
+// release_mbid; that may collide with a sibling row, in which case
+// `findAlbumByReleaseMbid` returns it and `mergeAlbums` collapses them.
+export function upsertAlbumForDiscovery(
   title: string,
   artistId: string,
   releaseYear: number | null,
-  releaseMbid?: string | null,
-  releaseGroupMbid?: string | null,
+  releaseMbid: string | null,
+  releaseGroupMbid: string | null,
 ): string {
   const normalizedInput = normalizeString(title);
 
-  const sqlMatch = db
-    .select({ id: albums.id, releaseMbid: albums.releaseMbid, releaseGroupMbid: albums.releaseGroupMbid })
+  if (releaseMbid) {
+    const existing = db
+      .select({ id: albums.id })
+      .from(albums)
+      .where(
+        and(eq(albums.artistId, artistId), eq(albums.releaseMbid, releaseMbid)),
+      )
+      .get();
+    if (existing) return existing.id;
+  }
+
+  const existingUnresolved = db
+    .select({ id: albums.id })
     .from(albums)
     .where(
       and(
         eq(albums.artistId, artistId),
         eq(albums.normalizedTitle, normalizedInput),
+        releaseMbid ? eq(albums.releaseMbid, releaseMbid) : isNull(albums.releaseMbid),
       ),
     )
     .get();
-  if (sqlMatch) {
-    if (releaseMbid && !sqlMatch.releaseMbid) {
-      db.update(albums).set({ releaseMbid }).where(eq(albums.id, sqlMatch.id)).run();
-    }
-    if (releaseGroupMbid && !sqlMatch.releaseGroupMbid) {
-      db.update(albums).set({ releaseGroupMbid }).where(eq(albums.id, sqlMatch.id)).run();
-    }
-    return sqlMatch.id;
-  }
-
-  const artistAlbums = db
-    .select({
-      id: albums.id,
-      title: albums.title,
-      normalizedTitle: albums.normalizedTitle,
-      canonicalTitle: albums.canonicalTitle,
-      releaseMbid: albums.releaseMbid,
-      releaseGroupMbid: albums.releaseGroupMbid,
-    })
-    .from(albums)
-    .where(eq(albums.artistId, artistId))
-    .all();
-  const match = artistAlbums.find(
-    (a) =>
-      (a.normalizedTitle == null &&
-        normalizeString(a.title) === normalizedInput) ||
-      (a.canonicalTitle != null &&
-        normalizeString(a.canonicalTitle) === normalizedInput),
-  );
-  if (match) {
-    const updates: Record<string, unknown> = {};
-    if (match.normalizedTitle == null) updates.normalizedTitle = normalizeString(match.title);
-    if (releaseMbid && !match.releaseMbid) updates.releaseMbid = releaseMbid;
-    if (releaseGroupMbid && !match.releaseGroupMbid) updates.releaseGroupMbid = releaseGroupMbid;
-    if (Object.keys(updates).length > 0) {
-      db.update(albums).set(updates).where(eq(albums.id, match.id)).run();
-    }
-    return match.id;
-  }
+  if (existingUnresolved) return existingUnresolved.id;
 
   return db
     .insert(albums)
-    .values({ title, artistId, releaseYear, normalizedTitle: normalizedInput, releaseMbid: releaseMbid ?? null, releaseGroupMbid: releaseGroupMbid ?? null })
-    .onConflictDoUpdate({
-      target: [albums.title, albums.artistId],
-      set: { title, normalizedTitle: normalizedInput },
+    .values({
+      title,
+      artistId,
+      releaseYear,
+      normalizedTitle: normalizedInput,
+      releaseMbid,
+      releaseGroupMbid,
     })
     .returning({ id: albums.id })
     .get()!.id;
+}
+
+export function findAlbumByReleaseMbid(
+  artistId: string,
+  releaseMbid: string,
+): AlbumRow | undefined {
+  return db
+    .select()
+    .from(albums)
+    .where(
+      and(eq(albums.artistId, artistId), eq(albums.releaseMbid, releaseMbid)),
+    )
+    .get();
+}
+
+export function getAlbumById(albumId: string): AlbumRow | undefined {
+  return db.select().from(albums).where(eq(albums.id, albumId)).get();
 }

@@ -1,1 +1,0 @@
-ALTER TABLE `albums` ADD `metadata_locked_at` integer;

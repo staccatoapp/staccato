@@ -10,7 +10,8 @@
     "lint": "eslint src/",
     "start": "node dist/index.js",
     "studio": "drizzle-kit studio",
-    "inspect-tags": "node tools/inspect-tags.js"
+    "inspect-tags": "node tools/inspect-tags.js",
+    "fingerprint": "pnpm --filter @staccato/server exec tsx tools/fingerprint.ts"
   },
   "dependencies": {
     "@fastify/secure-session": "^8.3.0",

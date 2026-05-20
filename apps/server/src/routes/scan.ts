@@ -1,25 +1,51 @@
 import { FastifyPluginAsync } from "fastify";
-import { scanProgress, startScan } from "../scanner/index.js";
+import { z } from "zod";
+import {
+  libraryProgress,
+  retryResolution,
+  startManualScan,
+} from "../library/index.js";
+import { countTracksByStatus } from "../db/queries/tracks.js";
+
+const retryBodySchema = z.object({
+  scope: z.enum(["failed", "low_confidence"]),
+  threshold: z.number().min(0).max(1).optional(),
+});
 
 const scanRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post("/scan", async (req, reply) => {
-    if (scanProgress.running) {
+    if (libraryProgress.running) {
       req.log.warn("scan requested but already in progress");
       return reply.status(409).send({ error: "Scan already in progress" });
     }
     const musicDir = process.env.MUSIC_DIR ?? "./music";
     req.log.info({ musicDir }, "manual scan triggered");
-    startScan(musicDir).catch((err) =>
+    startManualScan(musicDir).catch((err) =>
       req.log.error({ err }, "manual scan failed"),
     );
     return reply.status(202).send({ message: "Scan started" });
   });
 
-  fastify.get("/scan/status", async () => ({
-    ...scanProgress,
-    startedAt: scanProgress.startedAt?.toISOString() ?? null,
-    completedAt: scanProgress.completedAt?.toISOString() ?? null,
-  }));
+  fastify.get("/scan/status", async () => {
+    const counts = countTracksByStatus();
+    return {
+      ...libraryProgress,
+      startedAt: libraryProgress.startedAt?.toISOString() ?? null,
+      completedAt: libraryProgress.completedAt?.toISOString() ?? null,
+      counts,
+    };
+  });
+
+  fastify.post("/resolve/retry", async (req, reply) => {
+    const parsed = retryBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply
+        .status(400)
+        .send({ error: "Invalid retry options", details: parsed.error });
+    }
+    const result = await retryResolution(parsed.data);
+    return reply.status(202).send(result);
+  });
 };
 
 export default scanRoutes;

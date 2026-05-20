@@ -1,11 +1,18 @@
+export type TrackStatusCounts = {
+  pending: number;
+  resolving: number;
+  resolved: number;
+  failed: number;
+};
+
 export type ScanProgress = {
   running: boolean;
   scanned: number;
-  total: number;
-};
-
-export type ResolutionProgress = {
-  running: boolean;
   resolved: number;
-  total: number;
+  failed: number;
+  inFlight: number;
+  total: number | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  counts: TrackStatusCounts;
 };

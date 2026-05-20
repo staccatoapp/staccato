@@ -5,16 +5,19 @@ import {
   eq,
   inArray,
   isNotNull,
-  isNull,
+  lt,
   sql,
 } from "drizzle-orm";
 import { db } from "../client.js";
 import { tracks } from "../schema/tracks.js";
+import type {
+  ResolutionMethod,
+  ResolutionStatus,
+} from "../schema/tracks.js";
 import { SQLiteUpdateSetSource } from "drizzle-orm/sqlite-core";
 import { artists } from "../schema/artists.js";
 import { albums } from "../schema/albums.js";
 import { PaginationOptions } from "@staccato/shared";
-import type { TrackTags } from "../../scanner/tags.js";
 import { upsertTrackFts, deleteTrackFts } from "./tracks-fts.js";
 import { getAlbumByArtist, deleteAlbum } from "./albums.js";
 import { deleteArtist } from "./artists.js";
@@ -253,22 +256,23 @@ export function getLocalTrackMbidsByMbids(mbids: string[]): string[] {
     .map((r) => r.musicbrainzId!);
 }
 
-export function getTrackByFilePath(filePath: string):
-  | {
-      id: string;
-      albumId: string | null;
-      artistId: string;
-    }
-  | undefined {
-  return db
-    .select({
-      id: tracks.id,
-      albumId: tracks.albumId,
-      artistId: tracks.artistId,
-    })
-    .from(tracks)
-    .where(eq(tracks.filePath, filePath))
-    .get();
+export type TrackFullRow = typeof tracks.$inferSelect;
+
+export function getTrackByFilePath(filePath: string): TrackFullRow | undefined {
+  return db.select().from(tracks).where(eq(tracks.filePath, filePath)).get();
+}
+
+export function getTrackByFingerprint(
+  fingerprint: string,
+  excludeTrackId?: string,
+): TrackFullRow | undefined {
+  const where = excludeTrackId
+    ? and(
+        eq(tracks.audioFingerprint, fingerprint),
+        sql`${tracks.id} != ${excludeTrackId}`,
+      )
+    : eq(tracks.audioFingerprint, fingerprint);
+  return db.select().from(tracks).where(where).get();
 }
 
 export function getTrackSiblingInAlbum(
@@ -291,66 +295,231 @@ export function getTrackByArtist(artistId: string): { id: string } | undefined {
     .get();
 }
 
-export function getUnresolvedTracksByAlbum(albumId: string) {
-  return db
-    .select({
-      id: tracks.id,
-      title: tracks.title,
-      trackNumber: tracks.trackNumber,
-      discNumber: tracks.discNumber,
-    })
-    .from(tracks)
-    .where(and(eq(tracks.albumId, albumId), isNull(tracks.musicbrainzId)))
-    .all();
+export interface DiscoverTrackInput {
+  filePath: string;
+  title: string;
+  artistId: string;
+  albumId: string | null;
+  trackNumber: number | null;
+  discNumber: number | null;
+  durationSeconds: number | null;
+  fileFormat: string | null;
+  fileSizeBytes: number | null;
+  fileMtime: number | null;
+  mbRecordingId: string | null;
 }
-export type UnresolvedTrackInAlbumRow = ReturnType<
-  typeof getUnresolvedTracksByAlbum
->[number];
 
-export function getUnresolvedTracksWithAlbumAndArtistDetails() {
-  return db
-    .select({
-      trackId: tracks.id,
-      title: tracks.title,
-      albumId: tracks.albumId,
-      artistId: tracks.artistId,
-      artistName: artists.name,
-      albumTitle: albums.title,
-      releaseYear: albums.releaseYear,
+// Insert-or-update a track row at file discovery time. Resolution status is
+// reset to pending so the worker will pick it up. canonical/confidence/method
+// fields are intentionally NOT touched here — those only change on commit
+// from the resolver path.
+export function upsertDiscoveredTrack(
+  input: DiscoverTrackInput,
+  rawArtistName: string,
+  rawAlbumTitle: string | null,
+): string {
+  const inserted = db
+    .insert(tracks)
+    .values({
+      title: input.title,
+      artistId: input.artistId,
+      albumId: input.albumId,
+      trackNumber: input.trackNumber,
+      discNumber: input.discNumber,
+      durationSeconds: input.durationSeconds,
+      filePath: input.filePath,
+      fileFormat: input.fileFormat,
+      fileSizeBytes: input.fileSizeBytes,
+      fileMtime: input.fileMtime,
+      musicbrainzId: input.mbRecordingId,
+      resolutionStatus: "pending",
     })
-    .from(tracks)
-    .innerJoin(artists, eq(tracks.artistId, artists.id))
-    .leftJoin(albums, eq(tracks.albumId, albums.id))
-    .where(eq(tracks.resolutionStatus, "pending"))
-    .all();
-}
-export type UnresolvedTrackWithAlbumAndArtistDetailsRow = ReturnType<
-  typeof getUnresolvedTracksWithAlbumAndArtistDetails
->[number];
+    .onConflictDoUpdate({
+      target: tracks.filePath,
+      set: {
+        title: input.title,
+        artistId: input.artistId,
+        albumId: input.albumId,
+        trackNumber: input.trackNumber,
+        discNumber: input.discNumber,
+        durationSeconds: input.durationSeconds,
+        fileFormat: input.fileFormat,
+        fileSizeBytes: input.fileSizeBytes,
+        fileMtime: input.fileMtime,
+        pendingRemovalAt: null,
+      },
+    })
+    .returning({ id: tracks.id })
+    .get()!;
 
-export function getUnresolvedTracksPendingFingerprint() {
+  upsertTrackFts(
+    inserted.id,
+    input.title,
+    rawArtistName,
+    rawAlbumTitle ?? "",
+  );
+  return inserted.id;
+}
+
+export function markTrackResolving(trackId: string): void {
+  db.update(tracks)
+    .set({ resolutionStatus: "resolving" })
+    .where(eq(tracks.id, trackId))
+    .run();
+}
+
+export function markTrackResolved(
+  trackId: string,
+  fields: {
+    musicbrainzId: string | null;
+    canonicalTitle: string | null;
+    confidenceScore: number;
+    resolutionMethod: ResolutionMethod;
+    audioFingerprint: string | null;
+  },
+): void {
+  db.update(tracks)
+    .set({
+      ...fields,
+      resolutionStatus: "resolved",
+    })
+    .where(eq(tracks.id, trackId))
+    .run();
+}
+
+export function markTrackFailed(
+  trackId: string,
+  fields: {
+    confidenceScore: number | null;
+    audioFingerprint: string | null;
+  },
+): void {
+  db.update(tracks)
+    .set({
+      ...fields,
+      resolutionStatus: "failed",
+    })
+    .where(eq(tracks.id, trackId))
+    .run();
+}
+
+export function setAudioFingerprint(
+  trackId: string,
+  fingerprint: string,
+): void {
+  db.update(tracks)
+    .set({ audioFingerprint: fingerprint })
+    .where(eq(tracks.id, trackId))
+    .run();
+}
+
+export function repointTrackPath(
+  trackId: string,
+  newPath: string,
+  fileMtime: number,
+  fileSizeBytes: number,
+): void {
+  db.update(tracks)
+    .set({
+      filePath: newPath,
+      fileMtime,
+      fileSizeBytes,
+      pendingRemovalAt: null,
+    })
+    .where(eq(tracks.id, trackId))
+    .run();
+}
+
+export function markPendingRemovalByPath(
+  filePath: string,
+  at: number,
+): void {
+  db.update(tracks)
+    .set({ pendingRemovalAt: at })
+    .where(eq(tracks.filePath, filePath))
+    .run();
+}
+
+export function clearPendingRemoval(trackId: string): void {
+  db.update(tracks)
+    .set({ pendingRemovalAt: null })
+    .where(eq(tracks.id, trackId))
+    .run();
+}
+
+export function getTracksPendingRemovalBefore(cutoff: number): TrackFullRow[] {
   return db
-    .select({ trackId: tracks.id, filePath: tracks.filePath })
+    .select()
     .from(tracks)
     .where(
       and(
-        eq(tracks.resolutionStatus, "pending"),
-        eq(tracks.fingerprintStatus, "pending"),
+        isNotNull(tracks.pendingRemovalAt),
+        lt(tracks.pendingRemovalAt, cutoff),
       ),
     )
     .all();
 }
-export type UnresolvedTrackPendingFingerprint = ReturnType<
-  typeof getUnresolvedTracksPendingFingerprint
->[number];
 
-export function getResolvedTrackMbidsByAlbumId(albumId: string): string[] {
+export function getPendingRemovalRows(): TrackFullRow[] {
   return db
-    .select({ musicbrainzId: tracks.musicbrainzId })
+    .select()
     .from(tracks)
-    .where(and(eq(tracks.albumId, albumId), isNotNull(tracks.musicbrainzId)))
-    .all()
-    .map((t) => t.musicbrainzId!);
+    .where(isNotNull(tracks.pendingRemovalAt))
+    .all();
+}
+
+export function resetResolvingToPending(): number {
+  const result = db
+    .update(tracks)
+    .set({ resolutionStatus: "pending" })
+    .where(eq(tracks.resolutionStatus, "resolving"))
+    .run();
+  return result.changes;
+}
+
+export function getPendingTrackPaths(): Array<{ id: string; filePath: string }> {
+  return db
+    .select({ id: tracks.id, filePath: tracks.filePath })
+    .from(tracks)
+    .where(eq(tracks.resolutionStatus, "pending"))
+    .all();
+}
+
+export function getFailedTrackPaths(): Array<{ id: string; filePath: string }> {
+  return db
+    .select({ id: tracks.id, filePath: tracks.filePath })
+    .from(tracks)
+    .where(eq(tracks.resolutionStatus, "failed"))
+    .all();
+}
+
+export function getLowConfidenceTrackPaths(
+  threshold: number,
+): Array<{ id: string; filePath: string }> {
+  return db
+    .select({ id: tracks.id, filePath: tracks.filePath })
+    .from(tracks)
+    .where(
+      and(
+        eq(tracks.resolutionStatus, "resolved"),
+        sql`${tracks.confidenceScore} < ${threshold}`,
+      ),
+    )
+    .all();
+}
+
+export function resetTracksToPending(trackIds: string[]): number {
+  if (trackIds.length === 0) return 0;
+  const result = db
+    .update(tracks)
+    .set({
+      resolutionStatus: "pending" as ResolutionStatus,
+      resolutionMethod: null,
+      confidenceScore: null,
+    })
+    .where(inArray(tracks.id, trackIds))
+    .run();
+  return result.changes;
 }
 
 export function updateTrackByTrackId(
@@ -379,35 +548,27 @@ function updateTrackBaseQuery(trackUpdate: TrackUpdate) {
 }
 export type TrackUpdate = SQLiteUpdateSetSource<typeof tracks>;
 
-export function countUnresolvedTracks(): number {
-  const result = db
-    .select({ count: count() })
+export function countTracksByStatus(): {
+  pending: number;
+  resolving: number;
+  resolved: number;
+  failed: number;
+} {
+  const rows = db
+    .select({
+      status: tracks.resolutionStatus,
+      count: count(),
+    })
     .from(tracks)
-    .where(eq(tracks.resolutionStatus, "pending"))
-    .get();
-  return result?.count || 0;
-}
-
-export function getPendingTracksWithFullMbidTags() {
-  return db
-    .select({ id: tracks.id, musicbrainzId: tracks.musicbrainzId })
-    .from(tracks)
-    .innerJoin(albums, eq(tracks.albumId, albums.id))
-    .where(
-      and(
-        eq(tracks.resolutionStatus, "pending"),
-        isNotNull(tracks.musicbrainzId),
-        isNotNull(albums.releaseGroupMbid),
-      ),
-    )
+    .groupBy(tracks.resolutionStatus)
     .all();
-}
-
-export function markRemainingPendingAsFailed(): void {
-  db.update(tracks)
-    .set({ resolutionStatus: "failed" })
-    .where(eq(tracks.resolutionStatus, "pending"))
-    .run();
+  const out = { pending: 0, resolving: 0, resolved: 0, failed: 0 };
+  for (const row of rows) {
+    if (row.status in out) {
+      (out as Record<string, number>)[row.status] = row.count;
+    }
+  }
+  return out;
 }
 
 export function getAllTrackFilePaths(): string[] {
@@ -418,58 +579,16 @@ export function getAllTrackFilePaths(): string[] {
     .map((r) => r.filePath);
 }
 
-export function upsertTrack(
-  tags: TrackTags,
-  filePath: string,
-  artistId: string,
-  albumId: string | null,
-): void {
-  const mbFields = tags.mbRecordingId
-    ? ({ musicbrainzId: tags.mbRecordingId, fingerprintStatus: "matched" } as const)
-    : {};
-
-  const insertedTrack = db
-    .insert(tracks)
-    .values({
-      title: tags.title,
-      artistId,
-      albumId,
-      trackNumber: tags.trackNumber,
-      discNumber: tags.discNumber,
-      durationSeconds: tags.durationSeconds,
-      filePath,
-      fileFormat: tags.fileFormat,
-      fileSizeBytes: tags.fileSizeBytes,
-      musicbrainzId: tags.mbRecordingId ?? null,
-      fingerprintStatus: tags.mbRecordingId ? "matched" : "pending",
-      resolutionStatus: "pending",
-    })
-    .onConflictDoUpdate({
-      target: tracks.filePath,
-      set: {
-        title: tags.title,
-        artistId,
-        albumId,
-        trackNumber: tags.trackNumber,
-        discNumber: tags.discNumber,
-        durationSeconds: tags.durationSeconds,
-        fileFormat: tags.fileFormat,
-        fileSizeBytes: tags.fileSizeBytes,
-        ...mbFields,
-      },
-    })
-    .returning({ id: tracks.id })
-    .get()!;
-
-  upsertTrackFts(insertedTrack.id, tags.title, tags.artistName, tags.albumTitle ?? "");
-}
-
-export function deleteTrackByPath(filePath: string): void {
-  const track = getTrackByFilePath(filePath);
+export function deleteTrackById(trackId: string): void {
+  const track = db
+    .select({ id: tracks.id, albumId: tracks.albumId, artistId: tracks.artistId })
+    .from(tracks)
+    .where(eq(tracks.id, trackId))
+    .get();
   if (!track) return;
 
-  deleteTrackFts(track.id);
-  db.delete(tracks).where(eq(tracks.id, track.id)).run();
+  deleteTrackFts(trackId);
+  db.delete(tracks).where(eq(tracks.id, trackId)).run();
 
   if (track.albumId) {
     const sibling = getTrackSiblingInAlbum(track.albumId);
@@ -483,4 +602,60 @@ export function deleteTrackByPath(filePath: string): void {
   if (!artistTrack && !artistAlbum) {
     deleteArtist(track.artistId);
   }
+}
+
+export function deleteTrackByPath(filePath: string): void {
+  const track = db
+    .select({ id: tracks.id })
+    .from(tracks)
+    .where(eq(tracks.filePath, filePath))
+    .get();
+  if (!track) return;
+  deleteTrackById(track.id);
+}
+
+// Legacy: unused after the rewrite. Retained as a no-op stub so callers that
+// haven't migrated yet still link. Will be removed.
+export function getUnresolvedTracksByAlbum(_albumId: string) {
+  return [] as Array<{
+    id: string;
+    title: string;
+    trackNumber: number | null;
+    discNumber: number | null;
+  }>;
+}
+export type UnresolvedTrackInAlbumRow = ReturnType<
+  typeof getUnresolvedTracksByAlbum
+>[number];
+
+// Legacy compatibility export — read pending tracks with album/artist context.
+// Kept so retry endpoints and external callers continue to compile.
+export function getUnresolvedTracksWithAlbumAndArtistDetails() {
+  return db
+    .select({
+      trackId: tracks.id,
+      title: tracks.title,
+      albumId: tracks.albumId,
+      artistId: tracks.artistId,
+      artistName: artists.name,
+      albumTitle: albums.title,
+      releaseYear: albums.releaseYear,
+    })
+    .from(tracks)
+    .innerJoin(artists, eq(tracks.artistId, artists.id))
+    .leftJoin(albums, eq(tracks.albumId, albums.id))
+    .where(eq(tracks.resolutionStatus, "pending"))
+    .all();
+}
+export type UnresolvedTrackWithAlbumAndArtistDetailsRow = ReturnType<
+  typeof getUnresolvedTracksWithAlbumAndArtistDetails
+>[number];
+
+export function getResolvedTrackMbidsByAlbumId(albumId: string): string[] {
+  return db
+    .select({ musicbrainzId: tracks.musicbrainzId })
+    .from(tracks)
+    .where(and(eq(tracks.albumId, albumId), isNotNull(tracks.musicbrainzId)))
+    .all()
+    .map((t) => t.musicbrainzId!);
 }

@@ -3,12 +3,9 @@ import Fastify from "fastify";
 import sessionPlugin, { requireAuth } from "./plugins/session.js";
 import authRoutes from "./routes/auth.js";
 import scanRoutes from "./routes/scan.js";
-import resolutionRoutes from "./routes/resolution.js";
 import fastifyStatic from "@fastify/static";
 import { runMigrations } from "./db/migrate.js";
-import { startScan } from "./scanner/index.js";
-import { startWatcher } from "./scanner/watcher.js";
-import { reconcileWithFilesystem } from "./scanner/startup-diff.js";
+import { startLibraryPipeline } from "./library/index.js";
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -59,7 +56,6 @@ app.register(authRoutes, { prefix: "/api/auth" });
 app.register(async (protectedApp) => {
   protectedApp.addHook("preHandler", requireAuth);
   protectedApp.register(scanRoutes, { prefix: "/api/library" });
-  protectedApp.register(resolutionRoutes, { prefix: "/api/library" });
   protectedApp.register(libraryRoutes, { prefix: "/api/library" });
   protectedApp.register(albumRoutes, { prefix: "/api/albums" });
   protectedApp.register(artistRoutes, { prefix: "/api/artists" });
@@ -117,12 +113,10 @@ const start = async () => {
   const port = Number(process.env.PORT) || 8280;
   await app.listen({ port, host: "0.0.0.0" });
 
-  reconcileWithFilesystem(musicDir);
-  startScan(musicDir).catch((err) =>
-    logger.error({ err }, "startup scan failed"),
+  startLibraryPipeline(musicDir).catch((err) =>
+    logger.error({ err }, "library pipeline failed to start"),
   );
 
-  startWatcher(musicDir);
   startLidarrPoller();
 
   startRefresher();
