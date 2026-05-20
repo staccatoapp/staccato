@@ -115,6 +115,13 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
     return validateToken(token);
   });
 
+  fastify.get("/server", async (_req, reply) => {
+    const settings = getOrCreateServerSettings();
+    return reply.send({
+      metadataConfidenceThreshold: settings.metadataConfidenceThreshold,
+    });
+  });
+
   fastify.get("/lidarr", async (_req, reply) => {
     const settings = getOrCreateServerSettings();
     const response: LidarrSettings = {

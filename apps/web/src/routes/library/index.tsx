@@ -8,6 +8,7 @@ import type {
   Artist,
   LibrarySearchResults,
   PlaylistListItem,
+  ServerSettings,
   TrackListItem,
 } from "@staccato/shared";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,17 @@ function LibraryPage() {
   }, [searchQuery]);
 
   const isSearchMode = debouncedSearch.length >= 2;
+
+  const { data: serverSettings } = useQuery<ServerSettings>({
+    queryKey: ["server-settings"],
+    queryFn: async () => {
+      const res = await fetch("/api/settings/server");
+      if (!res.ok) throw new Error("Failed to fetch server settings");
+      return res.json();
+    },
+    staleTime: Infinity,
+  });
+  const threshold = serverSettings?.metadataConfidenceThreshold ?? 0.75;
 
   const albumsQuery = useInfiniteList<AlbumListItem>({
     queryKey: ["albums"],
@@ -195,9 +207,12 @@ function LibraryPage() {
         releaseYear={album.releaseYear}
         coverArtUrl={album.coverArtUrl}
         href={`/albums/${album.id}`}
+        confidenceScore={album.confidenceScore}
+        pendingTrackCount={album.pendingTrackCount}
+        threshold={threshold}
       />
     ),
-    [],
+    [threshold],
   );
   const renderArtist = useCallback(
     (artist: Artist) => (
@@ -368,6 +383,9 @@ function LibraryPage() {
                       releaseYear={album.releaseYear}
                       coverArtUrl={album.coverArtUrl}
                       href={`/albums/${album.id}`}
+                      confidenceScore={album.confidenceScore}
+                      pendingTrackCount={album.pendingTrackCount}
+                      threshold={threshold}
                     />
                   ))}
                 </div>

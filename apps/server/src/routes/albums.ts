@@ -21,7 +21,10 @@ import {
   searchReleasesForIdentify,
   MB_PRIORITY,
 } from "../musicbrainz/client.js";
-import { applyAlbumIdentification } from "../library/identify.js";
+import {
+  applyAlbumIdentification,
+  confirmAlbumMatch,
+} from "../library/identify.js";
 
 const CUID2_RE = /^[a-z0-9]{24}$/;
 const MBID_RE =
@@ -126,6 +129,19 @@ const albumRoutes: FastifyPluginAsync = async (fastify) => {
     return result;
   });
 
+  // ─── Confirm Album Match: mark current automated match as accepted ─────────
+  fastify.post("/:albumId/confirm-match", async (request, reply) => {
+    const { albumId } = request.params as { albumId: string };
+    if (!CUID2_RE.test(albumId)) {
+      return reply.status(404).send({ error: "Album not found" });
+    }
+    const result = await confirmAlbumMatch(albumId, request.log);
+    if (!result.ok) {
+      return reply.status(404).send({ error: "Album not found" });
+    }
+    return result;
+  });
+
   fastify.get("/:albumKey", async (request, reply) => {
     const { albumKey } = request.params as { albumKey: string };
 
@@ -158,6 +174,8 @@ const albumRoutes: FastifyPluginAsync = async (fastify) => {
             releaseGroupMbid: localRow.releaseGroupMbid,
             coverArtUrl: localRow.coverArtUrl,
           }),
+          confidenceScore: localRow.confidenceScore,
+          pendingTrackCount: localRow.pendingTrackCount,
         },
         tracks: localTracks,
       };

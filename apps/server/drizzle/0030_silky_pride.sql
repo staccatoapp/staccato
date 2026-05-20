@@ -1,0 +1,1 @@
+ALTER TABLE `server_settings` ADD `metadata_confidence_threshold` real DEFAULT 0.75 NOT NULL;

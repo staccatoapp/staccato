@@ -22,6 +22,10 @@ import {
   type MBReleaseTrack,
 } from "../musicbrainz/client.js";
 
+export type ConfirmMatchResult =
+  | { ok: true; albumId: string; confirmed: number }
+  | { ok: false; reason: "not_found" };
+
 export type IdentifyApplyResult =
   | {
       ok: true;
@@ -39,6 +43,40 @@ export type IdentifyApplyResult =
 // releases frequently omit the disc number locally).
 function pairKey(disc: number | null, track: number | null): string {
   return `${disc ?? 1}:${track ?? 0}`;
+}
+
+// Confirm the current automated match for an album — sets confidence to 1.0
+// and marks all tracks as manually resolved without triggering a MB lookup.
+export async function confirmAlbumMatch(
+  albumId: string,
+  log: FastifyBaseLogger,
+): Promise<ConfirmMatchResult> {
+  const album = getAlbumById(albumId);
+  if (!album) {
+    log.warn({ albumId }, "confirm match: album not found");
+    return { ok: false, reason: "not_found" };
+  }
+
+  const artistName = getArtistDetails(album.artistId)?.name ?? "";
+  const title = album.canonicalTitle ?? album.title;
+  let confirmed = 0;
+
+  db.transaction(() => {
+    updateAlbumByAlbumId(albumId, { confidenceScore: 1.0 });
+    const localTracks = getTracksInAlbum(albumId);
+    for (const track of localTracks) {
+      updateTrackByTrackId(track.id, {
+        resolutionStatus: "resolved",
+        resolutionMethod: "manual",
+        confidenceScore: 1.0,
+      });
+      upsertTrackFts(track.id, track.title, artistName, title);
+      confirmed++;
+    }
+  });
+
+  log.info({ albumId, confirmed }, "album match confirmed manually");
+  return { ok: true, albumId, confirmed };
 }
 
 // Manually re-link an album to a user-chosen MusicBrainz release and re-map its

@@ -1,7 +1,8 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Music2, Play } from "lucide-react";
+import { Ban, Music2, Play, TriangleAlert } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { generateAlbumGradient } from "@/lib/music";
 import { cn } from "@/lib/utils";
 
@@ -11,15 +12,36 @@ export const AlbumCard = memo(function AlbumCard({
   releaseYear,
   coverArtUrl,
   href,
+  confidenceScore,
+  pendingTrackCount,
+  threshold = 0.75,
 }: {
   title: string;
   artistName?: string | null;
   releaseYear?: number | null;
   coverArtUrl?: string | null;
   href: string;
+  confidenceScore?: number | null;
+  pendingTrackCount?: number;
+  threshold?: number;
 }) {
   const [imgFailed, setImgFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
+
+  const resolutionDone = pendingTrackCount === 0;
+  const badgeStatus =
+    !resolutionDone || pendingTrackCount === undefined
+      ? null
+      : confidenceScore === null || confidenceScore === undefined
+        ? "no_match"
+        : confidenceScore < threshold
+          ? "low_confidence"
+          : null;
+  const pct =
+    badgeStatus === "low_confidence" && confidenceScore != null
+      ? Math.round(confidenceScore * 100)
+      : null;
+
   const gradient = useMemo(
     () => generateAlbumGradient(title, artistName ?? ""),
     [title, artistName],
@@ -54,6 +76,22 @@ export const AlbumCard = memo(function AlbumCard({
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
             <Music2 className="w-8 h-8 text-white/15" />
+          </div>
+        )}
+        {badgeStatus === "no_match" && (
+          <div className="absolute top-2 left-2 z-10">
+            <Badge className="gap-1 text-[0.65rem] px-1.5 py-0.5 bg-black/70 text-white border-0 backdrop-blur-sm hover:bg-black/70">
+              <Ban className="w-3 h-3" />
+              No match
+            </Badge>
+          </div>
+        )}
+        {badgeStatus === "low_confidence" && (
+          <div className="absolute top-2 left-2 z-10">
+            <Badge className="gap-1 text-[0.65rem] px-1.5 py-0.5 bg-amber-500/80 text-white border-0 backdrop-blur-sm hover:bg-amber-500/80">
+              <TriangleAlert className="w-3 h-3" />
+              {pct}%
+            </Badge>
           </div>
         )}
         <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">

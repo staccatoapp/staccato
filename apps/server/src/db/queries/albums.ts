@@ -28,6 +28,8 @@ export type AlbumWithArtistDetailsRow = {
   releaseGroupMbid: string | null;
   coverArtUrl: string | null;
   createdAt: Date | null;
+  confidenceScore: number | null;
+  pendingTrackCount: number;
 };
 
 export function getAlbumsByArtistId(artistId: string) {
@@ -88,6 +90,8 @@ export function getAlbumsWithArtistDetails(
       releaseGroupMbid: albums.releaseGroupMbid,
       coverArtUrl: albums.coverArtUrl,
       createdAt: albums.createdAt,
+      confidenceScore: albums.confidenceScore,
+      pendingTrackCount: sql<number>`(SELECT COUNT(*) FROM tracks WHERE tracks.album_id = ${albums.id} AND tracks.resolution_status IN ('pending','resolving'))`,
     })
     .from(albums)
     .innerJoin(artists, eq(albums.artistId, artists.id))
@@ -114,6 +118,8 @@ export function getAlbumWithArtistDetails(
       releaseGroupMbid: albums.releaseGroupMbid,
       coverArtUrl: albums.coverArtUrl,
       createdAt: albums.createdAt,
+      confidenceScore: albums.confidenceScore,
+      pendingTrackCount: sql<number>`(SELECT COUNT(*) FROM tracks WHERE tracks.album_id = ${albums.id} AND tracks.resolution_status IN ('pending','resolving'))`,
     })
     .from(albums)
     .innerJoin(artists, eq(albums.artistId, artists.id))
@@ -135,6 +141,8 @@ export function getAlbumByMbid(
       releaseGroupMbid: albums.releaseGroupMbid,
       coverArtUrl: albums.coverArtUrl,
       createdAt: albums.createdAt,
+      confidenceScore: albums.confidenceScore,
+      pendingTrackCount: sql<number>`(SELECT COUNT(*) FROM tracks WHERE tracks.album_id = ${albums.id} AND tracks.resolution_status IN ('pending','resolving'))`,
     })
     .from(albums)
     .innerJoin(artists, eq(albums.artistId, artists.id))
@@ -157,6 +165,8 @@ export function searchAlbums(
       releaseGroupMbid: albums.releaseGroupMbid,
       coverArtUrl: albums.coverArtUrl,
       createdAt: albums.createdAt,
+      confidenceScore: albums.confidenceScore,
+      pendingTrackCount: sql<number>`(SELECT COUNT(*) FROM tracks WHERE tracks.album_id = ${albums.id} AND tracks.resolution_status IN ('pending','resolving'))`,
     })
     .from(albums)
     .innerJoin(artists, eq(albums.artistId, artists.id))

@@ -6,4 +6,6 @@ export type AlbumListItem = {
   releaseYear: number | null;
   coverArtUrl: string | null;
   createdAt: string | null;
+  confidenceScore: number | null;
+  pendingTrackCount: number;
 };

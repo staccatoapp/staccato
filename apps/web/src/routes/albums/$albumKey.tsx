@@ -10,8 +10,11 @@ import {
   Plus,
   RotateCw,
   Search,
+  TriangleAlert,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -21,6 +24,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type {
   PlaylistListItem,
+  ServerSettings,
   UnifiedAlbumDetail,
 } from "@staccato/shared";
 import { AlbumHeader } from "@/components/music/AlbumHeader";
@@ -102,6 +106,41 @@ function LocalAlbumView({
   const { albumKey } = Route.useParams();
   const { album, tracks } = data;
   const [identifyOpen, setIdentifyOpen] = useState(false);
+
+  const { data: serverSettings } = useQuery<ServerSettings>({
+    queryKey: ["server-settings"],
+    queryFn: async () => {
+      const res = await fetch("/api/settings/server");
+      if (!res.ok) throw new Error("Failed to fetch server settings");
+      return res.json();
+    },
+    staleTime: Infinity,
+  });
+
+  const threshold = serverSettings?.metadataConfidenceThreshold ?? 0.75;
+  const resolutionDone = album.pendingTrackCount === 0;
+  const showBanner =
+    resolutionDone &&
+    (album.confidenceScore === null || album.confidenceScore < threshold);
+  const pct =
+    album.confidenceScore !== null && album.confidenceScore !== undefined
+      ? Math.round(album.confidenceScore * 100)
+      : null;
+
+  const confirmMatchMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/albums/${albumKey}/confirm-match`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Failed to confirm match");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["album", albumKey] });
+      toast.success("Match confirmed");
+    },
+    onError: () => toast.error("Failed to confirm match"),
+  });
 
   const { data: playlistsData } = useQuery({
     queryKey: ["playlists"],
@@ -228,6 +267,52 @@ function LocalAlbumView({
           </DropdownMenu>
         )}
       </AlbumHeader>
+
+      {showBanner && (
+        <div className="mx-6 mb-6 flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="text-sm font-semibold text-foreground">
+                {pct !== null
+                  ? "Low confidence metadata match"
+                  : "No metadata match"}
+              </span>
+              {pct !== null && (
+                <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-[0.65rem] px-1.5 py-0 hover:bg-amber-500/20">
+                  {pct}%
+                </Badge>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {pct !== null
+                ? `Staccato matched these files to "${album.title}" by ${album.artistName}, but isn't sure. Re-identify to pick a different release, or confirm if this looks right.`
+                : `Staccato couldn't match these files to a MusicBrainz release. Re-identify to search manually.`}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setIdentifyOpen(true)}
+            >
+              <Search className="w-3.5 h-3.5 mr-1.5" />
+              Re-identify
+            </Button>
+            {pct !== null && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={confirmMatchMutation.isPending}
+                onClick={() => confirmMatchMutation.mutate()}
+              >
+                <Check className="w-3.5 h-3.5 mr-1.5" />
+                Confirm match
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="px-6 pb-8">
         <TrackList

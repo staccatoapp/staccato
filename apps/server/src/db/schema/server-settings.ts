@@ -1,5 +1,5 @@
 import { createId } from "@paralleldrive/cuid2";
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const serverSettings = sqliteTable("server_settings", {
   id: text("id")
@@ -10,6 +10,9 @@ export const serverSettings = sqliteTable("server_settings", {
   lidarrQualityProfileId: integer("lidarr_quality_profile_id"),
   lidarrMetadataProfileId: integer("lidarr_metadata_profile_id"),
   lidarrRootFolderPath: text("lidarr_root_folder_path"),
+  metadataConfidenceThreshold: real("metadata_confidence_threshold")
+    .notNull()
+    .default(0.75),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(
     () => new Date(),
   ),

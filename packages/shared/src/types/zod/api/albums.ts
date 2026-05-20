@@ -25,6 +25,8 @@ export const UnifiedAlbumLocalSchema = z.object({
     releaseMbid: z.string().nullable(),
     releaseGroupMbid: z.string().nullable(),
     coverArtUrl: z.string().nullable(),
+    confidenceScore: z.number().nullable(),
+    pendingTrackCount: z.number(),
   }),
   tracks: z.array(UnifiedAlbumLocalTrackSchema),
 });
@@ -129,3 +131,10 @@ export const IdentifyApplyResponseSchema = z.object({
   total: z.number(),
 });
 export type IdentifyApplyResponse = z.infer<typeof IdentifyApplyResponseSchema>;
+
+export const ConfirmMatchResponseSchema = z.object({
+  ok: z.literal(true),
+  albumId: z.string(),
+  confirmed: z.number(),
+});
+export type ConfirmMatchResponse = z.infer<typeof ConfirmMatchResponseSchema>;
