@@ -5,9 +5,11 @@ import {
   ChevronLeft,
   Clock,
   Download,
+  MoreHorizontal,
   Play,
   Plus,
   RotateCw,
+  Search,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -24,6 +26,7 @@ import type {
 import { AlbumHeader } from "@/components/music/AlbumHeader";
 import { AlbumDetailSkeleton } from "@/components/music/AlbumDetailSkeleton";
 import { TrackList } from "@/components/music/TrackList";
+import { IdentifyAlbumDialog } from "@/components/music/IdentifyAlbumDialog";
 import { toUiStatus, useDownloads } from "@/hooks/useDownloads";
 import { useRetryDownload } from "@/hooks/useRequestDownload";
 import { useRequestDownloadDialog } from "@/hooks/useRequestDownloadDialog";
@@ -96,7 +99,9 @@ function LocalAlbumView({
   data: Extract<UnifiedAlbumDetail, { source: "local" }>;
 }) {
   const queryClient = useQueryClient();
+  const { albumKey } = Route.useParams();
   const { album, tracks } = data;
+  const [identifyOpen, setIdentifyOpen] = useState(false);
 
   const { data: playlistsData } = useQuery({
     queryKey: ["playlists"],
@@ -180,6 +185,20 @@ function LocalAlbumView({
           <Play className="w-4 h-4" />
           Play Album
         </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            aria-label="Album actions"
+            className={buttonVariants({ variant: "outline", size: "icon" })}
+          >
+            <MoreHorizontal className="w-4 h-4" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onClick={() => setIdentifyOpen(true)}>
+              <Search className="w-4 h-4" />
+              Identify
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         {hasPlaylists && (
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -261,6 +280,25 @@ function LocalAlbumView({
           }
         />
       </div>
+
+      <IdentifyAlbumDialog
+        open={identifyOpen}
+        onOpenChange={setIdentifyOpen}
+        albumKey={albumKey}
+        album={{
+          id: album.id,
+          title: album.title,
+          artistName: album.artistName,
+          releaseMbid: album.releaseMbid,
+          releaseGroupMbid: album.releaseGroupMbid,
+        }}
+        currentTracks={tracks.map((t) => ({
+          title: t.title,
+          trackNumber: t.trackNumber,
+          discNumber: t.discNumber,
+          durationSeconds: t.durationSeconds,
+        }))}
+      />
     </div>
   );
 }

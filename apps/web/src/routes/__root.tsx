@@ -23,6 +23,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { PlaybackSession } from "@staccato/shared";
 import { PlayerBar } from "@/components/layout/player-bar";
+import { Toaster } from "@/components/ui/sonner";
 
 const queryClient = new QueryClient();
 
@@ -160,6 +161,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       {isOnboarding ? <Outlet /> : <LayoutContent />}
+      <Toaster richColors position="bottom-center" />
     </QueryClientProvider>
   );
 }

@@ -24,6 +24,7 @@ export type AlbumWithArtistDetailsRow = {
   artistId: string;
   artistName: string;
   releaseYear: number | null;
+  releaseMbid: string | null;
   releaseGroupMbid: string | null;
   coverArtUrl: string | null;
   createdAt: Date | null;
@@ -83,6 +84,7 @@ export function getAlbumsWithArtistDetails(
       artistId: albums.artistId,
       artistName: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
       releaseYear: albums.releaseYear,
+      releaseMbid: albums.releaseMbid,
       releaseGroupMbid: albums.releaseGroupMbid,
       coverArtUrl: albums.coverArtUrl,
       createdAt: albums.createdAt,
@@ -108,6 +110,7 @@ export function getAlbumWithArtistDetails(
       artistId: albums.artistId,
       artistName: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
       releaseYear: albums.releaseYear,
+      releaseMbid: albums.releaseMbid,
       releaseGroupMbid: albums.releaseGroupMbid,
       coverArtUrl: albums.coverArtUrl,
       createdAt: albums.createdAt,
@@ -128,6 +131,7 @@ export function getAlbumByMbid(
       artistId: albums.artistId,
       artistName: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
       releaseYear: albums.releaseYear,
+      releaseMbid: albums.releaseMbid,
       releaseGroupMbid: albums.releaseGroupMbid,
       coverArtUrl: albums.coverArtUrl,
       createdAt: albums.createdAt,
@@ -149,6 +153,7 @@ export function searchAlbums(
       artistId: albums.artistId,
       artistName: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
       releaseYear: albums.releaseYear,
+      releaseMbid: albums.releaseMbid,
       releaseGroupMbid: albums.releaseGroupMbid,
       coverArtUrl: albums.coverArtUrl,
       createdAt: albums.createdAt,

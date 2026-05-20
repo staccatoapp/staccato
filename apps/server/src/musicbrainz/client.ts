@@ -78,9 +78,26 @@ export interface MBReleaseTrack {
 export interface MBReleaseDetails {
   tracks: MBReleaseTrack[];
   releaseName: string | null;
+  disambiguation: string | null;
+  releaseYear: number | null;
   artistMbid: string | null;
   artistName: string | null;
   releaseGroupMbid: string | null;
+}
+
+// One row per MusicBrainz release (specific pressing) for the Identify dialog.
+export interface IdentifyReleaseCandidate {
+  releaseMbid: string;
+  releaseGroupMbid: string | null;
+  title: string;
+  disambiguation: string | null;
+  artistName: string;
+  formatDetail: string | null;
+  trackCount: number | null;
+  country: string | null;
+  date: string | null;
+  label: string | null;
+  releaseType: string | null;
 }
 
 interface MBReleaseLike {
@@ -411,6 +428,104 @@ export async function searchReleasesByQuery(
   }
 }
 
+// Strip embedded double-quotes so they can't break a quoted Lucene phrase.
+// Matches the codebase's existing (unescaped) phrase-query style elsewhere.
+function quotePhrase(value: string): string {
+  return value.replace(/"/g, " ").trim();
+}
+
+// Summarize a release's media into a human format string:
+// "CD", "2 × CD", "CD + DVD", "4 × CD + DVD + 12\" Vinyl".
+function summarizeFormats(
+  media: { format?: string | null }[] | null | undefined,
+): string | null {
+  if (!media || media.length === 0) return null;
+  const counts = new Map<string, number>();
+  const order: string[] = [];
+  for (const m of media) {
+    const f = m.format ?? "Unknown";
+    if (!counts.has(f)) order.push(f);
+    counts.set(f, (counts.get(f) ?? 0) + 1);
+  }
+  return order
+    .map((f) => {
+      const n = counts.get(f) ?? 1;
+      return n > 1 ? `${n} × ${f}` : f;
+    })
+    .join(" + ");
+}
+
+// Per-release search for the Identify Album dialog. Unlike searchReleasesByQuery
+// this does NOT dedupe by release-group — the user needs to see every pressing
+// (country/format/label vary) so they can pick the one whose tracklist matches
+// their files. Defaults to INTERACTIVE priority (user is waiting on it).
+export async function searchReleasesForIdentify(
+  opts: { release: string; artist: string; year?: string },
+  limit = 25,
+  priority: MbPriority = MB_PRIORITY.INTERACTIVE,
+): Promise<IdentifyReleaseCandidate[]> {
+  const clauses: string[] = [];
+  const release = quotePhrase(opts.release);
+  const artist = quotePhrase(opts.artist);
+  const year = opts.year?.trim();
+  if (release) clauses.push(`release:"${release}"`);
+  if (artist) clauses.push(`artist:"${artist}"`);
+  if (year) clauses.push(`date:${year}*`);
+  if (clauses.length === 0) return [];
+  const queryStr = clauses.join(" AND ");
+
+  try {
+    const params = new URLSearchParams({
+      query: queryStr,
+      fmt: "json",
+      limit: String(limit),
+    });
+    const response = await throttledFetch(
+      `${MB_BASE}/release?${params}&inc=artist-credits+release-groups+media+labels`,
+      { priority },
+    );
+    if (!response.ok) {
+      log.warn(
+        {
+          status: response.status,
+          operation: "searchReleasesForIdentify",
+          query: queryStr,
+        },
+        "mb identify release search non-ok response",
+      );
+      return [];
+    }
+    const data = MBReleaseSearchResponseSchema.parse(await response.json());
+    return data.releases.map((r) => {
+      const summed = r.media?.reduce(
+        (sum, m) => sum + (m["track-count"] ?? 0),
+        0,
+      );
+      const trackCount =
+        r["track-count"] ?? (summed && summed > 0 ? summed : null);
+      return {
+        releaseMbid: r.id,
+        releaseGroupMbid: r["release-group"]?.id ?? null,
+        title: r.title,
+        disambiguation: r.disambiguation ?? null,
+        artistName: r["artist-credit"]?.[0]?.artist.name ?? "Unknown Artist",
+        formatDetail: summarizeFormats(r.media),
+        trackCount,
+        country: r.country ?? null,
+        date: r.date ?? null,
+        label: r["label-info"]?.[0]?.label?.name ?? null,
+        releaseType: r["release-group"]?.["primary-type"] ?? null,
+      };
+    });
+  } catch (err) {
+    log.warn(
+      { err, operation: "searchReleasesForIdentify", query: queryStr },
+      "mb identify release search failed",
+    );
+    return [];
+  }
+}
+
 export interface MBRecordingDetail {
   recordingMbid: string;
   title: string;
@@ -525,6 +640,8 @@ export async function lookupReleaseDetails(
           })),
       ),
       releaseName: data.title ?? null,
+      disambiguation: data.disambiguation ?? null,
+      releaseYear: parseReleaseYear(data.date),
       artistMbid: data["artist-credit"]?.[0]?.artist.id ?? null,
       artistName: data["artist-credit"]?.[0]?.artist.name ?? null,
       releaseGroupMbid: data["release-group"]?.id ?? null,

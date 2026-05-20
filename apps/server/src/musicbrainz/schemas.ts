@@ -74,14 +74,34 @@ export const MBReleaseSearchResponseSchema = z.object({
     z.object({
       id: z.string(),
       title: z.string(),
+      disambiguation: z.string().nullish(),
       date: z.string().nullish(),
+      country: z.string().nullish(),
       status: z.string().nullish(),
+      "track-count": z.number().nullish(),
       "artist-credit": ArtistCreditSchema.nullish(),
       "release-group": z
         .object({
           id: z.string().nullish(),
           "primary-type": z.string().nullish(),
         })
+        .nullish(),
+      media: z
+        .array(
+          z.object({
+            format: z.string().nullish(),
+            "track-count": z.number().nullish(),
+          }),
+        )
+        .nullish(),
+      "label-info": z
+        .array(
+          z.object({
+            label: z
+              .object({ name: z.string().nullish() })
+              .nullish(),
+          }),
+        )
         .nullish(),
     }),
   ),
@@ -98,6 +118,8 @@ export const MBRecordingLookupSchema = z.object({
 
 export const MBReleaseLookupSchema = z.object({
   title: z.string().nullish(),
+  disambiguation: z.string().nullish(),
+  date: z.string().nullish(),
   "artist-credit": ArtistCreditSchema.nullish(),
   "release-group": z
     .object({
