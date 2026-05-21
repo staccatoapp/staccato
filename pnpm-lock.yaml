@@ -30,6 +30,49 @@ importers:
         specifier: 2.0.0-alpha.17
         version: 2.0.0-alpha.17(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(postcss@8.5.10)(tsx@4.21.0)(typescript@5.9.2)
 
+  apps/metadata-service:
+    dependencies:
+      '@staccato/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      dotenv-flow:
+        specifier: ^4.1.0
+        version: 4.1.0
+      fastify:
+        specifier: ^5.8.5
+        version: 5.8.5
+      p-queue:
+        specifier: ^8.0.1
+        version: 8.1.1
+      pino:
+        specifier: ^9.5.0
+        version: 9.14.0
+      pino-pretty:
+        specifier: ^11.2.2
+        version: 11.3.0
+      zod:
+        specifier: ^3.24.0
+        version: 3.25.76
+    devDependencies:
+      '@staccato/eslint-config':
+        specifier: workspace:*
+        version: link:../../packages/eslint-config
+      '@staccato/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      '@types/dotenv-flow':
+        specifier: ^3.3.3
+        version: 3.3.3
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.15.3
+      tsx:
+        specifier: ^4.19.4
+        version: 4.21.0
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.2
+
   apps/server:
     dependencies:
       '@fastify/secure-session':
@@ -4273,6 +4316,7 @@ packages:
   semver@7.7.3:
     resolution: {integrity: sha512-SdsKMrI9TdgjdweUSR9MweHA4EJ8YxHn8DFaDisvhVlUOe4BF1tLD7GAj0lIqWVl+dPb/rExr0Btby5loQm20Q==}
     engines: {node: '>=10'}
+    hasBin: true
 
   send@1.2.1:
     resolution: {integrity: sha512-1gnZf7DFcoIcajTjTwjwuDjzuz4PPcY2StKPlsGAQ1+YH20IRVrBaXSWmdjowTJ6u8Rc01PoYOGHXfP1mYcZNQ==}

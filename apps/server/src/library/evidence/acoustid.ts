@@ -28,7 +28,10 @@ const acoustidQueue = new PQueue({
 });
 
 async function throttledFetch(url: string): Promise<Response> {
-  const res = await acoustidQueue.add(() => fetch(url));
+  const res = await acoustidQueue.add(() => {
+    log.debug({ url }, "fetching acoustid");
+    return fetch(url);
+  });
   if (!res) throw new Error("acoustid queue returned no response");
   return res;
 }

@@ -117,9 +117,23 @@ function parseReleaseYear(date?: string | null): number | null {
   return Number.isNaN(year) ? null : year;
 }
 
-const MB_BASE = "https://musicbrainz.org/ws/2";
+const MB_BASE = process.env.METADATA_URL ?? "https://musicbrainz.org/ws/2";
 
-const MB_INTERVAL_MS = parseInt(process.env.MB_RATE_LIMIT_MS ?? "1100", 10);
+// Throttle knobs for the shared MB queue. Defaults match MusicBrainz's public
+// 1-req/sec limit. When pointed at our own mirror/façade (METADATA_URL), raise
+// MB_CONCURRENCY and set MB_RATE_LIMIT_MS=0 to drop the time-window cap so only
+// concurrency governs throughput.
+//   MB_CONCURRENCY   — max simultaneous in-flight requests   (default 1)
+//   MB_INTERVAL_CAP  — max requests started per interval      (default 1)
+//   MB_RATE_LIMIT_MS — interval window in ms; 0 disables it   (default 1100)
+function envInt(name: string, fallback: number, min: number): number {
+  const parsed = parseInt(process.env[name] ?? "", 10);
+  return Number.isFinite(parsed) && parsed >= min ? parsed : fallback;
+}
+
+const MB_CONCURRENCY = envInt("MB_CONCURRENCY", 1, 1);
+const MB_INTERVAL_CAP = envInt("MB_INTERVAL_CAP", 1, 1);
+const MB_INTERVAL_MS = envInt("MB_RATE_LIMIT_MS", 1100, 0);
 
 // Priority lanes for shared external-API queues (MB + CAA). Higher number =
 // runs sooner. INTERACTIVE is reserved for the search route (user typing).
@@ -134,11 +148,21 @@ export const MB_PRIORITY = {
 export type MbPriority = (typeof MB_PRIORITY)[keyof typeof MB_PRIORITY];
 
 const mbQueue = new PQueue({
-  concurrency: 1,
-  intervalCap: 1,
+  concurrency: MB_CONCURRENCY,
+  intervalCap: MB_INTERVAL_CAP,
   interval: MB_INTERVAL_MS,
   carryoverConcurrencyCount: true,
 });
+
+log.info(
+  {
+    concurrency: MB_CONCURRENCY,
+    intervalCap: MB_INTERVAL_CAP,
+    intervalMs: MB_INTERVAL_MS,
+    metadataUrl: MB_BASE,
+  },
+  "mb throttle configured",
+);
 
 export async function throttledFetch(
   url: string,
@@ -152,13 +176,15 @@ export async function throttledFetch(
     );
   }
   const res = await mbQueue.add(
-    () =>
-      fetch(url, {
+    () => {
+      log.debug({ url, priority }, "making mb request");
+      return fetch(url, {
         headers: {
           "User-Agent": APP_USER_AGENT,
           Accept: "application/json",
         },
-      }),
+      });
+    },
     { priority },
   );
   if (!res) throw new Error("mb queue returned no response");

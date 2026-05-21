@@ -14,7 +14,7 @@ import type { ResolutionMethod } from "../db/schema/tracks.js";
 
 const log = logger.child({ module: "library:mb-lookup" });
 
-const MB_BASE = "https://musicbrainz.org/ws/2";
+const MB_BASE = process.env.METADATA_URL ?? "https://musicbrainz.org/ws/2";
 
 const ArtistCreditEntrySchema = z.object({
   joinphrase: z.string().nullish(),
@@ -60,10 +60,7 @@ const RecordingSearchRichResponseSchema = z.object({
 });
 
 function toArtistCredits(
-  raw:
-    | Array<z.infer<typeof ArtistCreditEntrySchema>>
-    | null
-    | undefined,
+  raw: Array<z.infer<typeof ArtistCreditEntrySchema>> | null | undefined,
 ): ArtistCredit[] {
   if (!raw) return [];
   return raw.map((entry) => ({
