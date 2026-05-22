@@ -29,3 +29,5 @@ export * from "./types/typescript/downloads.js";
 export * from "./types/zod/api/downloads.js";
 
 export * from "./pagination.js";
+
+export * from "./search-rank.js";

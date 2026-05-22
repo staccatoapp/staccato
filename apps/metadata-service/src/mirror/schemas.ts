@@ -61,7 +61,7 @@ export type RecordingSearchResponse = z.infer<
 // Recording hits reuse RecordingSearchResponseSchema above (rich + score, with
 // releases carrying release-group/primary-type/status for pickBestRelease).
 
-// /artist?query=<q>&fmt=json — each hit carries a Solr score (ignored here).
+// /artist?query=<q>&fmt=json — each hit carries a Solr relevance score.
 export const ArtistSearchResponseSchema = z.object({
   artists: z.array(
     z.object({
@@ -69,6 +69,7 @@ export const ArtistSearchResponseSchema = z.object({
       name: z.string(),
       disambiguation: z.string().nullish(),
       type: z.string().nullish(),
+      score: z.number().nullish(),
     }),
   ),
 });
@@ -82,6 +83,7 @@ export const ReleaseSearchResponseSchema = z.object({
       title: z.string().nullish(),
       date: z.string().nullish(),
       status: z.string().nullish(),
+      score: z.number().nullish(),
       "artist-credit": z.array(ArtistCreditEntrySchema).nullish(),
       "release-group": z
         .object({

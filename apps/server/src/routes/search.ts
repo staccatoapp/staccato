@@ -36,7 +36,7 @@ async function attachArtistImagesByMbid<T extends { artistMbid: string }>(
   }));
 }
 
-const EMPTY = { recordings: [], artists: [], releases: [] };
+const EMPTY = { recordings: [], artists: [], releases: [], topResult: null };
 
 const searchRoutes: FastifyPluginAsync = async (fastify) => {
   // Unified free-text search (R3). One façade call fans out across the
@@ -79,6 +79,7 @@ const searchRoutes: FastifyPluginAsync = async (fastify) => {
       coverArtUrl: r.releaseGroupMbid
         ? resolveExternalCoverNow(r.releaseGroupMbid, MB_PRIORITY.INTERACTIVE)
         : null,
+      listenCount: r.listenCount,
     }));
 
     const artists = await attachArtistImagesByMbid(results.artists);
@@ -87,7 +88,9 @@ const searchRoutes: FastifyPluginAsync = async (fastify) => {
     logger.debug(
       `External search done. ${recordings.length} tracks, ${releases.length} albums, ${artists.length} artists.`,
     );
-    return { recordings, artists, releases };
+    // topResult is a {type, mbid} pointer into the sections above — passed
+    // through unchanged; section order (ranked by the façade) is preserved.
+    return { recordings, artists, releases, topResult: results.topResult };
   });
 };
 

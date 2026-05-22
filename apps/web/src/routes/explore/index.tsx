@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import type { ExternalSearchResults, RecommendedTrack } from "@staccato/shared";
 import { AlbumCard } from "@/components/music/AlbumCard";
+import { ArtistCard } from "@/components/library/artist-card";
 import { RecommendationTile } from "@/components/explore/RecommendationTile";
 import {
   RecommendedTrackListHeader,
@@ -22,6 +23,131 @@ import { RequestDownloadDialog } from "@/components/downloads/RequestDownloadDia
 import { toUiStatus, useDownloads } from "@/hooks/useDownloads";
 
 export const Route = createFileRoute("/explore/")({ component: ExplorePage });
+
+// Compact listen-count label, e.g. 517066 → "517K", 9003749 → "9M".
+function formatListens(n: number | null | undefined): string | null {
+  if (!n || n <= 0) return null;
+  if (n >= 1_000_000)
+    return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1)}M`;
+  if (n >= 1_000) return `${Math.round(n / 1_000)}K`;
+  return String(n);
+}
+
+// The "Top result" hero card. Resolves the {type, mbid} pointer against the
+// ranked sections and renders the matching entity prominently — album/artist
+// navigate, track previews.
+function TopResultCard({
+  data,
+  onPlayTrack,
+}: {
+  data: ExternalSearchResults;
+  onPlayTrack: (mbid: string, artist: string, title: string) => void;
+}) {
+  const top = data.topResult;
+  if (!top) return null;
+
+  const cardClass =
+    "flex items-center gap-4 max-w-md rounded-xl border border-border bg-card/40 p-4 transition-colors hover:bg-accent/40 text-left w-full";
+
+  if (top.type === "artist") {
+    const a = data.artists.find((x) => x.artistMbid === top.mbid);
+    if (!a) return null;
+    const listens = formatListens(a.listenCount);
+    return (
+      <Link
+        to="/artists/$artistKey"
+        params={{ artistKey: a.artistMbid }}
+        className={cardClass}
+      >
+        <div
+          className="w-20 h-20 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-2xl font-bold text-white/90"
+          style={{ background: generateAlbumGradient(a.name, a.name) }}
+        >
+          {a.imageUrl ? (
+            <img
+              src={a.imageUrl}
+              alt={a.name}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.display = "none";
+              }}
+            />
+          ) : (
+            a.name.charAt(0).toUpperCase()
+          )}
+        </div>
+        <div className="min-w-0">
+          <p className="text-xl font-bold truncate">{a.name}</p>
+          <p className="text-sm text-muted-foreground">
+            Artist{listens ? ` · ${listens} plays` : ""}
+          </p>
+        </div>
+      </Link>
+    );
+  }
+
+  if (top.type === "release") {
+    const r = data.releases.find((x) => x.releaseMbid === top.mbid);
+    if (!r) return null;
+    const listens = formatListens(r.listenCount);
+    return (
+      <Link
+        to="/albums/$albumKey"
+        params={{ albumKey: r.releaseGroupMbid ?? r.releaseMbid }}
+        className={cardClass}
+      >
+        <Cover url={r.coverArtUrl} seed={`${r.title} ${r.artistName}`} />
+        <div className="min-w-0">
+          <p className="text-xl font-bold truncate">{r.title}</p>
+          <p className="text-sm text-muted-foreground truncate">
+            Album · {r.artistName}
+            {listens ? ` · ${listens} plays` : ""}
+          </p>
+        </div>
+      </Link>
+    );
+  }
+
+  const rec = data.recordings.find((x) => x.recordingMbid === top.mbid);
+  if (!rec) return null;
+  const listens = formatListens(rec.listenCount);
+  return (
+    <button
+      type="button"
+      className={cardClass}
+      onClick={() => onPlayTrack(rec.recordingMbid, rec.artistName, rec.title)}
+    >
+      <Cover url={rec.coverArtUrl} seed={`${rec.releaseName ?? ""} ${rec.artistName}`} />
+      <div className="min-w-0">
+        <p className="text-xl font-bold truncate">{rec.title}</p>
+        <p className="text-sm text-muted-foreground truncate">
+          Song · {rec.artistName}
+          {listens ? ` · ${listens} plays` : ""}
+        </p>
+      </div>
+    </button>
+  );
+}
+
+function Cover({ url, seed }: { url: string | null; seed: string }) {
+  return (
+    <div
+      className="w-20 h-20 rounded-md shrink-0 overflow-hidden"
+      style={{ background: generateAlbumGradient(seed, seed) }}
+    >
+      {url && (
+        <img
+          src={url}
+          alt=""
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).style.display = "none";
+          }}
+        />
+      )}
+    </div>
+  );
+}
 
 function ExplorePage() {
   const navigate = useNavigate();
@@ -125,6 +251,21 @@ function ExplorePage() {
 
       {isSearchActive && data && (
         <div className="space-y-8">
+          {/* ── Top result ── */}
+          {data.topResult && (
+            <section>
+              <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-3">
+                Top result
+              </h2>
+              <TopResultCard
+                data={data}
+                onPlayTrack={(mbid, artist, title) =>
+                  handlePreview(mbid, artist, title)
+                }
+              />
+            </section>
+          )}
+
           {/* ── Tracks ── */}
           {data.recordings.length > 0 && (
             <section>
@@ -189,20 +330,26 @@ function ExplorePage() {
               <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-3">
                 Artists
               </h2>
-              <div className="space-y-1">
+              <div
+                className="grid gap-x-4 gap-y-6"
+                style={{
+                  gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+                }}
+              >
                 {data.artists.map((artist) => (
                   <Link
                     key={artist.artistMbid}
                     to="/artists/$artistKey"
                     params={{ artistKey: artist.artistMbid }}
-                    className="block px-3 py-2 rounded-md hover:bg-accent/50 transition-colors"
+                    className="block"
                   >
-                    <p className="text-sm font-medium">{artist.name}</p>
-                    {artist.disambiguation && (
-                      <p className="text-xs text-muted-foreground">
-                        {artist.disambiguation}
-                      </p>
-                    )}
+                    <ArtistCard
+                      artist={{
+                        id: artist.artistMbid,
+                        name: artist.name,
+                        imageUrl: artist.imageUrl,
+                      }}
+                    />
                   </Link>
                 ))}
               </div>

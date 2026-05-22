@@ -141,6 +141,8 @@ export function toMetadataSearchRecording(
     releaseGroupMbid: release?.["release-group"]?.id ?? null,
     releaseYear: parseReleaseYear(release?.date),
     durationMs: raw.length ?? null,
+    // Popularity is attached by the route after the ListenBrainz lookup.
+    listenCount: null,
   };
 }
 
@@ -153,15 +155,17 @@ export function toMetadataSearchArtist(
     name: raw.name,
     disambiguation: raw.disambiguation ?? null,
     type: raw.type ?? null,
+    listenCount: null,
   };
 }
 
 // R3: release search hits deduped to one row per release-group. Mirrors the
 // server's old searchReleasesByQuery — group by release-group (fallback release
-// id), pick the best pressing per group via pickBestRelease.
+// id), pick the best pressing per group via pickBestRelease. Returns each row
+// paired with the winning pressing's Solr score (used for ranking).
 export function toMetadataSearchReleases(
   raw: ReleaseSearchResponse["releases"],
-): MetadataSearchRelease[] {
+): Array<{ item: MetadataSearchRelease; lexScore: number }> {
   const byGroup = new Map<string, ReleaseSearchResponse["releases"]>();
   for (const r of raw) {
     const groupId = r["release-group"]?.id ?? r.id;
@@ -170,7 +174,7 @@ export function toMetadataSearchReleases(
     byGroup.set(groupId, group);
   }
 
-  const results: MetadataSearchRelease[] = [];
+  const results: Array<{ item: MetadataSearchRelease; lexScore: number }> = [];
   for (const group of byGroup.values()) {
     const first = group[0];
     if (!first) continue;
@@ -178,13 +182,17 @@ export function toMetadataSearchReleases(
     const best = group.find((r) => r.id === bestId) ?? first;
     const artist = best["artist-credit"]?.[0]?.artist;
     results.push({
-      releaseMbid: best.id,
-      releaseGroupMbid: best["release-group"]?.id ?? null,
-      title: best.title ?? "",
-      artistName: artist?.name ?? "Unknown Artist",
-      artistMbid: artist?.id ?? null,
-      releaseYear: parseReleaseYear(best.date),
-      releaseType: best["release-group"]?.["primary-type"] ?? null,
+      item: {
+        releaseMbid: best.id,
+        releaseGroupMbid: best["release-group"]?.id ?? null,
+        title: best.title ?? "",
+        artistName: artist?.name ?? "Unknown Artist",
+        artistMbid: artist?.id ?? null,
+        releaseYear: parseReleaseYear(best.date),
+        releaseType: best["release-group"]?.["primary-type"] ?? null,
+        listenCount: null,
+      },
+      lexScore: best.score ?? 0,
     });
   }
   return results;

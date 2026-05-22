@@ -9,6 +9,11 @@ import { z } from "zod";
 // Named MetadataSearch* (not External*) to avoid a barrel collision with
 // api/search.ts, which exports ExternalArtistResult / ExternalReleaseResult.
 
+// Per-item ListenBrainz popularity (total global listen count), used by the
+// façade for ranking and surfaced for optional display. Null when LB has no
+// data for the MBID or the popularity lookup was unavailable.
+const listenCount = z.number().nullable();
+
 export const MetadataSearchRecordingSchema = z.object({
   recordingMbid: z.string(),
   title: z.string(),
@@ -21,6 +26,7 @@ export const MetadataSearchRecordingSchema = z.object({
   releaseGroupMbid: z.string().nullable(),
   releaseYear: z.number().nullable(),
   durationMs: z.number().nullable(),
+  listenCount,
 });
 export type MetadataSearchRecording = z.infer<
   typeof MetadataSearchRecordingSchema
@@ -31,6 +37,7 @@ export const MetadataSearchArtistSchema = z.object({
   name: z.string(),
   disambiguation: z.string().nullable(),
   type: z.string().nullable(),
+  listenCount,
 });
 export type MetadataSearchArtist = z.infer<typeof MetadataSearchArtistSchema>;
 
@@ -42,12 +49,25 @@ export const MetadataSearchReleaseSchema = z.object({
   artistMbid: z.string().nullable(),
   releaseYear: z.number().nullable(),
   releaseType: z.string().nullable(),
+  listenCount,
 });
 export type MetadataSearchRelease = z.infer<typeof MetadataSearchReleaseSchema>;
+
+// Cross-category best match. A pointer into the sections (the top entity is
+// always present in its section list), so it carries no duplicated data and
+// inherits the server's enrichment.
+export const MetadataSearchTopResultSchema = z.object({
+  type: z.enum(["recording", "artist", "release"]),
+  mbid: z.string(),
+});
+export type MetadataSearchTopResult = z.infer<
+  typeof MetadataSearchTopResultSchema
+>;
 
 export const MetadataSearchResultsSchema = z.object({
   recordings: z.array(MetadataSearchRecordingSchema),
   artists: z.array(MetadataSearchArtistSchema),
   releases: z.array(MetadataSearchReleaseSchema),
+  topResult: MetadataSearchTopResultSchema.nullable(),
 });
 export type MetadataSearchResults = z.infer<typeof MetadataSearchResultsSchema>;
