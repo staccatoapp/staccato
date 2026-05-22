@@ -1,5 +1,3 @@
-// TODO - desperately needs cleaning up and splitting out, file is messy, but i cba right now
-
 import PQueue from "p-queue";
 import { APP_USER_AGENT } from "../constants.js";
 import { logger } from "../logger.js";
@@ -22,10 +20,6 @@ import {
   type MetadataReleaseTrack,
   type MetadataSearchResults,
 } from "@staccato/shared";
-import {
-  MBRecordingSearchResponseSchema,
-  MBReleaseGroupSearchResponseSchema,
-} from "./schemas.js";
 
 export interface RecordingMatch {
   recordingMbid: string;
@@ -43,16 +37,6 @@ export type MBReleaseTrack = MetadataReleaseTrack;
 export type MBReleaseDetails = MetadataReleaseDetail;
 export type ExternalAlbumDetail = MetadataAlbumDetail;
 
-interface MBReleaseLike {
-  id: string;
-  title?: string | null;
-  date?: string | null;
-  status?: string | null;
-  "release-group"?: {
-    id?: string | null;
-    "primary-type"?: string | null;
-  } | null;
-}
 
 function parseReleaseYear(date?: string | null): number | null {
   if (!date) return null;
@@ -60,17 +44,13 @@ function parseReleaseYear(date?: string | null): number | null {
   return Number.isNaN(year) ? null : year;
 }
 
-const MB_BASE = process.env.METADATA_URL ?? "https://musicbrainz.org/ws/2";
-// Façade base — all migrated routes (lookups + searches + assets) go through
-// the metadata service. Exported so the asset clients (artistimage, coverart)
-// share one source until the full base-URL consolidation in 3.6.
 export const FACADE_BASE =
   process.env.STACCATO_METADATA_URL ?? "http://localhost:8290/v1";
 
 // Throttle knobs for the shared MB queue. Defaults match MusicBrainz's public
-// 1-req/sec limit. When pointed at our own mirror/façade (METADATA_URL), raise
-// MB_CONCURRENCY and set MB_RATE_LIMIT_MS=0 to drop the time-window cap so only
-// concurrency governs throughput.
+// 1-req/sec limit. When pointed at the hosted façade (STACCATO_METADATA_URL),
+// raise MB_CONCURRENCY and set MB_RATE_LIMIT_MS=0 to drop the time-window cap
+// so only concurrency governs throughput.
 //   MB_CONCURRENCY   — max simultaneous in-flight requests   (default 1)
 //   MB_INTERVAL_CAP  — max requests started per interval      (default 1)
 //   MB_RATE_LIMIT_MS — interval window in ms; 0 disables it   (default 1100)
@@ -107,7 +87,7 @@ log.info(
     concurrency: MB_CONCURRENCY,
     intervalCap: MB_INTERVAL_CAP,
     intervalMs: MB_INTERVAL_MS,
-    metadataUrl: MB_BASE,
+    facadeUrl: FACADE_BASE,
   },
   "mb throttle configured",
 );
@@ -146,108 +126,6 @@ const TYPE_RANK: Record<string, number> = {
   Broadcast: 3,
   Other: 4,
 };
-
-// TODO - working, but could be improved further by also considering release group types, and maybe doing a separate search for release groups when we have an album hint? need to experiment more with the best way to leverage release group info in matching
-export async function searchRecording(
-  artistName: string,
-  title: string,
-  hint?: { albumTitle: string; releaseYear?: number },
-  priority: MbPriority = MB_PRIORITY.BACKGROUND,
-): Promise<RecordingMatch | null> {
-  // first try match on artist + title - gets the better tagged matches out of the way faster
-  // video:false excludes music-video recordings, which share artist+title with the audio recording
-  // and can outrank it in MB's relevance scoring (e.g. alt-J "Breezeblocks")
-  const artistAndTitleMatch = await attemptRecordingSearch(
-    `artist:"${artistName}" AND recording:"${title}" AND video:false`,
-    85,
-    hint,
-    priority,
-  );
-  if (artistAndTitleMatch) return artistAndTitleMatch;
-
-  // then try album + title for cases where files aren't tagged with artist
-  // there probably is a cleaner/more reusable way to construct the queries. im just happy it's working atm tbh
-  if (hint?.albumTitle) {
-    return attemptRecordingSearch(
-      `recording:"${title}" AND release:"${hint.albumTitle}" AND video:false`,
-      90,
-      hint,
-      priority,
-    );
-  }
-
-  return null;
-}
-
-async function attemptRecordingSearch(
-  queryStr: string,
-  minScore: number,
-  hint?: { albumTitle: string; releaseYear?: number },
-  priority: MbPriority = MB_PRIORITY.BACKGROUND,
-): Promise<RecordingMatch | null> {
-  try {
-    const query = new URLSearchParams({
-      query: queryStr,
-      fmt: "json",
-      limit: "10", // unsure here. 10 seems to be enough for hitting the right recording without iterating through too many junk ones, need to play more
-    });
-    const response = await throttledFetch(
-      `${MB_BASE}/recording?${query}&inc=releases+release-groups+artist-credits`,
-      { priority },
-    );
-    if (!response.ok) {
-      log.warn(
-        {
-          status: response.status,
-          operation: "attemptRecordingSearch",
-          query: queryStr,
-        },
-        "mb recording search non-ok response",
-      );
-      return null;
-    }
-    const data = MBRecordingSearchResponseSchema.parse(await response.json());
-    const normalizedHint = hint?.albumTitle
-      ? normalizeString(hint.albumTitle)
-      : null;
-    for (const recording of data.recordings) {
-      if (recording.video === true) continue;
-      if (recording.score < minScore) continue;
-      if (
-        normalizedHint &&
-        recording.releases &&
-        recording.releases.length > 0
-      ) {
-        const matchesHint = recording.releases.some(
-          (rel) => rel.title && normalizeString(rel.title) === normalizedHint,
-        );
-        if (!matchesHint) continue;
-      }
-      const bestReleaseMbid = recording.releases?.length
-        ? pickBestRelease(recording.releases, hint)
-        : null;
-      const bestRelease =
-        recording.releases?.find((rel) => rel.id === bestReleaseMbid) ??
-        recording.releases?.[0];
-      return {
-        recordingMbid: recording.id,
-        releaseMbid: bestReleaseMbid,
-        releaseGroupMbid: bestRelease?.["release-group"]?.id ?? null,
-        score: recording.score,
-        mbArtistName: recording["artist-credit"]?.[0]?.artist.name ?? null,
-        mbArtistId: recording["artist-credit"]?.[0]?.artist.id ?? null,
-        mbTrackTitle: recording.title ?? null,
-      };
-    }
-    return null;
-  } catch (err) {
-    log.warn(
-      { err, operation: "attemptRecordingSearch", query: queryStr },
-      "mb recording search failed",
-    );
-    return null;
-  }
-}
 
 // R3 · unified free-text search. One façade call fans out across the
 // recording/artist/release Solr indexes and returns all three categories,
@@ -450,56 +328,6 @@ export async function lookupReleaseDetails(
   }
 }
 
-export async function searchReleaseGroupCandidates(
-  albumTitle: string,
-  artistName: string,
-  priority: MbPriority = MB_PRIORITY.BACKGROUND,
-): Promise<string[]> {
-  try {
-    const params = new URLSearchParams({
-      query: `artist:"${artistName}" AND releasegroup:"${albumTitle}"`,
-      inc: "releases+artist-credits",
-      fmt: "json",
-      limit: "5",
-    });
-    const response = await throttledFetch(
-      `${MB_BASE}/release-group?${params}`,
-      {
-        priority,
-      },
-    );
-    if (!response.ok) {
-      log.warn(
-        {
-          status: response.status,
-          operation: "searchReleaseGroupCandidates",
-          albumTitle,
-          artistName,
-        },
-        "mb release-group search non-ok response",
-      );
-      return [];
-    }
-    const data = MBReleaseGroupSearchResponseSchema.parse(
-      await response.json(),
-    );
-    return data["release-groups"]
-      .filter((rg) => rg.score >= 80)
-      .map((rg) => rg.id);
-  } catch (err) {
-    log.warn(
-      {
-        err,
-        operation: "searchReleaseGroupCandidates",
-        albumTitle,
-        artistName,
-      },
-      "mb release-group search failed",
-    );
-    return [];
-  }
-}
-
 export type ExternalArtistDetail = MetadataArtist;
 export type ArtistReleaseGroup = MetadataArtistReleaseGroup;
 
@@ -599,33 +427,3 @@ export async function lookupExternalAlbum(
   }
 }
 
-function pickBestRelease(
-  releases: MBReleaseLike[],
-  hint?: { albumTitle: string; releaseYear?: number },
-): string | null {
-  const officialRelease = releases.filter((r) => r.status === "Official");
-  if (officialRelease.length === 0) return null;
-
-  if (hint) {
-    const albumTitle = normalizeString(hint.albumTitle);
-    const hintMatch = officialRelease.find((r) => {
-      if (!r.title || normalizeString(r.title) !== albumTitle) return false;
-      if (hint.releaseYear && r.date) {
-        return r.date.startsWith(String(hint.releaseYear));
-      }
-      return true;
-    });
-    if (hintMatch) return hintMatch.id;
-  }
-
-  return (
-    [...officialRelease].sort((a, b) => {
-      const rankA =
-        TYPE_RANK[a["release-group"]?.["primary-type"] ?? "Other"] ?? 4;
-      const rankB =
-        TYPE_RANK[b["release-group"]?.["primary-type"] ?? "Other"] ?? 4;
-      if (rankA !== rankB) return rankA - rankB;
-      return (a.date ?? "9999") < (b.date ?? "9999") ? -1 : 1;
-    })[0]?.id ?? null
-  );
-}

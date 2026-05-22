@@ -4,6 +4,7 @@ import {
   type MetadataRecording,
 } from "@staccato/shared";
 import {
+  FACADE_BASE,
   MB_PRIORITY,
   type MbPriority,
   throttledFetch,
@@ -13,11 +14,6 @@ import type { RecordingCandidate } from "./types.js";
 import type { ResolutionMethod } from "../db/schema/tracks.js";
 
 const log = logger.child({ module: "library:mb-lookup" });
-
-// Façade base — both recording lookup (R1) and structured search (R2) go
-// through the metadata service.
-const FACADE_BASE =
-  process.env.STACCATO_METADATA_URL ?? "http://localhost:8290/v1";
 
 // MetadataRecording's artistCredits/releases are structurally identical to the
 // resolver's ArtistCredit[]/ReleaseCandidate[] — only the resolution fields
