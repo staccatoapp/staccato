@@ -6,15 +6,23 @@ import { logger } from "../logger.js";
 
 const log = logger.child({ module: "musicbrainz" });
 import {
-  MBArtistLookupSchema,
-  MBArtistReleaseGroupsSchema,
-  MBArtistSearchResponseSchema,
-  MBExternalRecordingSearchResponseSchema,
-  MBRecordingLookupSchema,
+  MetadataAlbumDetailSchema,
+  MetadataArtistDetailSchema,
+  MetadataRecordingSchema,
+  MetadataReleaseDetailSchema,
+  MetadataSearchResultsSchema,
+  type MetadataAlbumDetail,
+  type MetadataArtistDetail,
+  type MetadataArtistReleaseGroup,
+  type MetadataArtist,
+  type MetadataRelease,
+  type MetadataReleaseDetail,
+  type MetadataReleaseTrack,
+  type MetadataSearchResults,
+} from "@staccato/shared";
+import {
   MBRecordingSearchResponseSchema,
-  MBReleaseGroupLookupSchema,
   MBReleaseGroupSearchResponseSchema,
-  MBReleaseLookupSchema,
   MBReleaseSearchResponseSchema,
 } from "./schemas.js";
 
@@ -28,62 +36,11 @@ export interface RecordingMatch {
   mbTrackTitle: string | null;
 }
 
-export interface ExternalRecordingResult {
-  recordingMbid: string;
-  title: string;
-  artistName: string;
-  artistMbid: string | null;
-  releaseName: string | null;
-  releaseMbid: string | null;
-  releaseYear: number | null;
-  durationMs: number | null;
-}
-
-export interface ExternalArtistResult {
-  artistMbid: string;
-  name: string;
-  disambiguation: string | null;
-  type: string | null;
-}
-
-export interface ExternalReleaseResult {
-  releaseMbid: string;
-  releaseGroupMbid: string | null;
-  title: string;
-  artistName: string;
-  artistMbid: string | null;
-  releaseYear: number | null;
-  releaseType: string | null;
-}
-
-export interface ExternalAlbumDetail {
-  releaseGroupMbid: string;
-  releaseMbid: string;
-  title: string;
-  artistName: string;
-  artistMbid: string | null;
-  releaseYear: number | null;
-  releaseType: string | null;
-  tracks: MBReleaseTrack[];
-}
-
-export interface MBReleaseTrack {
-  discPosition: number;
-  trackPosition: number;
-  recordingMbid: string;
-  title: string;
-  durationMs: number | null;
-}
-
-export interface MBReleaseDetails {
-  tracks: MBReleaseTrack[];
-  releaseName: string | null;
-  disambiguation: string | null;
-  releaseYear: number | null;
-  artistMbid: string | null;
-  artistName: string | null;
-  releaseGroupMbid: string | null;
-}
+// Lookup DTOs now live in packages/shared as the façade contract. Aliased here
+// so existing imports (identify.ts, etc.) keep working.
+export type MBReleaseTrack = MetadataReleaseTrack;
+export type MBReleaseDetails = MetadataReleaseDetail;
+export type ExternalAlbumDetail = MetadataAlbumDetail;
 
 // One row per MusicBrainz release (specific pressing) for the Identify dialog.
 export interface IdentifyReleaseCandidate {
@@ -118,6 +75,10 @@ function parseReleaseYear(date?: string | null): number | null {
 }
 
 const MB_BASE = process.env.METADATA_URL ?? "https://musicbrainz.org/ws/2";
+// Façade base — migrated lookups (R1 recs, R4, R6, R7) go through the metadata
+// service. Raw-MB search calls below still use MB_BASE until 3.2–3.5.
+const FACADE_BASE =
+  process.env.STACCATO_METADATA_URL ?? "http://localhost:8290/v1";
 
 // Throttle knobs for the shared MB queue. Defaults match MusicBrainz's public
 // 1-req/sec limit. When pointed at our own mirror/façade (METADATA_URL), raise
@@ -301,156 +262,34 @@ async function attemptRecordingSearch(
   }
 }
 
-export async function searchRecordingsByQuery(
+// R3 · unified free-text search. One façade call fans out across the
+// recording/artist/release Solr indexes and returns all three categories,
+// replacing the three raw-MB *ByQuery functions. The server layers in-library /
+// cover-art / artist-image enrichment on top (routes/search.ts).
+export async function searchExternalUnified(
   query: string,
   limit = 10,
   priority: MbPriority = MB_PRIORITY.BACKGROUND,
-): Promise<ExternalRecordingResult[]> {
+): Promise<MetadataSearchResults | null> {
   try {
-    const params = new URLSearchParams({
-      query,
-      fmt: "json",
-      limit: String(limit),
-    });
-    const response = await throttledFetch(
-      `${MB_BASE}/recording?${params}&inc=releases+release-groups+artist-credits`,
-      { priority },
-    );
-    if (!response.ok) {
-      log.warn(
-        {
-          status: response.status,
-          operation: "searchRecordingsByQuery",
-          query,
-        },
-        "mb external recording search non-ok response",
-      );
-      return [];
-    }
-    const data = MBExternalRecordingSearchResponseSchema.parse(
-      await response.json(),
-    );
-    return data.recordings
-      .filter((r) => r.video !== true)
-      .map((r) => {
-        const bestRelease = r.releases?.length
-          ? pickBestRelease(r.releases)
-          : null;
-        const releaseObj =
-          r.releases?.find((rel) => rel.id === bestRelease) ?? r.releases?.[0];
-        return {
-          recordingMbid: r.id,
-          title: r.title,
-          artistName: r["artist-credit"]?.[0]?.artist.name ?? "Unknown Artist",
-          artistMbid: r["artist-credit"]?.[0]?.artist.id ?? null,
-          releaseName: releaseObj?.title ?? null,
-          releaseMbid: releaseObj?.id ?? null,
-          releaseYear: parseReleaseYear(releaseObj?.date),
-          durationMs: r.length ?? null,
-        };
-      });
-  } catch (err) {
-    log.warn(
-      { err, operation: "searchRecordingsByQuery", query },
-      "mb external recording search failed",
-    );
-    return [];
-  }
-}
-
-export async function searchArtistsByQuery(
-  query: string,
-  limit = 5,
-  priority: MbPriority = MB_PRIORITY.BACKGROUND,
-): Promise<ExternalArtistResult[]> {
-  try {
-    const params = new URLSearchParams({
-      query,
-      fmt: "json",
-      limit: String(limit),
-    });
-    const response = await throttledFetch(`${MB_BASE}/artist?${params}`, {
+    const params = new URLSearchParams({ q: query, limit: String(limit) });
+    const response = await throttledFetch(`${FACADE_BASE}/search?${params}`, {
       priority,
     });
     if (!response.ok) {
       log.warn(
-        { status: response.status, operation: "searchArtistsByQuery", query },
-        "mb artist search non-ok response",
+        { status: response.status, operation: "searchExternalUnified", query },
+        "facade unified search non-ok response",
       );
-      return [];
+      return null;
     }
-    const data = MBArtistSearchResponseSchema.parse(await response.json());
-    return data.artists.map((a) => ({
-      artistMbid: a.id,
-      name: a.name,
-      disambiguation: a.disambiguation ?? null,
-      type: a.type ?? null,
-    }));
+    return MetadataSearchResultsSchema.parse(await response.json());
   } catch (err) {
     log.warn(
-      { err, operation: "searchArtistsByQuery", query },
-      "mb artist search failed",
+      { err, operation: "searchExternalUnified", query },
+      "facade unified search failed",
     );
-    return [];
-  }
-}
-
-export async function searchReleasesByQuery(
-  query: string,
-  limit = 8,
-  priority: MbPriority = MB_PRIORITY.BACKGROUND,
-): Promise<ExternalReleaseResult[]> {
-  try {
-    const fetchLimit = Math.min(limit * 3, 25);
-    const params = new URLSearchParams({
-      query,
-      fmt: "json",
-      limit: String(fetchLimit),
-    });
-    const response = await throttledFetch(
-      `${MB_BASE}/release?${params}&inc=artist-credits+release-groups`,
-      { priority },
-    );
-    if (!response.ok) {
-      log.warn(
-        { status: response.status, operation: "searchReleasesByQuery", query },
-        "mb release search non-ok response",
-      );
-      return [];
-    }
-    const data = MBReleaseSearchResponseSchema.parse(await response.json());
-
-    const byGroup = new Map<string, typeof data.releases>();
-    for (const r of data.releases) {
-      const rgId = r["release-group"]?.id ?? r.id;
-      const grp = byGroup.get(rgId) ?? [];
-      grp.push(r);
-      byGroup.set(rgId, grp);
-    }
-
-    const results: ExternalReleaseResult[] = [];
-    for (const grp of byGroup.values()) {
-      const firstRelease = grp[0];
-      if (!firstRelease) continue;
-      const bestId = pickBestRelease(grp) ?? firstRelease.id;
-      const best = grp.find((r) => r.id === bestId) ?? firstRelease;
-      results.push({
-        releaseMbid: best.id,
-        releaseGroupMbid: best["release-group"]?.id ?? null,
-        title: best.title,
-        artistName: best["artist-credit"]?.[0]?.artist.name ?? "Unknown Artist",
-        artistMbid: best["artist-credit"]?.[0]?.artist.id ?? null,
-        releaseYear: parseReleaseYear(best.date),
-        releaseType: best["release-group"]?.["primary-type"] ?? null,
-      });
-    }
-    return results.slice(0, limit);
-  } catch (err) {
-    log.warn(
-      { err, operation: "searchReleasesByQuery", query },
-      "mb release search failed",
-    );
-    return [];
+    return null;
   }
 }
 
@@ -563,6 +402,24 @@ export interface MBRecordingDetail {
   durationMs: number | null;
 }
 
+// Server-side release selection over the façade's MetadataRelease[] (R1 returns
+// the full release set; the recs projection picks one). Same policy as the raw
+// pickBestRelease below, expressed over the DTO field names.
+function pickCanonicalRelease(
+  releases: MetadataRelease[],
+): MetadataRelease | null {
+  const official = releases.filter((r) => r.status === "Official");
+  if (official.length === 0) return null;
+  return (
+    [...official].sort((a, b) => {
+      const rankA = TYPE_RANK[a.primaryType ?? "Other"] ?? 4;
+      const rankB = TYPE_RANK[b.primaryType ?? "Other"] ?? 4;
+      if (rankA !== rankB) return rankA - rankB;
+      return (a.date ?? "9999") < (b.date ?? "9999") ? -1 : 1;
+    })[0] ?? null
+  );
+}
+
 const recordingDetailCache = new Map<string, MBRecordingDetail | null>();
 const recordingDetailInflight = new Map<
   string,
@@ -582,7 +439,7 @@ export async function lookupRecording(
   const promise = (async (): Promise<MBRecordingDetail | null> => {
     try {
       const response = await throttledFetch(
-        `${MB_BASE}/recording/${mbid}?inc=artist-credits+releases+release-groups&fmt=json`,
+        `${FACADE_BASE}/recordings/${mbid}`,
         { priority },
       );
       if (!response.ok) {
@@ -592,31 +449,28 @@ export async function lookupRecording(
             operation: "lookupRecording",
             recordingMbid: mbid,
           },
-          "mb recording lookup non-ok response",
+          "facade recording lookup non-ok response",
         );
         return null;
       }
-      const data = MBRecordingLookupSchema.parse(await response.json());
-      const bestReleaseMbid = data.releases?.length
-        ? pickBestRelease(data.releases)
-        : null;
-      const bestRelease =
-        data.releases?.find((r) => r.id === bestReleaseMbid) ??
-        data.releases?.[0];
+      const data = MetadataRecordingSchema.parse(await response.json());
+      const best =
+        pickCanonicalRelease(data.releases) ?? data.releases[0] ?? null;
+      const artist = data.artistCredits[0];
       return {
-        recordingMbid: mbid,
-        title: data.title ?? "",
-        artistName: data["artist-credit"]?.[0]?.artist.name ?? null,
-        artistMbid: data["artist-credit"]?.[0]?.artist.id ?? null,
-        releaseGroupMbid: bestRelease?.["release-group"]?.id ?? null,
-        releaseName: bestRelease?.title ?? null,
-        releaseYear: parseReleaseYear(bestRelease?.date),
-        durationMs: data.length ?? null,
+        recordingMbid: data.recordingMbid,
+        title: data.title,
+        artistName: artist?.name ?? null,
+        artistMbid: artist?.mbid ?? null,
+        releaseGroupMbid: best?.releaseGroupMbid ?? null,
+        releaseName: best?.title ?? null,
+        releaseYear: parseReleaseYear(best?.date),
+        durationMs: data.durationMs,
       };
     } catch (err) {
       log.warn(
         { err, operation: "lookupRecording", recordingMbid: mbid },
-        "mb recording lookup failed",
+        "facade recording lookup failed",
       );
       return null;
     }
@@ -638,7 +492,7 @@ export async function lookupReleaseDetails(
 ): Promise<MBReleaseDetails | null> {
   try {
     const response = await throttledFetch(
-      `${MB_BASE}/release/${releaseMbid}?inc=recordings+artist-credits+release-groups&fmt=json`,
+      `${FACADE_BASE}/releases/${releaseMbid}`,
       { priority },
     );
     if (!response.ok) {
@@ -648,34 +502,15 @@ export async function lookupReleaseDetails(
           operation: "lookupReleaseDetails",
           releaseMbid,
         },
-        "mb release lookup non-ok response",
+        "facade release lookup non-ok response",
       );
       return null;
     }
-    const data = MBReleaseLookupSchema.parse(await response.json());
-    return {
-      tracks: data.media.flatMap((disc) =>
-        disc.tracks
-          .filter((t) => t.recording.video !== true)
-          .map((t) => ({
-            discPosition: disc.position,
-            trackPosition: t.position,
-            recordingMbid: t.recording.id,
-            title: t.title,
-            durationMs: t.length ?? null,
-          })),
-      ),
-      releaseName: data.title ?? null,
-      disambiguation: data.disambiguation ?? null,
-      releaseYear: parseReleaseYear(data.date),
-      artistMbid: data["artist-credit"]?.[0]?.artist.id ?? null,
-      artistName: data["artist-credit"]?.[0]?.artist.name ?? null,
-      releaseGroupMbid: data["release-group"]?.id ?? null,
-    };
+    return MetadataReleaseDetailSchema.parse(await response.json());
   } catch (err) {
     log.warn(
       { err, operation: "lookupReleaseDetails", releaseMbid },
-      "mb release lookup failed",
+      "facade release lookup failed",
     );
     return null;
   }
@@ -731,63 +566,51 @@ export async function searchReleaseGroupCandidates(
   }
 }
 
-export interface ExternalArtistDetail {
-  artistMbid: string;
-  name: string;
-  disambiguation: string | null;
-}
+export type ExternalArtistDetail = MetadataArtist;
+export type ArtistReleaseGroup = MetadataArtistReleaseGroup;
 
-export interface ArtistReleaseGroup {
-  releaseGroupMbid: string;
-  title: string;
-  firstReleaseDate: string | null;
-  primaryType: string | null;
-  secondaryTypes: string[];
-}
-
-const artistDetailCache = new Map<string, ExternalArtistDetail | null>();
+const artistDetailCache = new Map<string, MetadataArtistDetail | null>();
 const artistDetailInflight = new Map<
   string,
-  Promise<ExternalArtistDetail | null>
+  Promise<MetadataArtistDetail | null>
 >();
 
-export async function lookupExternalArtist(
+// R7 · artist detail + discography in one façade round-trip. Replaces the
+// previously separate lookupExternalArtist + getArtistReleaseGroups (the
+// paginated release-group fetch now lives in the façade). Consumers read
+// whichever half they need — the local-with-MBID branch uses only releaseGroups.
+export async function lookupArtistDetail(
   artistMbid: string,
   priority: MbPriority = MB_PRIORITY.BACKGROUND,
-): Promise<ExternalArtistDetail | null> {
+): Promise<MetadataArtistDetail | null> {
   if (artistDetailCache.has(artistMbid)) {
     return artistDetailCache.get(artistMbid) ?? null;
   }
   const existing = artistDetailInflight.get(artistMbid);
   if (existing) return existing;
 
-  const promise = (async (): Promise<ExternalArtistDetail | null> => {
+  const promise = (async (): Promise<MetadataArtistDetail | null> => {
     try {
       const response = await throttledFetch(
-        `${MB_BASE}/artist/${artistMbid}?fmt=json`,
+        `${FACADE_BASE}/artists/${artistMbid}`,
         { priority },
       );
       if (!response.ok) {
         log.warn(
           {
             status: response.status,
-            operation: "lookupExternalArtist",
+            operation: "lookupArtistDetail",
             artistMbid,
           },
-          "mb artist lookup non-ok response",
+          "facade artist lookup non-ok response",
         );
         return null;
       }
-      const data = MBArtistLookupSchema.parse(await response.json());
-      return {
-        artistMbid: data.id,
-        name: data.name,
-        disambiguation: data.disambiguation ?? null,
-      };
+      return MetadataArtistDetailSchema.parse(await response.json());
     } catch (err) {
       log.warn(
-        { err, operation: "lookupExternalArtist", artistMbid },
-        "mb artist lookup failed",
+        { err, operation: "lookupArtistDetail", artistMbid },
+        "facade artist lookup failed",
       );
       return null;
     }
@@ -800,82 +623,6 @@ export async function lookupExternalArtist(
     return result;
   } finally {
     artistDetailInflight.delete(artistMbid);
-  }
-}
-
-const artistReleaseGroupsCache = new Map<string, ArtistReleaseGroup[]>();
-const artistReleaseGroupsInflight = new Map<
-  string,
-  Promise<ArtistReleaseGroup[]>
->();
-
-const MB_RG_PAGE_LIMIT = 100;
-const MB_RG_MAX_PAGES = 5;
-
-export async function getArtistReleaseGroups(
-  artistMbid: string,
-  priority: MbPriority = MB_PRIORITY.BACKGROUND,
-): Promise<ArtistReleaseGroup[]> {
-  const cached = artistReleaseGroupsCache.get(artistMbid);
-  if (cached) return cached;
-  const existing = artistReleaseGroupsInflight.get(artistMbid);
-  if (existing) return existing;
-
-  const promise = (async (): Promise<ArtistReleaseGroup[]> => {
-    const all: ArtistReleaseGroup[] = [];
-    try {
-      for (let page = 0; page < MB_RG_MAX_PAGES; page++) {
-        const params = new URLSearchParams({
-          artist: artistMbid,
-          type: "album|ep",
-          fmt: "json",
-          limit: String(MB_RG_PAGE_LIMIT),
-          offset: String(page * MB_RG_PAGE_LIMIT),
-        });
-        const response = await throttledFetch(
-          `${MB_BASE}/release-group?${params}`,
-          { priority },
-        );
-        if (!response.ok) {
-          log.warn(
-            {
-              status: response.status,
-              operation: "getArtistReleaseGroups",
-              artistMbid,
-              page,
-            },
-            "mb artist release-groups non-ok response",
-          );
-          break;
-        }
-        const data = MBArtistReleaseGroupsSchema.parse(await response.json());
-        for (const rg of data["release-groups"]) {
-          all.push({
-            releaseGroupMbid: rg.id,
-            title: rg.title,
-            firstReleaseDate: rg["first-release-date"] ?? null,
-            primaryType: rg["primary-type"] ?? null,
-            secondaryTypes: rg["secondary-types"] ?? [],
-          });
-        }
-        if (data["release-groups"].length < MB_RG_PAGE_LIMIT) break;
-      }
-    } catch (err) {
-      log.warn(
-        { err, operation: "getArtistReleaseGroups", artistMbid },
-        "mb artist release-groups failed",
-      );
-    }
-    return all;
-  })();
-
-  artistReleaseGroupsInflight.set(artistMbid, promise);
-  try {
-    const result = await promise;
-    artistReleaseGroupsCache.set(artistMbid, result);
-    return result;
-  } finally {
-    artistReleaseGroupsInflight.delete(artistMbid);
   }
 }
 
@@ -894,7 +641,7 @@ export async function lookupExternalAlbum(
 ): Promise<ExternalAlbumDetail | null> {
   try {
     const res = await throttledFetch(
-      `${MB_BASE}/release-group/${rgMbid}?inc=releases+artist-credits&fmt=json`,
+      `${FACADE_BASE}/release-groups/${rgMbid}`,
       { priority },
     );
     if (!res.ok) {
@@ -904,35 +651,15 @@ export async function lookupExternalAlbum(
           operation: "lookupExternalAlbum",
           releaseGroupMbid: rgMbid,
         },
-        "mb release-group lookup non-ok response",
+        "facade release-group lookup non-ok response",
       );
       return null;
     }
-    const rg = MBReleaseGroupLookupSchema.parse(await res.json());
-
-    const releases = rg.releases ?? [];
-    const releaseMbid = pickBestRelease(releases) ?? releases[0]?.id;
-    if (!releaseMbid) return null;
-
-    const canonical = releases.find((r) => r.id === releaseMbid) ?? releases[0];
-
-    const details = await lookupReleaseDetails(releaseMbid, priority);
-    if (!details) return null;
-
-    return {
-      releaseGroupMbid: rgMbid,
-      releaseMbid,
-      title: rg.title,
-      artistName: rg["artist-credit"]?.[0]?.artist.name ?? "Unknown Artist",
-      artistMbid: rg["artist-credit"]?.[0]?.artist.id ?? null,
-      releaseYear: parseReleaseYear(canonical?.date),
-      releaseType: rg["primary-type"] ?? null,
-      tracks: details.tracks,
-    };
+    return MetadataAlbumDetailSchema.parse(await res.json());
   } catch (err) {
     log.warn(
       { err, operation: "lookupExternalAlbum", releaseGroupMbid: rgMbid },
-      "mb release-group lookup failed",
+      "facade release-group lookup failed",
     );
     return null;
   }

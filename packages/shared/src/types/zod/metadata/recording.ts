@@ -30,7 +30,28 @@ export const MetadataRecordingSchema = z.object({
   recordingMbid: z.string(),
   title: z.string(),
   durationMs: z.number().nullable(),
+  // MB's video flag. The resolver drops video recordings (a music video shares
+  // artist+title with the audio recording); recommendation lookups ignore it.
+  video: z.boolean(),
   artistCredits: z.array(MetadataArtistCreditSchema),
   releases: z.array(MetadataReleaseSchema),
 });
 export type MetadataRecording = z.infer<typeof MetadataRecordingSchema>;
+
+// R2 · resolver structured search. The R1 recording shape plus the Solr
+// relevance score; the resolver ranks candidates and applies thresholds on it.
+export const MetadataRecordingSearchResultSchema = MetadataRecordingSchema.extend(
+  {
+    score: z.number(),
+  },
+);
+export type MetadataRecordingSearchResult = z.infer<
+  typeof MetadataRecordingSearchResultSchema
+>;
+
+export const MetadataRecordingSearchResponseSchema = z.object({
+  recordings: z.array(MetadataRecordingSearchResultSchema),
+});
+export type MetadataRecordingSearchResponse = z.infer<
+  typeof MetadataRecordingSearchResponseSchema
+>;

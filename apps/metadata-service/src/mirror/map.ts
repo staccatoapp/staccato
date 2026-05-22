@@ -1,13 +1,26 @@
 import type {
+  MetadataArtist,
   MetadataArtistCredit,
+  MetadataArtistReleaseGroup,
   MetadataRecording,
+  MetadataRecordingSearchResult,
   MetadataRelease,
+  MetadataReleaseDetail,
+  MetadataSearchArtist,
+  MetadataSearchRecording,
+  MetadataSearchRelease,
 } from "@staccato/shared";
 import type {
   ArtistCreditEntry,
+  ArtistLookup,
+  ArtistReleaseGroups,
+  ArtistSearchResponse,
   RecordingRich,
+  ReleaseLookup,
   ReleaseRich,
+  ReleaseSearchResponse,
 } from "./schemas.js";
+import { parseReleaseYear, pickBestRelease } from "./pickRelease.js";
 
 function toArtistCredits(
   raw: ArtistCreditEntry[] | null | undefined,
@@ -44,7 +57,135 @@ export function toMetadataRecording(raw: RecordingRich): MetadataRecording {
     recordingMbid: raw.id,
     title: raw.title ?? "",
     durationMs: raw.length ?? null,
+    video: raw.video ?? false,
     artistCredits: toArtistCredits(raw["artist-credit"]),
     releases: toReleases(raw.releases),
   };
+}
+
+// R2: one search hit — the R1 recording shape with the Solr score layered on.
+export function toMetadataRecordingSearchResult(
+  raw: RecordingRich & { score: number },
+): MetadataRecordingSearchResult {
+  return { ...toMetadataRecording(raw), score: raw.score };
+}
+
+// R4: release + flattened tracklist. Drops video recordings and reshapes the
+// nested media[].tracks[] into a flat MetadataReleaseTrack[] (the work the
+// server's lookupReleaseDetails used to do). Also reused for R6's tracklist.
+export function toMetadataReleaseDetail(
+  raw: ReleaseLookup,
+): MetadataReleaseDetail {
+  const artist = raw["artist-credit"]?.[0]?.artist;
+  return {
+    releaseName: raw.title ?? null,
+    disambiguation: raw.disambiguation ?? null,
+    releaseYear: parseReleaseYear(raw.date),
+    artistMbid: artist?.id ?? null,
+    artistName: artist?.name ?? null,
+    releaseGroupMbid: raw["release-group"]?.id ?? null,
+    tracks: raw.media.flatMap((disc) =>
+      disc.tracks
+        .filter((t) => t.recording.video !== true)
+        .map((t) => ({
+          discPosition: disc.position,
+          trackPosition: t.position,
+          recordingMbid: t.recording.id,
+          title: t.title,
+          durationMs: t.length ?? null,
+        })),
+    ),
+  };
+}
+
+// R7: artist detail half.
+export function toMetadataArtist(raw: ArtistLookup): MetadataArtist {
+  return {
+    artistMbid: raw.id,
+    name: raw.name,
+    disambiguation: raw.disambiguation ?? null,
+  };
+}
+
+// R7: discography half (one page of release-groups).
+export function toMetadataArtistReleaseGroups(
+  raw: ArtistReleaseGroups,
+): MetadataArtistReleaseGroup[] {
+  return raw["release-groups"].map((rg) => ({
+    releaseGroupMbid: rg.id,
+    title: rg.title,
+    firstReleaseDate: rg["first-release-date"] ?? null,
+    primaryType: rg["primary-type"] ?? null,
+    secondaryTypes: rg["secondary-types"] ?? [],
+  }));
+}
+
+// R3: one recording search hit, flattened to its best release. Mirrors the
+// server's old searchRecordingsByQuery: prefer the Official release ranked by
+// pickBestRelease, fall back to the first release. Carries releaseGroupMbid so
+// the server can attach cover art to track results.
+export function toMetadataSearchRecording(
+  raw: RecordingRich,
+): MetadataSearchRecording {
+  const bestId = raw.releases?.length ? pickBestRelease(raw.releases) : null;
+  const release =
+    raw.releases?.find((r) => r.id === bestId) ?? raw.releases?.[0] ?? null;
+  const artist = raw["artist-credit"]?.[0]?.artist;
+  return {
+    recordingMbid: raw.id,
+    title: raw.title ?? "",
+    artistName: artist?.name ?? "Unknown Artist",
+    artistMbid: artist?.id ?? null,
+    releaseName: release?.title ?? null,
+    releaseMbid: release?.id ?? null,
+    releaseGroupMbid: release?.["release-group"]?.id ?? null,
+    releaseYear: parseReleaseYear(release?.date),
+    durationMs: raw.length ?? null,
+  };
+}
+
+// R3: one artist search hit.
+export function toMetadataSearchArtist(
+  raw: ArtistSearchResponse["artists"][number],
+): MetadataSearchArtist {
+  return {
+    artistMbid: raw.id,
+    name: raw.name,
+    disambiguation: raw.disambiguation ?? null,
+    type: raw.type ?? null,
+  };
+}
+
+// R3: release search hits deduped to one row per release-group. Mirrors the
+// server's old searchReleasesByQuery — group by release-group (fallback release
+// id), pick the best pressing per group via pickBestRelease.
+export function toMetadataSearchReleases(
+  raw: ReleaseSearchResponse["releases"],
+): MetadataSearchRelease[] {
+  const byGroup = new Map<string, ReleaseSearchResponse["releases"]>();
+  for (const r of raw) {
+    const groupId = r["release-group"]?.id ?? r.id;
+    const group = byGroup.get(groupId) ?? [];
+    group.push(r);
+    byGroup.set(groupId, group);
+  }
+
+  const results: MetadataSearchRelease[] = [];
+  for (const group of byGroup.values()) {
+    const first = group[0];
+    if (!first) continue;
+    const bestId = pickBestRelease(group) ?? first.id;
+    const best = group.find((r) => r.id === bestId) ?? first;
+    const artist = best["artist-credit"]?.[0]?.artist;
+    results.push({
+      releaseMbid: best.id,
+      releaseGroupMbid: best["release-group"]?.id ?? null,
+      title: best.title ?? "",
+      artistName: artist?.name ?? "Unknown Artist",
+      artistMbid: artist?.id ?? null,
+      releaseYear: parseReleaseYear(best.date),
+      releaseType: best["release-group"]?.["primary-type"] ?? null,
+    });
+  }
+  return results;
 }

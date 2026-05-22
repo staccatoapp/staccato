@@ -45,30 +45,6 @@ export const MBRecordingSearchResponseSchema = z.object({
   recordings: z.array(RecordingSchema),
 });
 
-export const MBExternalRecordingSearchResponseSchema = z.object({
-  recordings: z.array(
-    z.object({
-      id: z.string(),
-      title: z.string(),
-      length: z.number().nullish(),
-      video: z.boolean().nullish(),
-      "artist-credit": ArtistCreditSchema.nullish(),
-      releases: z.array(ReleaseSchema).nullish(),
-    }),
-  ),
-});
-
-export const MBArtistSearchResponseSchema = z.object({
-  artists: z.array(
-    z.object({
-      id: z.string(),
-      name: z.string(),
-      disambiguation: z.string().nullish(),
-      type: z.string().nullish(),
-    }),
-  ),
-});
-
 export const MBReleaseSearchResponseSchema = z.object({
   releases: z.array(
     z.object({

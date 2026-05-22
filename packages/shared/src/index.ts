@@ -6,6 +6,10 @@ export * from "./types/zod/api/albums.js";
 export * from "./types/zod/api/artists.js";
 
 export * from "./types/zod/metadata/recording.js";
+export * from "./types/zod/metadata/release.js";
+export * from "./types/zod/metadata/album.js";
+export * from "./types/zod/metadata/artist.js";
+export * from "./types/zod/metadata/search.js";
 
 export * from "./types/typescript/auth.js";
 

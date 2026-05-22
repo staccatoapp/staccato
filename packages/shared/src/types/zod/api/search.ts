@@ -10,6 +10,7 @@ export const ExternalRecordingSchema = z.object({
   releaseYear: z.number().nullable(),
   durationMs: z.number().nullable(),
   inLibrary: z.boolean(),
+  coverArtUrl: z.string().nullable(),
 });
 export type ExternalRecording = z.infer<typeof ExternalRecordingSchema>;
 
@@ -39,8 +40,6 @@ export const ExternalSearchResultsSchema = z.object({
   releases: z.array(ExternalReleaseResultSchema),
 });
 export type ExternalSearchResults = z.infer<typeof ExternalSearchResultsSchema>;
-
-export type ExternalSearchType = "recording" | "release" | "artist";
 
 export const ExternalAlbumTrackSchema = z.object({
   discPosition: z.number(),

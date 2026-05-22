@@ -1,8 +1,6 @@
 import { FastifyPluginAsync } from "fastify";
 import {
-  searchArtistsByQuery,
-  searchRecordingsByQuery,
-  searchReleasesByQuery,
+  searchExternalUnified,
   MB_PRIORITY,
 } from "../musicbrainz/client.js";
 import { getLocalTrackMbidsByMbids } from "../db/queries/tracks.js";
@@ -38,97 +36,58 @@ async function attachArtistImagesByMbid<T extends { artistMbid: string }>(
   }));
 }
 
+const EMPTY = { recordings: [], artists: [], releases: [] };
+
 const searchRoutes: FastifyPluginAsync = async (fastify) => {
+  // Unified free-text search (R3). One façade call fans out across the
+  // recording/artist/release indexes; the server adds local-library marking,
+  // cover art, and artist images. Replaces the old per-type field-scoped search.
   fastify.get("/external", async (request) => {
-    const {
-      type,
-      recording,
-      release,
-      artist,
-      limit: rawLimit,
-    } = request.query as {
-      type?: string;
-      recording?: string;
-      release?: string;
-      artist?: string;
+    const { q, limit: rawLimit } = request.query as {
+      q?: string;
       limit?: string;
     };
 
-    logger.debug(
-      `Beginning external search. Type: ${type}. Recording: ${recording}. Release: ${release}. Artist: ${artist}`,
-    );
+    const query = q?.trim() ?? "";
+    if (query.length < 2) return EMPTY;
 
     const limit = Math.min(Number(rawLimit) || 10, 25);
+    logger.debug(`Beginning external search. Query: ${query}`);
 
-    if (type === "recording") {
-      const parts: string[] = [];
-      if (recording?.trim()) parts.push(`recording:"${recording.trim()}"`);
-      if (release?.trim()) parts.push(`release:"${release.trim()}"`);
-      if (artist?.trim()) parts.push(`artist:"${artist.trim()}"`);
-      if (parts.length === 0)
-        return { recordings: [], artists: [], releases: [] };
+    const results = await searchExternalUnified(
+      query,
+      limit,
+      MB_PRIORITY.INTERACTIVE,
+    );
+    if (!results) return EMPTY;
 
-      logger.debug(`Querying mb recordings with parts: ${parts.join(" AND ")}`);
-      const recordings = await searchRecordingsByQuery(
-        parts.join(" AND "),
-        limit,
-        MB_PRIORITY.INTERACTIVE,
-      );
-      logger.debug(
-        `Finished querying mb recordings with parts: ${parts.join(" AND ")}. Found ${recordings.length} recordings. Resolving local ids...`,
-      );
+    // Tracks: mark in-library and attach cover art (recordings now carry their
+    // best release's release-group, the Cover Art Archive key).
+    const localMbids = new Set(
+      getLocalTrackMbidsByMbids(results.recordings.map((r) => r.recordingMbid)),
+    );
+    const recordings = results.recordings.map((r) => ({
+      recordingMbid: r.recordingMbid,
+      title: r.title,
+      artistName: r.artistName,
+      artistMbid: r.artistMbid,
+      releaseName: r.releaseName,
+      releaseMbid: r.releaseMbid,
+      releaseYear: r.releaseYear,
+      durationMs: r.durationMs,
+      inLibrary: localMbids.has(r.recordingMbid),
+      coverArtUrl: r.releaseGroupMbid
+        ? resolveExternalCoverNow(r.releaseGroupMbid, MB_PRIORITY.INTERACTIVE)
+        : null,
+    }));
 
-      const mbids = recordings.map((r) => r.recordingMbid);
-      const localMbids = new Set(getLocalTrackMbidsByMbids(mbids));
-      logger.debug(`Local ids resolved`);
-      // recording results carry releaseMbid (not release-group), so they're
-      // returned without cover art — the album lookup endpoint resolves it.
-      return {
-        recordings: recordings.map((r) => ({
-          ...r,
-          inLibrary: localMbids.has(r.recordingMbid),
-        })),
-        artists: [],
-        releases: [],
-      };
-    }
+    const artists = await attachArtistImagesByMbid(results.artists);
+    const releases = attachCoverArtByReleaseGroup(results.releases);
 
-    if (type === "release") {
-      const parts: string[] = [];
-      if (release?.trim()) parts.push(`release:"${release.trim()}"`);
-      if (artist?.trim()) parts.push(`artist:"${artist.trim()}"`);
-      if (parts.length === 0)
-        return { recordings: [], artists: [], releases: [] };
-
-      logger.debug(`Querying mb releases with parts: ${parts.join(" AND ")}`);
-      const releases = await searchReleasesByQuery(
-        parts.join(" AND "),
-        limit,
-        MB_PRIORITY.INTERACTIVE,
-      );
-      logger.debug(
-        `Finished querying mb releases with parts: ${parts.join(" AND ")}. Found ${releases.length} recordings. Attaching cover art...`,
-      );
-      const withCovers = attachCoverArtByReleaseGroup(releases);
-      logger.debug(`Attached cover art`);
-      return { recordings: [], artists: [], releases: withCovers };
-    }
-
-    if (type === "artist") {
-      if (!artist?.trim()) return { recordings: [], artists: [], releases: [] };
-      logger.debug(`Querying mb artists for ${artist}`);
-      const artists = await searchArtistsByQuery(
-        `artist:"${artist.trim()}"`,
-        limit,
-        MB_PRIORITY.INTERACTIVE,
-      );
-      logger.debug(`Found ${artists.length} artists. Attaching artist art...`);
-      const withImages = await attachArtistImagesByMbid(artists);
-      logger.debug(`Artist art attached.`);
-      return { recordings: [], artists: withImages, releases: [] };
-    }
-
-    return { recordings: [], artists: [], releases: [] };
+    logger.debug(
+      `External search done. ${recordings.length} tracks, ${releases.length} albums, ${artists.length} artists.`,
+    );
+    return { recordings, artists, releases };
   });
 };
 

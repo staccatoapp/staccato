@@ -2,7 +2,6 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import type { ExternalSearchResults, RecommendedTrack } from "@staccato/shared";
 import { AlbumCard } from "@/components/music/AlbumCard";
 import { RecommendationTile } from "@/components/explore/RecommendationTile";
@@ -24,45 +23,11 @@ import { toUiStatus, useDownloads } from "@/hooks/useDownloads";
 
 export const Route = createFileRoute("/explore/")({ component: ExplorePage });
 
-type Tab = "tracks" | "albums" | "artists";
-
-function hasMinLength(
-  tab: Tab,
-  f: { track: string; album: string; artist: string },
-) {
-  if (tab === "tracks")
-    return f.track.length >= 2 || f.album.length >= 2 || f.artist.length >= 2;
-  if (tab === "albums") return f.album.length >= 2 || f.artist.length >= 2;
-  return f.artist.length >= 2;
-}
-
-function buildParams(
-  tab: Tab,
-  f: { track: string; album: string; artist: string },
-): URLSearchParams {
-  const p = new URLSearchParams();
-  if (tab === "tracks") {
-    p.set("type", "recording");
-    if (f.track) p.set("recording", f.track);
-    if (f.album) p.set("release", f.album);
-    if (f.artist) p.set("artist", f.artist);
-  } else if (tab === "albums") {
-    p.set("type", "release");
-    if (f.album) p.set("release", f.album);
-    if (f.artist) p.set("artist", f.artist);
-  } else {
-    p.set("type", "artist");
-    if (f.artist) p.set("artist", f.artist);
-  }
-  return p;
-}
-
 function ExplorePage() {
   const navigate = useNavigate();
   const { audioRef, playingMbid, handlePreview } = usePreviewAudio();
-  const [tab, setTab] = useState<Tab>("tracks");
-  const [fields, setFields] = useState({ track: "", album: "", artist: "" });
-  const [debounced, setDebounced] = useState(fields);
+  const [query, setQuery] = useState("");
+  const [debounced, setDebounced] = useState("");
   const [recDismissed, setRecDismissed] = useState<Set<string>>(new Set());
 
   const { data: recTracks, isLoading: recTracksLoading } =
@@ -74,33 +39,22 @@ function ExplorePage() {
   const retryDownload = useRetryDownload();
 
   useEffect(() => {
-    const t = setTimeout(() => setDebounced(fields), 300);
+    const t = setTimeout(() => setDebounced(query), 300);
     return () => clearTimeout(t);
-  }, [fields]);
+  }, [query]);
 
-  function switchTab(value: string | null) {
-    if (!value) return;
-    setTab(value as Tab);
-    setFields({ track: "", album: "", artist: "" });
-    setDebounced({ track: "", album: "", artist: "" });
-  }
+  const searched = debounced.trim().length >= 2;
 
   const { data, isFetching } = useQuery({
-    queryKey: [
-      "external-search",
-      tab,
-      debounced.track,
-      debounced.album,
-      debounced.artist,
-    ],
+    queryKey: ["external-search", debounced],
     queryFn: async (): Promise<ExternalSearchResults> => {
       const res = await fetch(
-        `/api/search/external?${buildParams(tab, debounced)}`,
+        `/api/search/external?q=${encodeURIComponent(debounced.trim())}`,
       );
       if (!res.ok) throw new Error("Search failed");
       return res.json();
     },
-    enabled: hasMinLength(tab, debounced),
+    enabled: searched,
     staleTime: 60_000,
   });
 
@@ -140,12 +94,7 @@ function ExplorePage() {
     });
   }
 
-  const isSearchActive =
-    fields.track.length > 0 ||
-    fields.album.length > 0 ||
-    fields.artist.length > 0;
-
-  const searched = hasMinLength(tab, debounced);
+  const isSearchActive = query.length > 0;
   const hasResults =
     data &&
     (data.recordings.length > 0 ||
@@ -163,56 +112,21 @@ function ExplorePage() {
       <audio ref={audioRef} />
       <h1 className="text-2xl font-bold tracking-tight mb-6">Explore</h1>
 
-      <Tabs value={tab} onValueChange={switchTab}>
-        <TabsList className="mb-3">
-          <TabsTrigger value="tracks">Tracks</TabsTrigger>
-          <TabsTrigger value="albums">Albums</TabsTrigger>
-          <TabsTrigger value="artists">Artists</TabsTrigger>
-        </TabsList>
+      <div className="max-w-lg mb-6">
+        <Input
+          placeholder="Search tracks, albums and artists…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          autoFocus
+        />
+      </div>
 
-        {/* ── Tracks tab ── */}
-        <TabsContent value="tracks">
-          <div className="max-w-lg mb-6 rounded-md border border-input overflow-hidden focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-0">
-            <Input
-              className="border-0 rounded-none shadow-none focus-visible:ring-0"
-              placeholder="Track title…"
-              value={fields.track}
-              onChange={(e) =>
-                setFields((f) => ({ ...f, track: e.target.value }))
-              }
-              autoFocus
-            />
-            <div className="flex items-center border-t border-border">
-              <span className="px-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground w-20 shrink-0 border-r border-border py-2">
-                Album
-              </span>
-              <Input
-                className="border-0 rounded-none shadow-none focus-visible:ring-0 text-sm py-2 h-auto"
-                placeholder="Album (optional)…"
-                value={fields.album}
-                onChange={(e) =>
-                  setFields((f) => ({ ...f, album: e.target.value }))
-                }
-              />
-            </div>
-            <div className="flex items-center border-t border-border">
-              <span className="px-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground w-20 shrink-0 border-r border-border py-2">
-                By artist
-              </span>
-              <Input
-                className="border-0 rounded-none shadow-none focus-visible:ring-0 text-sm py-2 h-auto"
-                placeholder="Artist (optional)…"
-                value={fields.artist}
-                onChange={(e) =>
-                  setFields((f) => ({ ...f, artist: e.target.value }))
-                }
-              />
-            </div>
-          </div>
+      {statusLine}
 
-          {statusLine}
-
-          {data && data.recordings.length > 0 && (
+      {isSearchActive && data && (
+        <div className="space-y-8">
+          {/* ── Tracks ── */}
+          {data.recordings.length > 0 && (
             <section>
               <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-3">
                 Tracks
@@ -226,7 +140,7 @@ function ExplorePage() {
                     title: recording.title,
                     artistName: recording.artistName,
                     albumTitle: recording.releaseName ?? null,
-                    coverArtUrl: null,
+                    coverArtUrl: recording.coverArtUrl,
                     durationMs: recording.durationMs,
                     inLibrary: recording.inLibrary ?? false,
                     releaseYear: recording.releaseYear,
@@ -242,75 +156,35 @@ function ExplorePage() {
               ))}
             </section>
           )}
-        </TabsContent>
 
-        {/* ── Albums tab ── */}
-        <TabsContent value="albums">
-          <div className="max-w-lg mb-6 rounded-md border border-input overflow-hidden focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-0">
-            <Input
-              className="border-0 rounded-none shadow-none focus-visible:ring-0"
-              placeholder="Album title…"
-              value={fields.album}
-              onChange={(e) =>
-                setFields((f) => ({ ...f, album: e.target.value }))
-              }
-              autoFocus
-            />
-            <div className="flex items-center border-t border-border">
-              <span className="px-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground w-20 shrink-0 border-r border-border py-2">
-                By artist
-              </span>
-              <Input
-                className="border-0 rounded-none shadow-none focus-visible:ring-0 text-sm py-2 h-auto"
-                placeholder="Artist (optional)…"
-                value={fields.artist}
-                onChange={(e) =>
-                  setFields((f) => ({ ...f, artist: e.target.value }))
-                }
-              />
-            </div>
-          </div>
-
-          {statusLine}
-
-          {data && data.releases.length > 0 && (
-            <div
-              className="grid gap-x-4 gap-y-6"
-              style={{
-                gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
-              }}
-            >
-              {data.releases.map((release) => (
-                <AlbumCard
-                  key={release.releaseMbid}
-                  title={release.title}
-                  artistName={release.artistName}
-                  releaseYear={release.releaseYear}
-                  coverArtUrl={release.coverArtUrl}
-                  href={`/albums/${release.releaseGroupMbid ?? release.releaseMbid}`}
-                />
-              ))}
-            </div>
+          {/* ── Albums ── */}
+          {data.releases.length > 0 && (
+            <section>
+              <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-3">
+                Albums
+              </h2>
+              <div
+                className="grid gap-x-4 gap-y-6"
+                style={{
+                  gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+                }}
+              >
+                {data.releases.map((release) => (
+                  <AlbumCard
+                    key={release.releaseMbid}
+                    title={release.title}
+                    artistName={release.artistName}
+                    releaseYear={release.releaseYear}
+                    coverArtUrl={release.coverArtUrl}
+                    href={`/albums/${release.releaseGroupMbid ?? release.releaseMbid}`}
+                  />
+                ))}
+              </div>
+            </section>
           )}
-        </TabsContent>
 
-        {/* ── Artists tab ── */}
-        <TabsContent value="artists">
-          <div className="max-w-lg mb-6 rounded-md border border-input overflow-hidden focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-0">
-            <Input
-              className="border-0 rounded-none shadow-none focus-visible:ring-0"
-              placeholder="Artist name…"
-              value={fields.artist}
-              onChange={(e) =>
-                setFields((f) => ({ ...f, artist: e.target.value }))
-              }
-              autoFocus
-            />
-          </div>
-
-          {statusLine}
-
-          {data && data.artists.length > 0 && (
+          {/* ── Artists ── */}
+          {data.artists.length > 0 && (
             <section>
               <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-3">
                 Artists
@@ -334,8 +208,8 @@ function ExplorePage() {
               </div>
             </section>
           )}
-        </TabsContent>
-      </Tabs>
+        </div>
+      )}
 
       {!isSearchActive && (
         <div className="mt-10 space-y-10">

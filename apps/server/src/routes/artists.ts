@@ -14,8 +14,7 @@ import {
   resolveArtistImageNow,
 } from "../artistimage/store.js";
 import {
-  getArtistReleaseGroups,
-  lookupExternalArtist,
+  lookupArtistDetail,
   MB_PRIORITY,
   type ArtistReleaseGroup,
 } from "../musicbrainz/client.js";
@@ -129,10 +128,10 @@ const artistRoutes: FastifyPluginAsync = async (fastify) => {
     if (localRow) {
       logger.debug(`Local artist of ID ${localId} found`);
       const libraryAlbums = getDiscographyAlbumsByArtistId(localRow.id);
-      const releaseGroups = localRow.musicbrainzId
-        ? await getArtistReleaseGroups(localRow.musicbrainzId, MB_PRIORITY.PAGE_LOAD)
-        : [];
-      const albums = mergeDiscography(releaseGroups, libraryAlbums);
+      const detail = localRow.musicbrainzId
+        ? await lookupArtistDetail(localRow.musicbrainzId, MB_PRIORITY.PAGE_LOAD)
+        : null;
+      const albums = mergeDiscography(detail?.releaseGroups ?? [], libraryAlbums);
 
       return {
         source: "local" as const,
@@ -158,13 +157,12 @@ const artistRoutes: FastifyPluginAsync = async (fastify) => {
       `No local artist for MBID ${artistKey} found. Searching externally`,
     );
 
-    const [external, releaseGroups, imageUrl] = await Promise.all([
-      lookupExternalArtist(artistKey, MB_PRIORITY.PAGE_LOAD),
-      getArtistReleaseGroups(artistKey, MB_PRIORITY.PAGE_LOAD),
+    const [detail, imageUrl] = await Promise.all([
+      lookupArtistDetail(artistKey, MB_PRIORITY.PAGE_LOAD),
       ensureArtistImageOnDisk(artistKey, MB_PRIORITY.PAGE_LOAD),
     ]);
 
-    if (!external) {
+    if (!detail) {
       request.log.warn(
         { artistKey },
         "external artist lookup returned nothing",
@@ -172,14 +170,14 @@ const artistRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(404).send({ error: "Artist not found" });
     }
 
-    const albums = mergeDiscography(releaseGroups, []);
+    const albums = mergeDiscography(detail.releaseGroups, []);
 
     return {
       source: "external" as const,
       artist: {
-        artistMbid: external.artistMbid,
-        name: external.name,
-        disambiguation: external.disambiguation,
+        artistMbid: detail.artist.artistMbid,
+        name: detail.artist.name,
+        disambiguation: detail.artist.disambiguation,
         imageUrl,
       },
       albums,
