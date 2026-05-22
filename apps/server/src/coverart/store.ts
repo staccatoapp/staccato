@@ -5,7 +5,7 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { coversDir } from "../paths.js";
 import { logger } from "../logger.js";
-import { fetchCoverArtUrlForGroup } from "./client.js";
+import { facadeCoverArtUrl, fetchCoverArtUrlForGroup } from "./client.js";
 import { MB_PRIORITY, type MbPriority } from "../musicbrainz/client.js";
 import { updateAlbumByAlbumId } from "../db/queries/albums.js";
 
@@ -113,7 +113,9 @@ export function resolveExternalCoverNow(
     );
   });
 
-  return `https://coverartarchive.org/release-group/${releaseGroupMbid}/front`;
+  // Serve the façade cover-art endpoint for THIS response; it 302s straight to
+  // the image (R9), so the browser <img> resolves it like the old CAA URL.
+  return facadeCoverArtUrl(releaseGroupMbid);
 }
 
 export function resolveAlbumCoverNow(row: {

@@ -1,4 +1,5 @@
 import type {
+  IdentifyReleaseCandidate,
   MetadataArtist,
   MetadataArtistCredit,
   MetadataArtistReleaseGroup,
@@ -19,6 +20,7 @@ import type {
   ReleaseLookup,
   ReleaseRich,
   ReleaseSearchResponse,
+  ReleaseSearchRich,
 } from "./schemas.js";
 import { parseReleaseYear, pickBestRelease } from "./pickRelease.js";
 
@@ -95,6 +97,55 @@ export function toMetadataReleaseDetail(
           durationMs: t.length ?? null,
         })),
     ),
+  };
+}
+
+// Summarize a release's media into a human format string:
+// "CD", "2 × CD", "CD + DVD", "4 × CD + DVD + 12\" Vinyl". Moved from the
+// server (was musicbrainz/client.ts) — the façade now owns this reshaping.
+function summarizeFormats(
+  media: { format?: string | null }[] | null | undefined,
+): string | null {
+  if (!media || media.length === 0) return null;
+  const counts = new Map<string, number>();
+  const order: string[] = [];
+  for (const m of media) {
+    const f = m.format ?? "Unknown";
+    if (!counts.has(f)) order.push(f);
+    counts.set(f, (counts.get(f) ?? 0) + 1);
+  }
+  return order
+    .map((f) => {
+      const n = counts.get(f) ?? 1;
+      return n > 1 ? `${n} × ${f}` : f;
+    })
+    .join(" + ");
+}
+
+// R5: one Identify-dialog row per release (specific pressing). No release-group
+// dedup — the user needs every pressing. Track count prefers the release-level
+// count, falling back to the summed per-medium counts.
+export function toIdentifyReleaseCandidate(
+  raw: ReleaseSearchRich["releases"][number],
+): IdentifyReleaseCandidate {
+  const summed = raw.media?.reduce(
+    (sum, m) => sum + (m["track-count"] ?? 0),
+    0,
+  );
+  const trackCount =
+    raw["track-count"] ?? (summed && summed > 0 ? summed : null);
+  return {
+    releaseMbid: raw.id,
+    releaseGroupMbid: raw["release-group"]?.id ?? null,
+    title: raw.title,
+    disambiguation: raw.disambiguation ?? null,
+    artistName: raw["artist-credit"]?.[0]?.artist.name ?? "Unknown Artist",
+    formatDetail: summarizeFormats(raw.media),
+    trackCount,
+    country: raw.country ?? null,
+    date: raw.date ?? null,
+    label: raw["label-info"]?.[0]?.label?.name ?? null,
+    releaseType: raw["release-group"]?.["primary-type"] ?? null,
   };
 }
 

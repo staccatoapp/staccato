@@ -10,6 +10,7 @@ export * from "./types/zod/metadata/release.js";
 export * from "./types/zod/metadata/album.js";
 export * from "./types/zod/metadata/artist.js";
 export * from "./types/zod/metadata/search.js";
+export * from "./types/zod/metadata/asset.js";
 
 export * from "./types/typescript/auth.js";
 

@@ -1,9 +1,14 @@
 import path from "node:path";
 import {
+  FACADE_BASE,
   MB_PRIORITY,
   throttledFetch,
   type MbPriority,
 } from "../musicbrainz/client.js";
+import {
+  MetadataArtistImageSchema,
+  type MetadataArtistImage,
+} from "@staccato/shared";
 import { logger } from "../logger.js";
 
 // Wikimedia's Special:FilePath returns the original asset (often multi-MB)
@@ -15,72 +20,43 @@ const RASTER_EXTS = new Set([".jpg", ".jpeg", ".png", ".webp"]);
 
 const log = logger.child({ module: "artistimage-client" });
 
-export type ArtistImageSource = {
-  url: string;
-  filename: string;
-};
+export type ArtistImageSource = MetadataArtistImage;
 
-// Resolve a MusicBrainz artist MBID through its Wikidata QID to a
-// Wikimedia Commons image. Returns null when any step is missing or fails.
+// Resolve a MusicBrainz artist MBID to a Wikimedia Commons image via the façade
+// (R8), which owns the MB url-rels → Wikidata QID → Commons filename chain. The
+// façade returns the base Commons URL + filename; sizing stays here
+// (presentation). Returns null when the façade has no image or the call fails.
 export async function lookupArtistImageSource(
   artistMbid: string,
   priority: MbPriority = MB_PRIORITY.BACKGROUND,
 ): Promise<ArtistImageSource | null> {
   try {
-    const mbRes = await throttledFetch(
-      `https://musicbrainz.org/ws/2/artist/${artistMbid}?inc=url-rels&fmt=json`,
+    const res = await throttledFetch(
+      `${FACADE_BASE}/artists/${artistMbid}/image`,
       { priority },
     );
-    if (!mbRes.ok) {
+    if (res.status === 404) {
+      log.debug({ artistMbid }, "facade artist image: none");
+      return null;
+    }
+    if (!res.ok) {
       log.warn(
-        { artistMbid, status: mbRes.status },
-        "mb artist url-rels lookup non-ok response",
+        { artistMbid, status: res.status },
+        "facade artist image non-ok response",
       );
       return null;
     }
-    const mbData = (await mbRes.json()) as {
-      relations?: Array<{ type: string; url: { resource: string } }>;
-    };
-
-    const wikidataRel = mbData.relations?.find((r) => r.type === "wikidata");
-    if (!wikidataRel) return null;
-
-    const qid = wikidataRel.url.resource.split("/wiki/")[1];
-    if (!qid) return null;
-
-    const wdRes = await fetch(
-      `https://www.wikidata.org/wiki/Special:EntityData/${qid}.json`,
+    const { url: baseUrl, filename } = MetadataArtistImageSchema.parse(
+      await res.json(),
     );
-    if (!wdRes.ok) {
-      log.warn(
-        { artistMbid, qid, status: wdRes.status },
-        "wikidata entity lookup non-ok response",
-      );
-      return null;
-    }
-    const wdData = (await wdRes.json()) as {
-      entities: Record<
-        string,
-        {
-          claims?: {
-            P18?: Array<{ mainsnak: { datavalue?: { value: string } } }>;
-          };
-        }
-      >;
-    };
 
-    const filename =
-      wdData.entities[qid]?.claims?.P18?.[0]?.mainsnak?.datavalue?.value;
-    if (!filename) return null;
-
-    const base = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(filename)}`;
     const ext = path.extname(filename).toLowerCase();
     const url = RASTER_EXTS.has(ext)
-      ? `${base}?width=${THUMBNAIL_WIDTH}`
-      : base;
+      ? `${baseUrl}?width=${THUMBNAIL_WIDTH}`
+      : baseUrl;
     return { filename, url };
   } catch (err) {
-    log.warn({ err, artistMbid }, "artist image source lookup failed");
+    log.warn({ err, artistMbid }, "facade artist image lookup failed");
     return null;
   }
 }

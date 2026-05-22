@@ -6,11 +6,13 @@ import { logger } from "../logger.js";
 
 const log = logger.child({ module: "musicbrainz" });
 import {
+  IdentifySearchResponseSchema,
   MetadataAlbumDetailSchema,
   MetadataArtistDetailSchema,
   MetadataRecordingSchema,
   MetadataReleaseDetailSchema,
   MetadataSearchResultsSchema,
+  type IdentifyReleaseCandidate,
   type MetadataAlbumDetail,
   type MetadataArtistDetail,
   type MetadataArtistReleaseGroup,
@@ -23,7 +25,6 @@ import {
 import {
   MBRecordingSearchResponseSchema,
   MBReleaseGroupSearchResponseSchema,
-  MBReleaseSearchResponseSchema,
 } from "./schemas.js";
 
 export interface RecordingMatch {
@@ -41,21 +42,6 @@ export interface RecordingMatch {
 export type MBReleaseTrack = MetadataReleaseTrack;
 export type MBReleaseDetails = MetadataReleaseDetail;
 export type ExternalAlbumDetail = MetadataAlbumDetail;
-
-// One row per MusicBrainz release (specific pressing) for the Identify dialog.
-export interface IdentifyReleaseCandidate {
-  releaseMbid: string;
-  releaseGroupMbid: string | null;
-  title: string;
-  disambiguation: string | null;
-  artistName: string;
-  formatDetail: string | null;
-  trackCount: number | null;
-  country: string | null;
-  date: string | null;
-  label: string | null;
-  releaseType: string | null;
-}
 
 interface MBReleaseLike {
   id: string;
@@ -75,9 +61,10 @@ function parseReleaseYear(date?: string | null): number | null {
 }
 
 const MB_BASE = process.env.METADATA_URL ?? "https://musicbrainz.org/ws/2";
-// Façade base — migrated lookups (R1 recs, R4, R6, R7) go through the metadata
-// service. Raw-MB search calls below still use MB_BASE until 3.2–3.5.
-const FACADE_BASE =
+// Façade base — all migrated routes (lookups + searches + assets) go through
+// the metadata service. Exported so the asset clients (artistimage, coverart)
+// share one source until the full base-URL consolidation in 3.6.
+export const FACADE_BASE =
   process.env.STACCATO_METADATA_URL ?? "http://localhost:8290/v1";
 
 // Throttle knobs for the shared MB queue. Defaults match MusicBrainz's public
@@ -293,60 +280,24 @@ export async function searchExternalUnified(
   }
 }
 
-// Strip embedded double-quotes so they can't break a quoted Lucene phrase.
-// Matches the codebase's existing (unescaped) phrase-query style elsewhere.
-function quotePhrase(value: string): string {
-  return value.replace(/"/g, " ").trim();
-}
-
-// Summarize a release's media into a human format string:
-// "CD", "2 × CD", "CD + DVD", "4 × CD + DVD + 12\" Vinyl".
-function summarizeFormats(
-  media: { format?: string | null }[] | null | undefined,
-): string | null {
-  if (!media || media.length === 0) return null;
-  const counts = new Map<string, number>();
-  const order: string[] = [];
-  for (const m of media) {
-    const f = m.format ?? "Unknown";
-    if (!counts.has(f)) order.push(f);
-    counts.set(f, (counts.get(f) ?? 0) + 1);
-  }
-  return order
-    .map((f) => {
-      const n = counts.get(f) ?? 1;
-      return n > 1 ? `${n} × ${f}` : f;
-    })
-    .join(" + ");
-}
-
-// Per-release search for the Identify Album dialog. Unlike searchReleasesByQuery
-// this does NOT dedupe by release-group — the user needs to see every pressing
-// (country/format/label vary) so they can pick the one whose tracklist matches
+// R5 · per-release search for the Identify Album dialog. Thin façade call — the
+// metadata service builds the structured Lucene query (release/artist/year) and
+// reshapes media/labels into IdentifyReleaseCandidate[]. Returns every pressing
+// (no release-group dedup) so the user can pick the one whose tracklist matches
 // their files. Defaults to INTERACTIVE priority (user is waiting on it).
 export async function searchReleasesForIdentify(
   opts: { release: string; artist: string; year?: string },
   limit = 25,
   priority: MbPriority = MB_PRIORITY.INTERACTIVE,
 ): Promise<IdentifyReleaseCandidate[]> {
-  const clauses: string[] = [];
-  const release = quotePhrase(opts.release);
-  const artist = quotePhrase(opts.artist);
-  const year = opts.year?.trim();
-  if (release) clauses.push(`release:"${release}"`);
-  if (artist) clauses.push(`artist:"${artist}"`);
-  if (year) clauses.push(`date:${year}*`);
-  if (clauses.length === 0) return [];
-  const queryStr = clauses.join(" AND ");
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (opts.release.trim()) params.set("release", opts.release.trim());
+  if (opts.artist.trim()) params.set("artist", opts.artist.trim());
+  if (opts.year?.trim()) params.set("year", opts.year.trim());
 
   try {
-    const params = new URLSearchParams({
-      query: queryStr,
-      fmt: "json",
-      limit: String(limit),
-    });
     const response = await throttledFetch(
-      `${MB_BASE}/release?${params}&inc=artist-credits+release-groups+media+labels`,
+      `${FACADE_BASE}/releases/search?${params}`,
       { priority },
     );
     if (!response.ok) {
@@ -354,38 +305,21 @@ export async function searchReleasesForIdentify(
         {
           status: response.status,
           operation: "searchReleasesForIdentify",
-          query: queryStr,
+          params: params.toString(),
         },
-        "mb identify release search non-ok response",
+        "facade identify release search non-ok response",
       );
       return [];
     }
-    const data = MBReleaseSearchResponseSchema.parse(await response.json());
-    return data.releases.map((r) => {
-      const summed = r.media?.reduce(
-        (sum, m) => sum + (m["track-count"] ?? 0),
-        0,
-      );
-      const trackCount =
-        r["track-count"] ?? (summed && summed > 0 ? summed : null);
-      return {
-        releaseMbid: r.id,
-        releaseGroupMbid: r["release-group"]?.id ?? null,
-        title: r.title,
-        disambiguation: r.disambiguation ?? null,
-        artistName: r["artist-credit"]?.[0]?.artist.name ?? "Unknown Artist",
-        formatDetail: summarizeFormats(r.media),
-        trackCount,
-        country: r.country ?? null,
-        date: r.date ?? null,
-        label: r["label-info"]?.[0]?.label?.name ?? null,
-        releaseType: r["release-group"]?.["primary-type"] ?? null,
-      };
-    });
+    return IdentifySearchResponseSchema.parse(await response.json()).results;
   } catch (err) {
     log.warn(
-      { err, operation: "searchReleasesForIdentify", query: queryStr },
-      "mb identify release search failed",
+      {
+        err,
+        operation: "searchReleasesForIdentify",
+        params: params.toString(),
+      },
+      "facade identify release search failed",
     );
     return [];
   }

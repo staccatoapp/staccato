@@ -96,6 +96,48 @@ export const ReleaseSearchResponseSchema = z.object({
 });
 export type ReleaseSearchResponse = z.infer<typeof ReleaseSearchResponseSchema>;
 
+// ── Release search (R5 · Identify dialog, all pressings) ─────────────────────
+// /release?query=<lucene>&inc=artist-credits+release-groups+media+labels&fmt=json
+// Unlike R3's release search this is NOT deduped by release-group — every
+// pressing is returned with its country/format/label/track-count so the user
+// can pick the one whose tracklist matches their files.
+export const ReleaseSearchRichSchema = z.object({
+  releases: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      disambiguation: z.string().nullish(),
+      date: z.string().nullish(),
+      country: z.string().nullish(),
+      status: z.string().nullish(),
+      "track-count": z.number().nullish(),
+      "artist-credit": z.array(ArtistCreditEntrySchema).nullish(),
+      "release-group": z
+        .object({
+          id: z.string().nullish(),
+          "primary-type": z.string().nullish(),
+        })
+        .nullish(),
+      media: z
+        .array(
+          z.object({
+            format: z.string().nullish(),
+            "track-count": z.number().nullish(),
+          }),
+        )
+        .nullish(),
+      "label-info": z
+        .array(
+          z.object({
+            label: z.object({ name: z.string().nullish() }).nullish(),
+          }),
+        )
+        .nullish(),
+    }),
+  ),
+});
+export type ReleaseSearchRich = z.infer<typeof ReleaseSearchRichSchema>;
+
 // ── Release lookup (R4, and the second hop of R6) ────────────────────────────
 // /release/:mbid?inc=recordings+artist-credits+release-groups&fmt=json
 export const ReleaseLookupSchema = z.object({

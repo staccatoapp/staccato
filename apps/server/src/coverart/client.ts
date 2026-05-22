@@ -1,11 +1,24 @@
 import PQueue from "p-queue";
-import { MB_PRIORITY, type MbPriority } from "../musicbrainz/client.js";
+import {
+  FACADE_BASE,
+  MB_PRIORITY,
+  type MbPriority,
+} from "../musicbrainz/client.js";
 import { logger } from "../logger.js";
 
 const log = logger.child({ module: "coverart" });
 
-const CAA_BASE = "https://coverartarchive.org";
+// Façade cover-art endpoint (R9). It mirrors CAA's front-cover redirect, so the
+// existing manual-redirect logic below is unchanged — only the host moves off
+// the public Cover Art Archive. Exported so the store can use the same URL as a
+// browser-facing <img> src (the façade 302s straight to the image).
+export function facadeCoverArtUrl(releaseGroupMbid: string): string {
+  return `${FACADE_BASE}/cover-art/release-group/${releaseGroupMbid}`;
+}
 
+// Per-INSTANCE throttle: bounds how fast THIS Staccato deployment hits the
+// façade. (The façade itself intentionally has no such queue — a shared queue
+// there would couple all deployments.)
 const caaQueue = new PQueue({
   concurrency: 5,
   intervalCap: 5,
@@ -38,7 +51,7 @@ export async function fetchCoverArtUrlForGroup(
   releaseGroupMbid: string,
   priority: MbPriority = MB_PRIORITY.BACKGROUND,
 ): Promise<string | null> {
-  return caaFetch(`${CAA_BASE}/release-group/${releaseGroupMbid}/front`, priority);
+  return caaFetch(facadeCoverArtUrl(releaseGroupMbid), priority);
 }
 
 async function caaFetch(url: string, priority: MbPriority): Promise<string | null> {
