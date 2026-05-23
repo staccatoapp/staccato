@@ -1,3 +1,5 @@
+import type { TrackArtistCredit } from "../zod/api/credits.js";
+
 export type TrackListItem = {
   id: string;
   title: string;
@@ -8,6 +10,7 @@ export type TrackListItem = {
   coverArtUrl: string | null;
   durationSeconds: number | null;
   fileFormat: string | null;
+  artists: TrackArtistCredit[];
 };
 
 export type TrackSearchResult = Omit<TrackListItem, "artistId" | "fileFormat">;

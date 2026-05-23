@@ -1,3 +1,5 @@
+import type { TrackArtistCredit } from "../zod/api/credits.js";
+
 export type PlaybackTrack = {
   id: string;
   title: string;
@@ -6,6 +8,7 @@ export type PlaybackTrack = {
   artistName: string | null;
   coverArtUrl: string | null;
   durationSeconds: number | null;
+  artists: TrackArtistCredit[];
 };
 
 export type PlaybackSession = {

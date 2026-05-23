@@ -30,6 +30,7 @@ import type {
 import { AlbumHeader } from "@/components/music/AlbumHeader";
 import { AlbumDetailSkeleton } from "@/components/music/AlbumDetailSkeleton";
 import { TrackList } from "@/components/music/TrackList";
+import { FeaturedArtists } from "@/components/music/FeaturedArtists";
 import { IdentifyAlbumDialog } from "@/components/music/IdentifyAlbumDialog";
 import { toUiStatus, useDownloads } from "@/hooks/useDownloads";
 import { useRetryDownload } from "@/hooks/useRequestDownload";
@@ -323,6 +324,12 @@ function LocalAlbumView({
                 ? `${t.discNumber ?? 1}-${t.trackNumber ?? "—"}`
                 : String(t.trackNumber ?? "—"),
             title: t.title,
+            titleSuffix: (
+              <FeaturedArtists
+                credits={t.artists}
+                className="text-muted-foreground"
+              />
+            ),
             formattedDuration: formatDurationSeconds(t.durationSeconds),
           }))}
           onPlayTrack={(index) =>

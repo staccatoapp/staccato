@@ -121,6 +121,15 @@ function ArtistDetailPage() {
         </h2>
         <Discography items={data.albums} />
       </div>
+
+      {data.source === "local" && data.appearsOn.length > 0 && (
+        <div className="px-6 pb-8">
+          <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-4">
+            Appears On
+          </h2>
+          <Discography items={data.appearsOn} />
+        </div>
+      )}
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { formatTime } from "@/lib/music";
 import { useVolume } from "@/hooks/useVolume";
 import { LyricsPanel } from "./lyrics-panel";
+import { FeaturedArtists } from "@/components/music/FeaturedArtists";
 
 function getSliderValue(
   value: number | readonly number[],
@@ -387,8 +388,9 @@ function PlayerBar() {
               <p className="text-sm font-medium">
                 {currentTrack?.title || "No track playing"}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground truncate">
                 {currentTrack?.artistName || "Unknown Artist"}
+                <FeaturedArtists credits={currentTrack?.artists} />
               </p>
             </div>
           </div>

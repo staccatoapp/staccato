@@ -4,6 +4,7 @@ export * from "./types/zod/api/auth.js";
 export * from "./types/zod/api/recommendations.js";
 export * from "./types/zod/api/albums.js";
 export * from "./types/zod/api/artists.js";
+export * from "./types/zod/api/credits.js";
 
 export * from "./types/zod/metadata/recording.js";
 export * from "./types/zod/metadata/release.js";

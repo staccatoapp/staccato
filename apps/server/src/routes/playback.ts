@@ -13,6 +13,10 @@ import {
   type PlaybackTrackRow,
 } from "../db/queries/tracks.js";
 import {
+  groupCreditsByTrack,
+  listTrackArtistsForTracks,
+} from "../db/queries/track-artists.js";
+import {
   insertListenEvent,
   markScrobbled,
 } from "../db/queries/listening-history.js";
@@ -217,6 +221,9 @@ function orderTracksByQueue(
 
 function buildSessionResponse(session: PlaybackSessionRow) {
   const sessionTracks = getPlaybackTracksByIds(session.trackQueue);
+  const credits = groupCreditsByTrack(
+    listTrackArtistsForTracks(session.trackQueue),
+  );
   const orderedTracks = orderTracksByQueue(session.trackQueue, sessionTracks).map(
     (t) => ({
       ...t,
@@ -227,6 +234,7 @@ function buildSessionResponse(session: PlaybackSessionRow) {
             coverArtUrl: t.coverArtUrl,
           })
         : t.coverArtUrl,
+      artists: credits.get(t.id) ?? [],
     }),
   );
 

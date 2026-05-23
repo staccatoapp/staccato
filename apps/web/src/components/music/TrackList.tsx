@@ -6,6 +6,7 @@ export interface TrackListTrack {
   num: string;
   title: string;
   formattedDuration: string;
+  titleSuffix?: ReactNode;
 }
 
 export function TrackList({
@@ -55,6 +56,7 @@ export function TrackList({
             </span>
             <span className="text-foreground truncate self-center">
               {track.title}
+              {track.titleSuffix}
             </span>
             <span className="text-right text-muted-foreground tabular-nums self-center text-xs">
               {track.formattedDuration}

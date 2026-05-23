@@ -12,6 +12,10 @@ import {
   getTracksInAlbum,
 } from "../db/queries/tracks.js";
 import {
+  groupCreditsByTrack,
+  listTrackArtistsForTracks,
+} from "../db/queries/track-artists.js";
+import {
   ensureCoverOnDisk,
   resolveAlbumCoverNow,
 } from "../coverart/store.js";
@@ -159,6 +163,9 @@ const albumRoutes: FastifyPluginAsync = async (fastify) => {
 
     if (localRow) {
       const localTracks = getTracksInAlbum(localRow.id);
+      const creditsByTrack = groupCreditsByTrack(
+        listTrackArtistsForTracks(localTracks.map((t) => t.id)),
+      );
       return {
         source: "local" as const,
         album: {
@@ -177,7 +184,10 @@ const albumRoutes: FastifyPluginAsync = async (fastify) => {
           confidenceScore: localRow.confidenceScore,
           pendingTrackCount: localRow.pendingTrackCount,
         },
-        tracks: localTracks,
+        tracks: localTracks.map((t) => ({
+          ...t,
+          artists: creditsByTrack.get(t.id) ?? [],
+        })),
       };
     }
 

@@ -12,6 +12,10 @@ import {
   searchAlbums,
 } from "../db/queries/albums.js";
 import { countTracks, getLibraryTracks } from "../db/queries/tracks.js";
+import {
+  groupCreditsByTrack,
+  listTrackArtistsForTracks,
+} from "../db/queries/track-artists.js";
 import { db } from "../db/client.js";
 import { resolveAlbumCoverNow } from "../coverart/store.js";
 import { resolveArtistImageNow } from "../artistimage/store.js";
@@ -68,6 +72,9 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
 
     const items = getLibraryTracks(paginationOptions);
     const total = countTracks();
+    const credits = groupCreditsByTrack(
+      listTrackArtistsForTracks(items.map((i) => i.id)),
+    );
 
     return {
       items: items.map((r) => ({
@@ -79,6 +86,7 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
               coverArtUrl: r.coverArtUrl,
             })
           : r.coverArtUrl,
+        artists: credits.get(r.id) ?? [],
       })),
       total,
     };
@@ -146,6 +154,10 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
       cover_art_url: string | null;
     }>;
 
+    const trackCredits = groupCreditsByTrack(
+      listTrackArtistsForTracks(trackRows.map((r) => r.id)),
+    );
+
     return {
       artists: artistResults.map((r) => ({
         ...r,
@@ -178,6 +190,7 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
               coverArtUrl: r.cover_art_url,
             })
           : r.cover_art_url,
+        artists: trackCredits.get(r.id) ?? [],
       })),
     };
   });

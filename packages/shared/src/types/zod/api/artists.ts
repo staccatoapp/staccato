@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const InLibraryDiscographyItemSchema = z.object({
+export const InLibraryDiscographyItemSchema = z.object({
   inLibrary: z.literal(true),
   id: z.string(),
   title: z.string(),
@@ -32,6 +32,7 @@ export const UnifiedArtistLocalSchema = z.object({
     imageUrl: z.string().nullable(),
   }),
   albums: z.array(ArtistDiscographyItemSchema),
+  appearsOn: z.array(InLibraryDiscographyItemSchema),
 });
 
 export const UnifiedArtistExternalSchema = z.object({

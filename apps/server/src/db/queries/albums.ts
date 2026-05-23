@@ -5,6 +5,7 @@ import {
   eq,
   isNull,
   like,
+  ne,
   notExists,
   or,
   sql,
@@ -13,6 +14,7 @@ import { db } from "../client.js";
 import { albums } from "../schema/albums.js";
 import { artists } from "../schema/artists.js";
 import { tracks } from "../schema/tracks.js";
+import { trackArtists } from "../schema/track-artists.js";
 import { SQLiteUpdateSetSource } from "drizzle-orm/sqlite-core";
 import { RunResult } from "better-sqlite3";
 import { PaginationOptions } from "@staccato/shared";
@@ -62,6 +64,31 @@ export function getDiscographyAlbumsByArtistId(
     })
     .from(albums)
     .where(eq(albums.artistId, artistId))
+    .all();
+}
+
+// Albums the artist guests on — has at least one track credit (track_artists)
+// but is NOT the album's primary artist (albums.artist_id). Drives the artist
+// page's "Appears On" grid. Track-credit based only; release-level co-credits
+// are SP3 and are intentionally excluded here.
+export function getAppearsOnAlbumsByArtistId(
+  artistId: string,
+): DiscographyAlbumRow[] {
+  return db
+    .select({
+      id: albums.id,
+      title: sql<string>`COALESCE(${albums.canonicalTitle}, ${albums.title})`,
+      releaseYear: albums.releaseYear,
+      releaseGroupMbid: albums.releaseGroupMbid,
+      coverArtUrl: albums.coverArtUrl,
+    })
+    .from(trackArtists)
+    .innerJoin(tracks, eq(trackArtists.trackId, tracks.id))
+    .innerJoin(albums, eq(tracks.albumId, albums.id))
+    .where(
+      and(eq(trackArtists.artistId, artistId), ne(albums.artistId, artistId)),
+    )
+    .groupBy(albums.id)
     .all();
 }
 

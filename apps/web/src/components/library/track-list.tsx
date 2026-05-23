@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useInfiniteScrollSentinel } from "@/hooks/useInfiniteScrollSentinel";
 import { AddToPlaylistDropdown } from "./add-to-playlist-dropdown";
+import { FeaturedArtists } from "@/components/music/FeaturedArtists";
 
 export function TrackRow({
   track,
@@ -101,6 +102,7 @@ export function TrackRow({
       {/* Artist */}
       <div className="truncate text-[0.8rem] text-muted-foreground">
         {track.artistName}
+        <FeaturedArtists credits={track.artists} />
       </div>
 
       {/* + playlist */}

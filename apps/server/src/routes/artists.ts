@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from "fastify";
 import type { ArtistDiscographyItem } from "@staccato/shared";
 import { getArtistDetails, getArtistIdByMbid } from "../db/queries/artists.js";
 import {
+  getAppearsOnAlbumsByArtistId,
   getDiscographyAlbumsByArtistId,
   type DiscographyAlbumRow,
 } from "../db/queries/albums.js";
@@ -146,6 +147,9 @@ const artistRoutes: FastifyPluginAsync = async (fastify) => {
           }),
         },
         albums,
+        appearsOn: sortByYearDesc(
+          getAppearsOnAlbumsByArtistId(localRow.id).map(libraryItem),
+        ),
       };
     }
 
