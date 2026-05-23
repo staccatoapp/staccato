@@ -24,7 +24,7 @@ import type {
 } from "./schemas.js";
 import { parseReleaseYear, pickBestRelease } from "./pickRelease.js";
 
-function toArtistCredits(
+export function toArtistCredits(
   raw: ArtistCreditEntry[] | null | undefined,
 ): MetadataArtistCredit[] {
   if (!raw) return [];
@@ -86,6 +86,7 @@ export function toMetadataReleaseDetail(
     artistMbid: artist?.id ?? null,
     artistName: artist?.name ?? null,
     releaseGroupMbid: raw["release-group"]?.id ?? null,
+    artistCredits: toArtistCredits(raw["artist-credit"]),
     tracks: raw.media.flatMap((disc) =>
       disc.tracks
         .filter((t) => t.recording.video !== true)

@@ -5,7 +5,7 @@ import {
   ReleaseGroupLookupSchema,
   ReleaseLookupSchema,
 } from "../mirror/schemas.js";
-import { toMetadataReleaseDetail } from "../mirror/map.js";
+import { toArtistCredits, toMetadataReleaseDetail } from "../mirror/map.js";
 import { parseReleaseYear, pickBestRelease } from "../mirror/pickRelease.js";
 
 const MBID_RE =
@@ -96,6 +96,7 @@ const releaseGroupRoutes: FastifyPluginAsync = async (fastify) => {
       artistMbid: artist?.id ?? null,
       releaseYear: parseReleaseYear(canonical?.date),
       releaseType: rg["primary-type"] ?? null,
+      artistCredits: toArtistCredits(rg["artist-credit"]),
       tracks: toMetadataReleaseDetail(relParsed.data).tracks,
     });
   });

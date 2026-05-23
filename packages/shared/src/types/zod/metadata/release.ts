@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MetadataArtistCreditSchema } from "./recording.js";
 
 // Façade → server contract for a release lookup (R4). Mirrors the server's
 // MBReleaseDetails / MBReleaseTrack. The façade owns the media.flatMap
@@ -21,6 +22,7 @@ export const MetadataReleaseDetailSchema = z.object({
   artistMbid: z.string().nullable(),
   artistName: z.string().nullable(),
   releaseGroupMbid: z.string().nullable(),
+  artistCredits: z.array(MetadataArtistCreditSchema),
   tracks: z.array(MetadataReleaseTrackSchema),
 });
 export type MetadataReleaseDetail = z.infer<typeof MetadataReleaseDetailSchema>;

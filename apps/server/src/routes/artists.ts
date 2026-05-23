@@ -4,6 +4,7 @@ import { getArtistDetails, getArtistIdByMbid } from "../db/queries/artists.js";
 import {
   getAppearsOnAlbumsByArtistId,
   getDiscographyAlbumsByArtistId,
+  getReleaseCoCreditAlbumsByArtistId,
   type DiscographyAlbumRow,
 } from "../db/queries/albums.js";
 import {
@@ -64,6 +65,12 @@ function sortByYearDesc(
     const by = b.releaseYear ?? -Infinity;
     return by - ay;
   });
+}
+
+function dedupById(rows: DiscographyAlbumRow[]): DiscographyAlbumRow[] {
+  const byId = new Map<string, DiscographyAlbumRow>();
+  for (const row of rows) byId.set(row.id, row);
+  return [...byId.values()];
 }
 
 function mergeDiscography(
@@ -148,7 +155,10 @@ const artistRoutes: FastifyPluginAsync = async (fastify) => {
         },
         albums,
         appearsOn: sortByYearDesc(
-          getAppearsOnAlbumsByArtistId(localRow.id).map(libraryItem),
+          dedupById([
+            ...getAppearsOnAlbumsByArtistId(localRow.id),
+            ...getReleaseCoCreditAlbumsByArtistId(localRow.id),
+          ]).map(libraryItem),
         ),
       };
     }

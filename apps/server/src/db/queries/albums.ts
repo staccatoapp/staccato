@@ -15,6 +15,7 @@ import { albums } from "../schema/albums.js";
 import { artists } from "../schema/artists.js";
 import { tracks } from "../schema/tracks.js";
 import { trackArtists } from "../schema/track-artists.js";
+import { albumArtists } from "../schema/album-artists.js";
 import { SQLiteUpdateSetSource } from "drizzle-orm/sqlite-core";
 import { RunResult } from "better-sqlite3";
 import { PaginationOptions } from "@staccato/shared";
@@ -87,6 +88,29 @@ export function getAppearsOnAlbumsByArtistId(
     .innerJoin(albums, eq(tracks.albumId, albums.id))
     .where(
       and(eq(trackArtists.artistId, artistId), ne(albums.artistId, artistId)),
+    )
+    .groupBy(albums.id)
+    .all();
+}
+
+// Albums the artist is a release-level co-credit on (album_artists) but is NOT
+// the album's primary artist (albums.artist_id). The release-level companion to
+// getAppearsOnAlbumsByArtistId; the artist route unions both into "Appears On".
+export function getReleaseCoCreditAlbumsByArtistId(
+  artistId: string,
+): DiscographyAlbumRow[] {
+  return db
+    .select({
+      id: albums.id,
+      title: sql<string>`COALESCE(${albums.canonicalTitle}, ${albums.title})`,
+      releaseYear: albums.releaseYear,
+      releaseGroupMbid: albums.releaseGroupMbid,
+      coverArtUrl: albums.coverArtUrl,
+    })
+    .from(albumArtists)
+    .innerJoin(albums, eq(albumArtists.albumId, albums.id))
+    .where(
+      and(eq(albumArtists.artistId, artistId), ne(albums.artistId, artistId)),
     )
     .groupBy(albums.id)
     .all();

@@ -3,7 +3,7 @@ import {
   ExternalAlbumDetailSchema,
   ExternalAlbumTrackSchema,
 } from "./search.js";
-import { TrackArtistCreditSchema } from "./credits.js";
+import { AlbumArtistCreditSchema, TrackArtistCreditSchema } from "./credits.js";
 
 export const UnifiedAlbumLocalTrackSchema = z.object({
   id: z.string(),
@@ -29,6 +29,7 @@ export const UnifiedAlbumLocalSchema = z.object({
     coverArtUrl: z.string().nullable(),
     confidenceScore: z.number().nullable(),
     pendingTrackCount: z.number(),
+    artists: z.array(AlbumArtistCreditSchema),
   }),
   tracks: z.array(UnifiedAlbumLocalTrackSchema),
 });

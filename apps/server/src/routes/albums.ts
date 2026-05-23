@@ -15,6 +15,7 @@ import {
   groupCreditsByTrack,
   listTrackArtistsForTracks,
 } from "../db/queries/track-artists.js";
+import { listAlbumArtists } from "../db/queries/album-artists.js";
 import {
   ensureCoverOnDisk,
   resolveAlbumCoverNow,
@@ -183,6 +184,7 @@ const albumRoutes: FastifyPluginAsync = async (fastify) => {
           }),
           confidenceScore: localRow.confidenceScore,
           pendingTrackCount: localRow.pendingTrackCount,
+          artists: listAlbumArtists(localRow.id),
         },
         tracks: localTracks.map((t) => ({
           ...t,
@@ -215,6 +217,12 @@ const albumRoutes: FastifyPluginAsync = async (fastify) => {
         releaseYear: external.releaseYear,
         releaseType: external.releaseType,
         coverArtUrl,
+        artists: external.artistCredits.map((c, i) => ({
+          artistId: c.mbid,
+          name: c.name,
+          joinPhrase: c.joinPhrase,
+          position: i,
+        })),
       },
       tracks: external.tracks,
     };

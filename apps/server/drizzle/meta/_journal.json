@@ -218,6 +218,13 @@
       "when": 1779282631742,
       "tag": "0030_silky_pride",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "6",
+      "when": 1779566450288,
+      "tag": "0031_parched_magus",
+      "breakpoints": true
     }
   ]
 }

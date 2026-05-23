@@ -1,3 +1,4 @@
+export * from "./album-artists.js";
 export * from "./albums.js";
 export * from "./artists.js";
 export * from "./download-requests.js";

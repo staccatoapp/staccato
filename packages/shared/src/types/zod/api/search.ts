@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AlbumArtistCreditSchema } from "./credits.js";
 
 export const ExternalRecordingSchema = z.object({
   recordingMbid: z.string(),
@@ -74,5 +75,6 @@ export const ExternalAlbumDetailSchema = z.object({
   artistMbid: z.string().nullable(),
   releaseYear: z.number().nullable(),
   releaseType: z.string().nullable(),
+  artists: z.array(AlbumArtistCreditSchema),
   tracks: z.array(ExternalAlbumTrackSchema),
 });

@@ -206,6 +206,7 @@ function LocalAlbumView({
       <AlbumHeader
         title={album.title}
         artistName={album.artistName}
+        artists={album.artists}
         releaseYear={album.releaseYear}
         coverArtUrl={album.coverArtUrl}
         trackCount={tracks.length}
@@ -476,6 +477,7 @@ function ExternalAlbumView({
       <AlbumHeader
         title={album.title}
         artistName={album.artistName}
+        artists={album.artists}
         releaseYear={album.releaseYear}
         coverArtUrl={album.coverArtUrl}
         trackCount={tracks.length}

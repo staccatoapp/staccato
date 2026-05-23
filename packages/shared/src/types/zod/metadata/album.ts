@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { MetadataReleaseTrackSchema } from "./release.js";
+import { MetadataArtistCreditSchema } from "./recording.js";
 
 // Façade → server contract for an album (release-group) detail lookup (R6).
 // Mirrors the server's ExternalAlbumDetail. The façade collapses the two MB
@@ -14,6 +15,7 @@ export const MetadataAlbumDetailSchema = z.object({
   artistMbid: z.string().nullable(),
   releaseYear: z.number().nullable(),
   releaseType: z.string().nullable(),
+  artistCredits: z.array(MetadataArtistCreditSchema),
   tracks: z.array(MetadataReleaseTrackSchema),
 });
 export type MetadataAlbumDetail = z.infer<typeof MetadataAlbumDetailSchema>;

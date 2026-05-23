@@ -1,6 +1,8 @@
 import { type ReactNode, useState } from "react";
 import { Music2 } from "lucide-react";
 import { generateAlbumGradient } from "@/lib/music";
+import type { AlbumArtistCredit } from "@staccato/shared";
+import { AlbumArtistLine } from "./AlbumArtistLine";
 
 function formatTotalDuration(totalSeconds: number): string {
   const h = Math.floor(totalSeconds / 3600);
@@ -11,6 +13,7 @@ function formatTotalDuration(totalSeconds: number): string {
 export function AlbumHeader({
   title,
   artistName,
+  artists,
   releaseYear,
   coverArtUrl,
   trackCount,
@@ -20,6 +23,7 @@ export function AlbumHeader({
 }: {
   title: string;
   artistName: string;
+  artists?: AlbumArtistCredit[];
   releaseYear?: number | null;
   coverArtUrl?: string | null;
   trackCount: number;
@@ -71,7 +75,11 @@ export function AlbumHeader({
               {title}
             </h1>
             <p className="text-sm text-muted-foreground">
-              {artistName}
+              {artists && artists.length > 0 ? (
+                <AlbumArtistLine credits={artists} />
+              ) : (
+                artistName
+              )}
               {releaseYear && (
                 <span className="before:content-['·'] before:mx-1.5">
                   {releaseYear}

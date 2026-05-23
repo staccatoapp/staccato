@@ -11,3 +11,11 @@ export const TrackArtistCreditSchema = z.object({
   position: z.number(),
 });
 export type TrackArtistCredit = z.infer<typeof TrackArtistCreditSchema>;
+
+export const AlbumArtistCreditSchema = z.object({
+  artistId: z.string(),
+  name: z.string(),
+  joinPhrase: z.string().nullable(),
+  position: z.number(),
+});
+export type AlbumArtistCredit = z.infer<typeof AlbumArtistCreditSchema>;

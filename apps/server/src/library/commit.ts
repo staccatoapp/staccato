@@ -18,9 +18,10 @@ import {
   updateTrackByAlbumId,
   updateTrackByTrackId,
 } from "../db/queries/tracks.js";
-import { normalizeString } from "../musicbrainz/client.js";
+import { normalizeString, lookupReleaseDetails, MB_PRIORITY } from "../musicbrainz/client.js";
 import { upsertTrackFts } from "../db/queries/tracks-fts.js";
 import { replaceTrackArtists } from "../db/queries/track-artists.js";
+import { replaceAlbumArtists } from "../db/queries/album-artists.js";
 import { ensureCoverOnDisk } from "../coverart/store.js";
 import { ensureArtistImageOnDisk } from "../artistimage/store.js";
 import type { ScoredCandidate, ResolvedRelease, RawTags } from "./types.js";
@@ -29,6 +30,52 @@ import {
 } from "./scoring.js";
 
 const log = logger.child({ module: "library:commit" });
+
+// Release-detail fetch is per-track, but album_artists only needs writing once
+// per (album, release). Dedup the deferred fetch so a bulk scan of an N-track
+// album makes one facade call, not N. Replace-on-write keeps it order-independent.
+const albumArtistsInflight = new Map<string, Promise<void>>();
+
+async function populateAlbumArtists(
+  releaseMbid: string,
+  albumId: string,
+): Promise<void> {
+  const key = `${albumId}:${releaseMbid}`;
+  const existing = albumArtistsInflight.get(key);
+  if (existing) return existing;
+
+  const promise = (async () => {
+    try {
+      const details = await lookupReleaseDetails(
+        releaseMbid,
+        MB_PRIORITY.BACKGROUND,
+      );
+      if (!details || details.artistCredits.length === 0) {
+        log.debug(
+          { releaseMbid, albumId },
+          "skipping album_artists population: no release artist credits",
+        );
+        return;
+      }
+      const credits = details.artistCredits.map((c, idx) => ({
+        artistId: ensureArtistByMbid(c.mbid, c.name),
+        position: idx,
+        joinPhrase: c.joinPhrase,
+      }));
+      replaceAlbumArtists(albumId, credits);
+    } catch (err) {
+      log.warn(
+        { err, releaseMbid, albumId },
+        "album artist population failed",
+      );
+    } finally {
+      albumArtistsInflight.delete(key);
+    }
+  })();
+
+  albumArtistsInflight.set(key, promise);
+  return promise;
+}
 
 interface CommitInput {
   trackId: string;
@@ -228,6 +275,10 @@ export function commitResolution(input: CommitInput): void {
   });
 
   // Schedule cover art + artist image fetch outside the transaction.
+  if (release?.releaseMbid && committedAlbumId) {
+    void populateAlbumArtists(release.releaseMbid, committedAlbumId);
+  }
+
   if (release?.releaseGroupMbid) {
     const rgMbid = release.releaseGroupMbid;
     const albumId = committedAlbumId;
