@@ -13,12 +13,24 @@ import {
   getLowConfidenceTrackPaths,
   resetTracksToPending,
 } from "../db/queries/tracks.js";
+import { deleteOrphanArtists } from "../db/queries/artists.js";
+import { deleteOrphanAlbums } from "../db/queries/albums.js";
 import { isFpcalcAvailable } from "./evidence/fingerprint.js";
 import { isAcoustidConfigured } from "./evidence/acoustid.js";
 
 const log = logger.child({ module: "library" });
 
 export { libraryProgress } from "./state.js";
+
+// Sweep placeholder rows that resolution left behind: discovered artist rows
+// not adopted by any lead credit (name mismatch, or a true Various-Artists
+// folder), and albums whose tracks all moved elsewhere. Safe to run at drain —
+// a row is only orphan-eligible once all its tracks/albums have repointed away.
+// Albums first, so an artist whose sole album just dropped is then collected.
+function sweepOrphans(): void {
+  deleteOrphanAlbums();
+  deleteOrphanArtists();
+}
 
 export async function startLibraryPipeline(musicDir: string): Promise<void> {
   resetProgress();
@@ -46,6 +58,7 @@ export async function startLibraryPipeline(musicDir: string): Promise<void> {
   // keeps the process alive and continues to feed the queue for new files.
   void (async () => {
     await drain();
+    sweepOrphans();
     completeProgress();
     log.info(
       {
@@ -73,6 +86,7 @@ export async function startManualScan(musicDir: string): Promise<void> {
   log.info({ musicDir, count }, "manual scan enqueued");
   void (async () => {
     await drain();
+    sweepOrphans();
     completeProgress();
   })();
 }

@@ -52,6 +52,7 @@ apps/server/data/
 data/
 /music/
 /notes
+docs/
 
 # Claude
 .claude/

@@ -2,6 +2,7 @@ import {
   and,
   asc,
   count,
+  desc,
   eq,
   inArray,
   isNotNull,
@@ -42,6 +43,24 @@ export function getTracksInAlbum(albumId: string) {
     .where(eq(tracks.albumId, albumId))
     .orderBy(asc(tracks.discNumber), asc(tracks.trackNumber))
     .all();
+}
+
+// The album's primary artist = the most-frequent lead among its resolved
+// tracks. Recomputed on every commit; the deterministic tiebreak (lowest
+// artist_id — cuid2 ids are monotonic, so oldest row wins) makes the final
+// value order-independent regardless of the order tracks resolve in.
+export function getDominantArtistIdForAlbum(albumId: string): string | null {
+  const row = db
+    .select({ artistId: tracks.artistId })
+    .from(tracks)
+    .where(
+      and(eq(tracks.albumId, albumId), eq(tracks.resolutionStatus, "resolved")),
+    )
+    .groupBy(tracks.artistId)
+    .orderBy(desc(count()), asc(tracks.artistId))
+    .limit(1)
+    .get();
+  return row?.artistId ?? null;
 }
 export type TrackInAlbumRow = ReturnType<typeof getTracksInAlbum>[number];
 

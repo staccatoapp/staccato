@@ -11,7 +11,8 @@
     "start": "node dist/index.js",
     "studio": "drizzle-kit studio",
     "inspect-tags": "node tools/inspect-tags.js",
-    "fingerprint": "pnpm --filter @staccato/server exec tsx tools/fingerprint.ts"
+    "fingerprint": "pnpm exec tsx tools/fingerprint.ts",
+    "sql": "tsx tools/sql.ts"
   },
   "dependencies": {
     "@fastify/secure-session": "^8.3.0",

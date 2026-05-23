@@ -5,20 +5,20 @@ import {
   findAlbumByReleaseMbid,
   getAlbumById,
   updateAlbumByAlbumId,
-  updateAlbumByArtistId,
 } from "../db/queries/albums.js";
 import {
-  deleteArtist,
   getArtistIdByMbid,
+  getArtistRowById,
   updateArtist,
   upsertArtist,
 } from "../db/queries/artists.js";
 import {
+  getDominantArtistIdForAlbum,
   markTrackResolved,
-  updateTrackByArtistId,
   updateTrackByAlbumId,
   updateTrackByTrackId,
 } from "../db/queries/tracks.js";
+import { normalizeString } from "../musicbrainz/client.js";
 import { upsertTrackFts } from "../db/queries/tracks-fts.js";
 import { replaceTrackArtists } from "../db/queries/track-artists.js";
 import { ensureCoverOnDisk } from "../coverart/store.js";
@@ -40,29 +40,43 @@ interface CommitInput {
   audioFingerprint: string | null;
 }
 
-// Resolve the canonical artist row for a given (mbid, name) pair. If an
-// artist row already exists with this MBID and is NOT the local artist,
-// repoints tracks and albums onto canonical and deletes the local row.
+// Resolve the artist row for a recording's lead credit (mbid, name) by
+// MBID-keyed find-or-create. Identity-stable: an existing row's MBID is never
+// reassigned, so a folder mixing two MB artists no longer corrupts a shared
+// row (last-writer-wins). The result is independent of commit order.
 function resolveArtistRow(
   localArtistId: string,
   mbArtistId: string,
   mbArtistName: string,
 ): string {
-  const canonicalArtistId = getArtistIdByMbid(mbArtistId);
-  if (canonicalArtistId && canonicalArtistId !== localArtistId) {
-    updateTrackByArtistId(localArtistId, { artistId: canonicalArtistId });
-    updateAlbumByArtistId(localArtistId, { artistId: canonicalArtistId });
-    deleteArtist(localArtistId);
-    updateArtist(canonicalArtistId, { canonicalName: mbArtistName });
-    return canonicalArtistId;
+  // 1. A row already owns this MBID → it is canonical for this artist. Refresh
+  //    its display name but never reassign its identity.
+  const existing = getArtistIdByMbid(mbArtistId);
+  if (existing) {
+    updateArtist(existing, { canonicalName: mbArtistName });
+    return existing;
   }
-  if (!canonicalArtistId) {
+
+  // 2. No row owns this MBID yet. Adopt the discovered placeholder row only if
+  //    it is still unclaimed (no MBID) AND its name matches this credit — so
+  //    the folder's own albumartist row takes its rightful MBID, while a
+  //    co-credit by a different artist (e.g. MF Grimm in an "MF Doom" folder)
+  //    gets its own row instead of hijacking the placeholder.
+  const local = getArtistRowById(localArtistId);
+  if (
+    local &&
+    local.musicbrainzId == null &&
+    local.normalizedName === normalizeString(mbArtistName)
+  ) {
     updateArtist(localArtistId, {
       musicbrainzId: mbArtistId,
       canonicalName: mbArtistName,
     });
+    return localArtistId;
   }
-  return localArtistId;
+
+  // 3. Otherwise create (or find by MBID) a dedicated row for this credit.
+  return ensureArtistByMbid(mbArtistId, mbArtistName);
 }
 
 // Resolve an MB-resolved artist credit by MBID, upserting the row if no
@@ -148,27 +162,23 @@ export function commitResolution(input: CommitInput): void {
 
   const lead = winner.artistCredits[0];
 
+  // Captured from the transaction so the post-commit cover-art side-effect can
+  // target the final album row directly (it is now owned by the dominant lead,
+  // not the discovered currentArtistId, so re-finding it by artist would miss).
+  let committedAlbumId: string | null = null;
+
   db.transaction(() => {
-    let canonicalArtistId = currentArtistId;
+    let leadArtistId = currentArtistId;
     if (lead) {
-      canonicalArtistId = resolveArtistRow(
-        currentArtistId,
-        lead.mbid,
-        lead.name,
-      );
+      leadArtistId = resolveArtistRow(currentArtistId, lead.mbid, lead.name);
     }
 
-    // Repoint album to canonical artist if it changed.
-    if (currentAlbumId && canonicalArtistId !== currentArtistId) {
-      const album = getAlbumById(currentAlbumId);
-      if (album && album.artistId !== canonicalArtistId) {
-        updateAlbumByAlbumId(currentAlbumId, { artistId: canonicalArtistId });
-      }
-    }
-
+    // Settle the album's release identity (merge / release-mbid), keyed on this
+    // track's lead — preserves the existing cross-folder album-merge behavior.
     const finalAlbumId = release
-      ? commitAlbum(currentAlbumId, canonicalArtistId, release)
+      ? commitAlbum(currentAlbumId, leadArtistId, release)
       : currentAlbumId;
+    committedAlbumId = finalAlbumId;
 
     // Persist track-artist credits (compilation support). Includes the lead
     // artist at position 0 so list-tracks-by-artist can union over a single
@@ -176,16 +186,17 @@ export function commitResolution(input: CommitInput): void {
     const credits = winner.artistCredits.map((c, idx) => ({
       artistId:
         idx === 0 && lead && c.mbid === lead.mbid
-          ? canonicalArtistId
+          ? leadArtistId
           : ensureArtistByMbid(c.mbid, c.name),
       position: idx,
       joinPhrase: c.joinPhrase,
     }));
     replaceTrackArtists(trackId, credits);
 
-    // Track row final state.
+    // Track row final state — point at this track's lead credit, then mark
+    // resolved so it counts toward the album's dominant-lead recompute below.
     updateTrackByTrackId(trackId, {
-      artistId: canonicalArtistId,
+      artistId: leadArtistId,
       albumId: finalAlbumId,
     });
 
@@ -196,6 +207,17 @@ export function commitResolution(input: CommitInput): void {
       resolutionMethod: winner.method,
       audioFingerprint: input.audioFingerprint,
     });
+
+    // The album's primary artist is the dominant lead among its resolved
+    // tracks (deterministic tiebreak in the query). Recomputed every commit,
+    // so the final value is order-independent.
+    if (finalAlbumId) {
+      const owner = getDominantArtistIdForAlbum(finalAlbumId) ?? leadArtistId;
+      const album = getAlbumById(finalAlbumId);
+      if (album && album.artistId !== owner) {
+        updateAlbumByAlbumId(finalAlbumId, { artistId: owner });
+      }
+    }
 
     upsertTrackFts(
       trackId,
@@ -208,19 +230,12 @@ export function commitResolution(input: CommitInput): void {
   // Schedule cover art + artist image fetch outside the transaction.
   if (release?.releaseGroupMbid) {
     const rgMbid = release.releaseGroupMbid;
+    const albumId = committedAlbumId;
     void (async () => {
       try {
         const local = await ensureCoverOnDisk(rgMbid);
-        if (local) {
-          const album = release.releaseMbid
-            ? findAlbumByReleaseMbid(
-                input.currentArtistId,
-                release.releaseMbid,
-              )
-            : null;
-          if (album) {
-            updateAlbumByAlbumId(album.id, { coverArtUrl: local });
-          }
+        if (local && albumId) {
+          updateAlbumByAlbumId(albumId, { coverArtUrl: local });
         }
       } catch (err) {
         log.warn({ err, rgMbid }, "cover art fetch failed");
