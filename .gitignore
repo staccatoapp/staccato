@@ -42,7 +42,8 @@ yarn-error.log*
 **/vitepress/dist
 
 # Tanstack
-**/routeTree.gen.ts
+# routeTree.gen.ts is intentionally committed so `tsc -b` works on a clean
+# checkout (CI).
 **/.tanstack/
 
 # Dev-specific
