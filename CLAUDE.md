@@ -36,6 +36,8 @@ All music metadata is normalised to MusicBrainz IDs (MBIDs). MBIDs are the unive
 
 - Prefer adding a log over omitting one. Every `catch` block should log something. Every external API call site should log failures with enough context to debug from the log alone.
 
+- whenever a user-created rule is loaded from .claude/rules or a skill is used from .claude/skills, provide feedback on the use of the rule or skill. Was it helpful? What could be improved? This will help us make it better for next time.
+
 ### Log Level guidance
 
 - `error` — unrecoverable failures, fatal errors, anything that breaks user-visible functionality.

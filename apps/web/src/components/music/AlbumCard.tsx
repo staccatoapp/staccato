@@ -1,14 +1,17 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Ban, Music2, Play, TriangleAlert } from "lucide-react";
+import type { AlbumArtistCredit } from "@staccato/shared";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { AlbumArtistLine } from "@/components/music/AlbumArtistLine";
 import { generateAlbumGradient } from "@/lib/music";
 import { cn } from "@/lib/utils";
 
 export const AlbumCard = memo(function AlbumCard({
   title,
   artistName,
+  artists,
   releaseYear,
   coverArtUrl,
   href,
@@ -18,6 +21,7 @@ export const AlbumCard = memo(function AlbumCard({
 }: {
   title: string;
   artistName?: string | null;
+  artists?: AlbumArtistCredit[];
   releaseYear?: number | null;
   coverArtUrl?: string | null;
   href: string;
@@ -53,67 +57,78 @@ export const AlbumCard = memo(function AlbumCard({
   }, [coverArtUrl]);
 
   return (
-    <Link
-      to={href as Parameters<typeof Link>[0]["to"]}
-      className="group block cursor-pointer min-w-0"
-    >
-      <div
-        className="relative aspect-square w-full rounded-lg overflow-hidden mb-2.5 shadow-md"
-        style={{ background: gradient }}
+    <div className="min-w-0">
+      <Link
+        to={href as Parameters<typeof Link>[0]["to"]}
+        className="group block cursor-pointer min-w-0"
       >
-        {coverArtUrl && !imgFailed ? (
-          <img
-            src={coverArtUrl}
-            alt={title}
-            decoding="async"
-            className={cn(
-              "w-full h-full object-cover transition-opacity duration-200",
-              loaded ? "opacity-100" : "opacity-0",
-            )}
-            onLoad={() => setLoaded(true)}
-            onError={() => setImgFailed(true)}
-          />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Music2 className="w-8 h-8 text-white/15" />
-          </div>
-        )}
-        {badgeStatus === "no_match" && (
-          <div className="absolute top-2 left-2 z-10">
-            <Badge className="gap-1 text-[0.65rem] px-1.5 py-0.5 bg-black/70 text-white border-0 backdrop-blur-sm hover:bg-black/70">
-              <Ban className="w-3 h-3" />
-              No match
-            </Badge>
-          </div>
-        )}
-        {badgeStatus === "low_confidence" && (
-          <div className="absolute top-2 left-2 z-10">
-            <Badge className="gap-1 text-[0.65rem] px-1.5 py-0.5 bg-amber-500/80 text-white border-0 backdrop-blur-sm hover:bg-amber-500/80">
-              <TriangleAlert className="w-3 h-3" />
-              {pct}%
-            </Badge>
-          </div>
-        )}
-        <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
-          <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shadow-lg translate-y-2.5 group-hover:translate-y-0 transition-transform duration-200">
-            <Play
-              className="w-4 h-4 text-primary-foreground ml-0.5"
-              fill="currentColor"
+        <div
+          className="relative aspect-square w-full rounded-lg overflow-hidden mb-2.5 shadow-md"
+          style={{ background: gradient }}
+        >
+          {coverArtUrl && !imgFailed ? (
+            <img
+              src={coverArtUrl}
+              alt={title}
+              decoding="async"
+              className={cn(
+                "w-full h-full object-cover transition-opacity duration-200",
+                loaded ? "opacity-100" : "opacity-0",
+              )}
+              onLoad={() => setLoaded(true)}
+              onError={() => setImgFailed(true)}
             />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Music2 className="w-8 h-8 text-white/15" />
+            </div>
+          )}
+          {badgeStatus === "no_match" && (
+            <div className="absolute top-2 left-2 z-10">
+              <Badge className="gap-1 text-[0.65rem] px-1.5 py-0.5 bg-black/70 text-white border-0 backdrop-blur-sm hover:bg-black/70">
+                <Ban className="w-3 h-3" />
+                No match
+              </Badge>
+            </div>
+          )}
+          {badgeStatus === "low_confidence" && (
+            <div className="absolute top-2 left-2 z-10">
+              <Badge className="gap-1 text-[0.65rem] px-1.5 py-0.5 bg-amber-500/80 text-white border-0 backdrop-blur-sm hover:bg-amber-500/80">
+                <TriangleAlert className="w-3 h-3" />
+                {pct}%
+              </Badge>
+            </div>
+          )}
+          <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shadow-lg translate-y-2.5 group-hover:translate-y-0 transition-transform duration-200">
+              <Play
+                className="w-4 h-4 text-primary-foreground ml-0.5"
+                fill="currentColor"
+              />
+            </div>
           </div>
         </div>
-      </div>
-      <p className="text-[0.8125rem] font-semibold text-foreground truncate leading-snug">
-        {title}
-      </p>
-      {(artistName || releaseYear) && (
-        <p className="text-[0.72rem] text-muted-foreground truncate mt-0.5">
-          {artistName}
-          {artistName && releaseYear && <span> · </span>}
-          {releaseYear && <span>{releaseYear}</span>}
+        <p className="text-[0.8125rem] font-semibold text-foreground truncate leading-snug">
+          {title}
         </p>
+      </Link>
+      {artists && artists.length > 0 ? (
+        // Per-artist links must live outside the album Link — nested <a> is
+        // invalid HTML — so the credit line is a sibling of the cover/title.
+        <p className="text-[0.72rem] text-muted-foreground truncate mt-0.5">
+          <AlbumArtistLine credits={artists} />
+          {releaseYear && <span> · {releaseYear}</span>}
+        </p>
+      ) : (
+        (artistName || releaseYear) && (
+          <p className="text-[0.72rem] text-muted-foreground truncate mt-0.5">
+            {artistName}
+            {artistName && releaseYear && <span> · </span>}
+            {releaseYear && <span>{releaseYear}</span>}
+          </p>
+        )
       )}
-    </Link>
+    </div>
   );
 });
 

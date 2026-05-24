@@ -33,3 +33,5 @@ export * from "./types/zod/api/downloads.js";
 export * from "./pagination.js";
 
 export * from "./search-rank.js";
+
+export * from "./artist-credit.js";

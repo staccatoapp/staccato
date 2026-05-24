@@ -22,6 +22,12 @@ export const albumArtists = sqliteTable(
       .references(() => artists.id, { onDelete: "cascade" }),
     position: integer("position").notNull(),
     joinPhrase: text("join_phrase"),
+    // Whether this credit "owns" the album (co-artist), as opposed to a feature
+    // guest. Derived from the join-phrase chain at write time; drives whether
+    // the album shows in this artist's Discography vs. Appears On.
+    isPrimary: integer("is_primary", { mode: "boolean" })
+      .notNull()
+      .default(true),
     createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(
       () => new Date(),
     ),

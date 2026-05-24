@@ -204,6 +204,7 @@ function LibraryPage() {
       <AlbumCard
         title={album.title}
         artistName={album.artistName}
+        artists={album.artists}
         releaseYear={album.releaseYear}
         coverArtUrl={album.coverArtUrl}
         href={`/albums/${album.id}`}
@@ -380,6 +381,7 @@ function LibraryPage() {
                       key={album.id}
                       title={album.title}
                       artistName={album.artistName}
+                      artists={album.artists}
                       releaseYear={album.releaseYear}
                       coverArtUrl={album.coverArtUrl}
                       href={`/albums/${album.id}`}

@@ -18,6 +18,7 @@ import {
   updateTrackByAlbumId,
   updateTrackByTrackId,
 } from "../db/queries/tracks.js";
+import { computePrimaryFlags } from "@staccato/shared";
 import { normalizeString, lookupReleaseDetails, MB_PRIORITY } from "../musicbrainz/client.js";
 import { upsertTrackFts } from "../db/queries/tracks-fts.js";
 import { replaceTrackArtists } from "../db/queries/track-artists.js";
@@ -57,10 +58,14 @@ async function populateAlbumArtists(
         );
         return;
       }
+      const primaryFlags = computePrimaryFlags(
+        details.artistCredits.map((c) => c.joinPhrase),
+      );
       const credits = details.artistCredits.map((c, idx) => ({
         artistId: ensureArtistByMbid(c.mbid, c.name),
         position: idx,
         joinPhrase: c.joinPhrase,
+        isPrimary: primaryFlags[idx] ?? true,
       }));
       replaceAlbumArtists(albumId, credits);
     } catch (err) {

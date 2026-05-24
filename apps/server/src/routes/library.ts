@@ -16,6 +16,7 @@ import {
   groupCreditsByTrack,
   listTrackArtistsForTracks,
 } from "../db/queries/track-artists.js";
+import { listAlbumArtistsForAlbums } from "../db/queries/album-artists.js";
 import { db } from "../db/client.js";
 import { resolveAlbumCoverNow } from "../coverart/store.js";
 import { resolveArtistImageNow } from "../artistimage/store.js";
@@ -50,6 +51,7 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
 
     const items = getAlbumsWithArtistDetails(paginationOptions);
     const total = countAlbums();
+    const creditsByAlbum = listAlbumArtistsForAlbums(items.map((i) => i.id));
 
     return {
       items: items.map((r) => ({
@@ -60,6 +62,7 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
           coverArtUrl: r.coverArtUrl,
         }),
         createdAt: r.createdAt?.toISOString() ?? null,
+        artists: creditsByAlbum.get(r.id) ?? [],
       })),
       total,
     };
@@ -101,6 +104,9 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
 
     const artistResults = searchArtists(pattern, 5);
     const albumResults = searchAlbums(pattern, 8);
+    const albumCreditsByAlbum = listAlbumArtistsForAlbums(
+      albumResults.map((r) => r.id),
+    );
 
     // FTS5 prefix match — Drizzle doesn't support FTS, raw SQL stays inline
     const ftsQuery = buildTracksFtsQuery(term);
@@ -175,6 +181,7 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
           coverArtUrl: r.coverArtUrl,
         }),
         createdAt: r.createdAt?.toISOString() ?? null,
+        artists: albumCreditsByAlbum.get(r.id) ?? [],
       })),
       tracks: trackRows.map((r) => ({
         id: r.id,

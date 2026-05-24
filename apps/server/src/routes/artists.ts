@@ -141,6 +141,14 @@ const artistRoutes: FastifyPluginAsync = async (fastify) => {
         : null;
       const albums = mergeDiscography(detail?.releaseGroups ?? [], libraryAlbums);
 
+      // A collaborative album the artist co-owns now lands in Discography. Make
+      // sure it can't also surface in Appears On via a track/guest credit.
+      const discographyIds = new Set(libraryAlbums.map((a) => a.id));
+      const appearsOnRows = dedupById([
+        ...getAppearsOnAlbumsByArtistId(localRow.id),
+        ...getReleaseCoCreditAlbumsByArtistId(localRow.id),
+      ]).filter((row) => !discographyIds.has(row.id));
+
       return {
         source: "local" as const,
         artist: {
@@ -154,12 +162,7 @@ const artistRoutes: FastifyPluginAsync = async (fastify) => {
           }),
         },
         albums,
-        appearsOn: sortByYearDesc(
-          dedupById([
-            ...getAppearsOnAlbumsByArtistId(localRow.id),
-            ...getReleaseCoCreditAlbumsByArtistId(localRow.id),
-          ]).map(libraryItem),
-        ),
+        appearsOn: sortByYearDesc(appearsOnRows.map(libraryItem)),
       };
     }
 

@@ -13,6 +13,7 @@ import {
 import { db } from "../client.js";
 import { artists } from "../schema/artists.js";
 import { albums } from "../schema/albums.js";
+import { albumArtists } from "../schema/album-artists.js";
 import { tracks } from "../schema/tracks.js";
 import { SQLiteUpdateSetSource } from "drizzle-orm/sqlite-core";
 import { PaginationOptions } from "@staccato/shared";
@@ -35,11 +36,21 @@ export function getArtists(paginationOptions: PaginationOptions): ArtistRow[] {
       musicbrainzId: artists.musicbrainzId,
       imageUrl: artists.imageUrl,
       createdAt: artists.createdAt,
-      albumCount: sql<number>`COUNT(${albums.id})`.mapWith(Number),
+      // Albums the artist owns: legacy single-artist primary (albums.artist_id)
+      // OR a primary release-level credit (album_artists). Matches the artist
+      // page's Discography so a co-owned collaboration counts for both artists.
+      albumCount: sql<number>`(
+        SELECT COUNT(*) FROM ${albums} al
+        WHERE al.artist_id = ${artists.id}
+           OR EXISTS (
+             SELECT 1 FROM ${albumArtists} aa
+             WHERE aa.album_id = al.id
+               AND aa.artist_id = ${artists.id}
+               AND aa.is_primary = 1
+           )
+      )`.mapWith(Number),
     })
     .from(artists)
-    .leftJoin(albums, eq(albums.artistId, artists.id))
-    .groupBy(artists.id)
     .orderBy(asc(sql`COALESCE(${artists.canonicalName}, ${artists.name})`))
     .limit(paginationOptions.limit)
     .offset(paginationOptions.offset)

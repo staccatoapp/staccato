@@ -3,6 +3,7 @@ import {
   asc,
   count,
   eq,
+  exists,
   isNull,
   like,
   ne,
@@ -52,6 +53,28 @@ export type DiscographyAlbumRow = {
   coverArtUrl: string | null;
 };
 
+// Correlated subquery: the artist is a *primary* (owning) release-level credit
+// on the outer `albums` row. Used both positively (discography membership) and
+// negatively (excluding owners from "Appears On"). Correlates on albums.id, so
+// the outer query must select from / join `albums`.
+function primaryAlbumArtistSubquery(artistId: string) {
+  return db
+    .select({ x: sql`1` })
+    .from(albumArtists)
+    .where(
+      and(
+        eq(albumArtists.albumId, albums.id),
+        eq(albumArtists.artistId, artistId),
+        eq(albumArtists.isPrimary, true),
+      ),
+    );
+}
+
+// Albums the artist owns: either the legacy single-artist primary
+// (albums.artist_id) or a primary release-level credit in album_artists. The
+// album_artists branch is what lets a collaborative album ("MF Doom & MF
+// Grimm") appear in the Discography of every co-owner, not just the dominant
+// track artist held in albums.artist_id.
 export function getDiscographyAlbumsByArtistId(
   artistId: string,
 ): DiscographyAlbumRow[] {
@@ -64,14 +87,18 @@ export function getDiscographyAlbumsByArtistId(
       coverArtUrl: albums.coverArtUrl,
     })
     .from(albums)
-    .where(eq(albums.artistId, artistId))
+    .where(
+      or(
+        eq(albums.artistId, artistId),
+        exists(primaryAlbumArtistSubquery(artistId)),
+      ),
+    )
     .all();
 }
 
 // Albums the artist guests on — has at least one track credit (track_artists)
-// but is NOT the album's primary artist (albums.artist_id). Drives the artist
-// page's "Appears On" grid. Track-credit based only; release-level co-credits
-// are SP3 and are intentionally excluded here.
+// but does NOT own the album (neither albums.artist_id nor a primary
+// album_artists credit). Drives the artist page's "Appears On" grid.
 export function getAppearsOnAlbumsByArtistId(
   artistId: string,
 ): DiscographyAlbumRow[] {
@@ -87,15 +114,19 @@ export function getAppearsOnAlbumsByArtistId(
     .innerJoin(tracks, eq(trackArtists.trackId, tracks.id))
     .innerJoin(albums, eq(tracks.albumId, albums.id))
     .where(
-      and(eq(trackArtists.artistId, artistId), ne(albums.artistId, artistId)),
+      and(
+        eq(trackArtists.artistId, artistId),
+        ne(albums.artistId, artistId),
+        notExists(primaryAlbumArtistSubquery(artistId)),
+      ),
     )
     .groupBy(albums.id)
     .all();
 }
 
-// Albums the artist is a release-level co-credit on (album_artists) but is NOT
-// the album's primary artist (albums.artist_id). The release-level companion to
-// getAppearsOnAlbumsByArtistId; the artist route unions both into "Appears On".
+// Albums the artist is a release-level *guest* on — credited in album_artists
+// with is_primary = 0 (e.g. an album-level "feat."). Owners are excluded by the
+// is_primary filter; the artist route unions this with track-level appearances.
 export function getReleaseCoCreditAlbumsByArtistId(
   artistId: string,
 ): DiscographyAlbumRow[] {
@@ -110,7 +141,10 @@ export function getReleaseCoCreditAlbumsByArtistId(
     .from(albumArtists)
     .innerJoin(albums, eq(albumArtists.albumId, albums.id))
     .where(
-      and(eq(albumArtists.artistId, artistId), ne(albums.artistId, artistId)),
+      and(
+        eq(albumArtists.artistId, artistId),
+        eq(albumArtists.isPrimary, false),
+      ),
     )
     .groupBy(albums.id)
     .all();
