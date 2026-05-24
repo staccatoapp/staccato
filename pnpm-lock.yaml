@@ -30,6 +30,18 @@ importers:
         specifier: 2.0.0-alpha.17
         version: 2.0.0-alpha.17(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(postcss@8.5.10)(tsx@4.21.0)(typescript@5.9.2)
 
+  apps/internal-docs:
+    devDependencies:
+      '@staccato/eslint-config':
+        specifier: workspace:*
+        version: link:../../packages/eslint-config
+      '@staccato/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      vitepress:
+        specifier: 2.0.0-alpha.17
+        version: 2.0.0-alpha.17(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(postcss@8.5.10)(tsx@4.21.0)(typescript@5.9.2)
+
   apps/metadata-service:
     dependencies:
       '@staccato/shared':
@@ -1899,6 +1911,7 @@ packages:
 
   '@ungap/structured-clone@1.3.0':
     resolution: {integrity: sha512-WmoN8qaIAo7WTYWbAZuG8PYEhn5fkz7dZrqTBZ7dtt//lL2Gwms1IcnQ5yHqjDfX8Ft5j4YzDM23f87zBfDe9g==}
+    deprecated: Potential CWE-502 - Update to 1.3.1 or higher
 
   '@vitejs/plugin-react@6.0.1':
     resolution: {integrity: sha512-l9X/E3cDb+xY3SWzlG1MOGt2usfEHGMNIaegaUGFsLkb3RCn/k8/TOXBcab+OndDI4TBtktT8/9BwwW8Vi9KUQ==}
