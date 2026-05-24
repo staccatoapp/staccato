@@ -18,7 +18,7 @@ const scanRoutes: FastifyPluginAsync = async (fastify) => {
       req.log.warn("scan requested but already in progress");
       return reply.status(409).send({ error: "Scan already in progress" });
     }
-    const musicDir = process.env.MUSIC_DIR ?? "./music";
+    const musicDir = process.env.STACCATO_SERVER_MUSIC_DIR ?? "./music";
     req.log.info({ musicDir }, "manual scan triggered");
     startManualScan(musicDir).catch((err) =>
       req.log.error({ err }, "manual scan failed"),

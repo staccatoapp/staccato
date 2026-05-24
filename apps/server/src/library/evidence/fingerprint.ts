@@ -14,7 +14,7 @@ export async function fingerprintFile(
   filePath: string,
 ): Promise<FingerprintResult | null> {
   try {
-    const binary = process.env.FPCALC_PATH ?? "fpcalc";
+    const binary = process.env.STACCATO_SERVER_FPCALC_PATH ?? "fpcalc";
     const { stdout } = await execFileAsync(binary, ["-json", filePath]);
     const parsed = JSON.parse(stdout) as FingerprintResult;
     if (!parsed.fingerprint || typeof parsed.duration !== "number") return null;
@@ -30,7 +30,7 @@ let fpcalcCached: boolean | null = null;
 export async function isFpcalcAvailable(): Promise<boolean> {
   if (fpcalcCached !== null) return fpcalcCached;
   try {
-    const binary = process.env.FPCALC_PATH ?? "fpcalc";
+    const binary = process.env.STACCATO_SERVER_FPCALC_PATH ?? "fpcalc";
     await execFileAsync(binary, ["-version"]);
     fpcalcCached = true;
   } catch {

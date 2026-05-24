@@ -40,7 +40,7 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.patch("/", async (req, reply) => {
     const parsedUpdates = UpdateUserSettingsSchema.parse(req.body);
     const cleanedUpdates = Object.fromEntries(
-      Object.entries(parsedUpdates).filter(([_, value]) => value != null),
+      Object.entries(parsedUpdates).filter(([, value]) => value != null),
     );
 
     const currentUserSettings = getOrCreateUserSettings(req.userId);

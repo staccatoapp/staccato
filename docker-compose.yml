@@ -10,7 +10,7 @@ services:
       - STACCATO_ENV=production
       - PORT=8080
       - STACCATO_DATA_DIR=/data
-      - MUSIC_DIR=/music
+      - STACCATO_SERVER_MUSIC_DIR=/music
 
   redis:
     image: redis:7-alpine

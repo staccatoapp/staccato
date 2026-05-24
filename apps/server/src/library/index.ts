@@ -41,12 +41,12 @@ export async function startLibraryPipeline(musicDir: string): Promise<void> {
   ]);
   if (!fpcalcOk) {
     log.warn(
-      "fpcalc not available — acoustid resolution will be skipped. install chromaprint and set FPCALC_PATH if needed.",
+      "fpcalc not available — acoustid resolution will be skipped. install chromaprint and set STACCATO_SERVER_FPCALC_PATH if needed.",
     );
   }
   if (!acoustidOk) {
     log.warn(
-      "ACOUSTID_API_KEY not set — acoustid resolution will be skipped",
+      "STACCATO_SERVER_ACOUSTID_API_KEY not set — acoustid resolution will be skipped",
     );
   }
 

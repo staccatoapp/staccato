@@ -16,7 +16,7 @@ declare module "fastify" {
 
 const sessionPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.register(secureSession, {
-    secret: process.env.SESSION_SECRET!,
+    secret: process.env.STACCATO_SERVER_SESSION_SECRET!,
     salt: "peppery-staccato",
     cookieName: "staccato-session",
     cookie: {

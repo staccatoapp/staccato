@@ -388,14 +388,7 @@ export async function lookupArtistDetail(
   }
 }
 
-export function normalizeString(str: string): string {
-  return str
-    .toLowerCase()
-    .replace(/[-‐‑‒–—―]/g, " ")
-    .replace(/[^a-z0-9\s]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+export { normalizeString } from "./normalize.js";
 
 export async function lookupExternalAlbum(
   rgMbid: string,

@@ -43,7 +43,7 @@ All music metadata is normalised to MusicBrainz IDs (MBIDs). MBIDs are the unive
 - `error` — unrecoverable failures, fatal errors, anything that breaks user-visible functionality.
 - `warn` — recoverable failures (silent catches in external clients returning null), degraded operating mode (missing optional integration like AcoustID), rate-limit backoffs that affect throughput, 4xx responses worth noting (auth failures, conflicts).
 - `info` — lifecycle events (server up, scan started/complete, pass started with counts), state transitions, successful user-visible actions (user logged in, download queued). Fastify already auto-logs every HTTP request/response at INFO — do not duplicate.
-- `debug` — per-item events (per-file scan, per-track resolution), polling tick details, deduplication skips, anything high-volume that would drown INFO. Default LOG_LEVEL hides these.
+- `debug` — per-item events (per-file scan, per-track resolution), polling tick details, deduplication skips, anything high-volume that would drown INFO. Default STACCATO_LOG_LEVEL hides these.
 
 ### Log call format
 

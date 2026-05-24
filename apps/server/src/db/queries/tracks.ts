@@ -13,10 +13,7 @@ import {
 } from "drizzle-orm";
 import { db } from "../client.js";
 import { tracks } from "../schema/tracks.js";
-import type {
-  ResolutionMethod,
-  ResolutionStatus,
-} from "../schema/tracks.js";
+import type { ResolutionMethod, ResolutionStatus } from "../schema/tracks.js";
 import { SQLiteUpdateSetSource } from "drizzle-orm/sqlite-core";
 import { artists } from "../schema/artists.js";
 import { albums } from "../schema/albums.js";
@@ -373,12 +370,7 @@ export function upsertDiscoveredTrack(
     .returning({ id: tracks.id })
     .get()!;
 
-  upsertTrackFts(
-    inserted.id,
-    input.title,
-    rawArtistName,
-    rawAlbumTitle ?? "",
-  );
+  upsertTrackFts(inserted.id, input.title, rawArtistName, rawAlbumTitle ?? "");
   return inserted.id;
 }
 
@@ -451,10 +443,7 @@ export function repointTrackPath(
     .run();
 }
 
-export function markPendingRemovalByPath(
-  filePath: string,
-  at: number,
-): void {
+export function markPendingRemovalByPath(filePath: string, at: number): void {
   db.update(tracks)
     .set({ pendingRemovalAt: at })
     .where(eq(tracks.filePath, filePath))
@@ -498,7 +487,10 @@ export function resetResolvingToPending(): number {
   return result.changes;
 }
 
-export function getPendingTrackPaths(): Array<{ id: string; filePath: string }> {
+export function getPendingTrackPaths(): Array<{
+  id: string;
+  filePath: string;
+}> {
   return db
     .select({ id: tracks.id, filePath: tracks.filePath })
     .from(tracks)
@@ -602,7 +594,11 @@ export function getAllTrackFilePaths(): string[] {
 
 export function deleteTrackById(trackId: string): void {
   const track = db
-    .select({ id: tracks.id, albumId: tracks.albumId, artistId: tracks.artistId })
+    .select({
+      id: tracks.id,
+      albumId: tracks.albumId,
+      artistId: tracks.artistId,
+    })
     .from(tracks)
     .where(eq(tracks.id, trackId))
     .get();
@@ -634,20 +630,6 @@ export function deleteTrackByPath(filePath: string): void {
   if (!track) return;
   deleteTrackById(track.id);
 }
-
-// Legacy: unused after the rewrite. Retained as a no-op stub so callers that
-// haven't migrated yet still link. Will be removed.
-export function getUnresolvedTracksByAlbum(_albumId: string) {
-  return [] as Array<{
-    id: string;
-    title: string;
-    trackNumber: number | null;
-    discNumber: number | null;
-  }>;
-}
-export type UnresolvedTrackInAlbumRow = ReturnType<
-  typeof getUnresolvedTracksByAlbum
->[number];
 
 // Legacy compatibility export — read pending tracks with album/artist context.
 // Kept so retry endpoints and external callers continue to compile.
@@ -719,7 +701,8 @@ export function getOrphanTracksInDirectories(
 ): OrphanTrackRow[] {
   if (directories.length === 0) return [];
   const likeConds = directories.map(
-    (dir) => sql`${tracks.filePath} LIKE ${escapeLikePrefix(dir) + "%"} ESCAPE '~'`,
+    (dir) =>
+      sql`${tracks.filePath} LIKE ${escapeLikePrefix(dir) + "%"} ESCAPE '~'`,
   );
   return db
     .select({

@@ -46,8 +46,12 @@ function ScanSection() {
     refetchInterval: (query) => (query.state.data?.running ? 2000 : false),
   });
 
+  // Narrow to the scalars the effect actually depends on, so the dep array is
+  // honest (instead of referencing the whole scanStatus object).
+  const scanLoaded = scanStatus != null;
+  const scanRunning = scanStatus?.running ?? false;
   useEffect(() => {
-    if (prevRunningRef.current && scanStatus && !scanStatus.running) {
+    if (prevRunningRef.current && scanLoaded && !scanRunning) {
       queryClient.invalidateQueries({ queryKey: ["albums"] });
       queryClient.invalidateQueries({ queryKey: ["tracks"] });
       queryClient.invalidateQueries({ queryKey: ["album"] });
@@ -55,8 +59,8 @@ function ScanSection() {
       const t = setTimeout(() => setScanComplete(false), 3000);
       return () => clearTimeout(t);
     }
-    prevRunningRef.current = scanStatus?.running ?? false;
-  }, [scanStatus?.running, queryClient]);
+    prevRunningRef.current = scanRunning;
+  }, [scanLoaded, scanRunning, queryClient]);
 
   const { mutate: triggerScan, isPending } = useMutation({
     mutationFn: async () => {

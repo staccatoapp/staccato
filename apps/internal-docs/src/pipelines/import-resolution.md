@@ -21,7 +21,7 @@ Entry points: `startLibraryPipeline(musicDir)` for normal startup and `startManu
 for a full re-scan (both in `apps/server/src/library/index.ts`).
 
 On boot the pipeline checks optional support — `fpcalc` availability
-(`evidence/fingerprint.ts`) and `ACOUSTID_API_KEY` (`evidence/acoustid.ts`), warning if either
+(`evidence/fingerprint.ts`) and `STACCATO_SERVER_ACOUSTID_API_KEY` (`evidence/acoustid.ts`), warning if either
 is missing — then runs `reconcile(musicDir)` (`reconcile.ts`):
 
 - Files **on disk but not in the DB** → `enqueueDiscovery()`.
@@ -46,9 +46,9 @@ Defined in `apps/server/src/library/queue.ts` using `p-queue`. Concurrency is en
 
 | Queue | Default | Env var | Why |
 | --- | --- | --- | --- |
-| Discovery | `8` | `LIBRARY_DISCOVERY_CONCURRENCY` | Local IO (stat + tag read + insert); fast, run wide. |
-| Resolution | `6` | `LIBRARY_WORKER_CONCURRENCY` | MusicBrainz-bound; also gated by the shared MB throttle. |
-| Enrichment | `2` | `LIBRARY_ENRICHMENT_CONCURRENCY` | Best-effort background backfill. |
+| Discovery | `8` | `STACCATO_SERVER_LIBRARY_DISCOVERY_CONCURRENCY` | Local IO (stat + tag read + insert); fast, run wide. |
+| Resolution | `6` | `STACCATO_SERVER_LIBRARY_WORKER_CONCURRENCY` | MusicBrainz-bound; also gated by the shared MB throttle. |
+| Enrichment | `2` | `STACCATO_SERVER_LIBRARY_ENRICHMENT_CONCURRENCY` | Best-effort background backfill. |
 
 `drain()` awaits discovery-idle **then** resolution-idle. Enrichment is intentionally excluded
 from `drain()` so eventual-consistency work never blocks scan completion.

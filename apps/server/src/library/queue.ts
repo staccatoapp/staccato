@@ -5,15 +5,15 @@ import { logger } from "../logger.js";
 const log = logger.child({ module: "library:queue" });
 
 const DISCOVERY_CONCURRENCY = parseInt(
-  process.env.LIBRARY_DISCOVERY_CONCURRENCY ?? "8",
+  process.env.STACCATO_SERVER_LIBRARY_DISCOVERY_CONCURRENCY ?? "8",
   10,
 );
 const RESOLUTION_CONCURRENCY = parseInt(
-  process.env.LIBRARY_WORKER_CONCURRENCY ?? "6",
+  process.env.STACCATO_SERVER_LIBRARY_WORKER_CONCURRENCY ?? "6",
   10,
 );
 const ENRICHMENT_CONCURRENCY = parseInt(
-  process.env.LIBRARY_ENRICHMENT_CONCURRENCY ?? "2",
+  process.env.STACCATO_SERVER_LIBRARY_ENRICHMENT_CONCURRENCY ?? "2",
   10,
 );
 

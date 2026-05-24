@@ -109,7 +109,7 @@ const start = async () => {
     );
   }
 
-  const musicDir = process.env.MUSIC_DIR ?? "./music";
+  const musicDir = process.env.STACCATO_SERVER_MUSIC_DIR ?? "./music";
   const port = Number(process.env.PORT) || 8280;
   await app.listen({ port, host: "0.0.0.0" });
 

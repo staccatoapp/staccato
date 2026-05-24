@@ -7,6 +7,7 @@
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
+    "test": "turbo run test",
     "preview": "pnpm build && pnpm --filter @staccato/server start",
     "studio": "pnpm --filter @staccato/server run studio",
     "inspect-tags": "pnpm --filter @staccato/server run inspect-tags"

@@ -1,4 +1,4 @@
-import { normalizeString } from "../musicbrainz/client.js";
+import { normalizeString } from "../musicbrainz/normalize.js";
 import type {
   RecordingCandidate,
   RawTags,

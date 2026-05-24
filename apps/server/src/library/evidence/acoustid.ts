@@ -111,9 +111,9 @@ export async function lookupFingerprint(
 }
 
 export function isAcoustidConfigured(): boolean {
-  return !!process.env.ACOUSTID_API_KEY;
+  return !!process.env.STACCATO_SERVER_ACOUSTID_API_KEY;
 }
 
 export function acoustidApiKey(): string | null {
-  return process.env.ACOUSTID_API_KEY ?? null;
+  return process.env.STACCATO_SERVER_ACOUSTID_API_KEY ?? null;
 }

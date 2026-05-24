@@ -32,7 +32,7 @@ async function main(): Promise<void> {
 
   if (!acoustidApiKey()) {
     console.warn(
-      "\nACOUSTID_API_KEY is not set — skipping the AcoustID lookup. " +
+      "\nSTACCATO_SERVER_ACOUSTID_API_KEY is not set — skipping the AcoustID lookup. " +
         "Set it in apps/server/.env(.development.local) to see candidate recordings.",
     );
     return;

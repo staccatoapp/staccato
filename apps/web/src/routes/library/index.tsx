@@ -186,18 +186,25 @@ function LibraryPage() {
     [isSearchMode, debouncedSearch, playlistsQuery.items],
   );
 
+  // fetchNextPage is referentially stable per query; destructure it so the
+  // callback deps are honest without depending on the whole (changing) query.
+  const { fetchNextPage: fetchNextAlbumsPage } = albumsQuery;
+  const { fetchNextPage: fetchNextArtistsPage } = artistsQuery;
+  const { fetchNextPage: fetchNextTracksPage } = tracksQuery;
+  const { fetchNextPage: fetchNextPlaylistsPage } = playlistsQuery;
+
   const fetchNextAlbums = useCallback(() => {
-    albumsQuery.fetchNextPage();
-  }, [albumsQuery.fetchNextPage]);
+    fetchNextAlbumsPage();
+  }, [fetchNextAlbumsPage]);
   const fetchNextArtists = useCallback(() => {
-    artistsQuery.fetchNextPage();
-  }, [artistsQuery.fetchNextPage]);
+    fetchNextArtistsPage();
+  }, [fetchNextArtistsPage]);
   const fetchNextTracks = useCallback(() => {
-    tracksQuery.fetchNextPage();
-  }, [tracksQuery.fetchNextPage]);
+    fetchNextTracksPage();
+  }, [fetchNextTracksPage]);
   const fetchNextPlaylists = useCallback(() => {
-    playlistsQuery.fetchNextPage();
-  }, [playlistsQuery.fetchNextPage]);
+    fetchNextPlaylistsPage();
+  }, [fetchNextPlaylistsPage]);
 
   const renderAlbum = useCallback(
     (album: AlbumListItem) => (

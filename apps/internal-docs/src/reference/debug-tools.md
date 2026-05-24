@@ -24,5 +24,5 @@
 
 > - `sql.ts` — ad-hoc Drizzle queries against the live DB.
 
-> For each script, document the exact invocation, required env (`ACOUSTID_API_KEY`,
+> For each script, document the exact invocation, required env (`STACCATO_SERVER_ACOUSTID_API_KEY`,
 > `STACCATO_METADATA_URL`), and example output.
