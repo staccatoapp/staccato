@@ -3,6 +3,7 @@ import type {
   RawTags,
   RecordingCandidate,
   ReleaseCandidate,
+  ResolvedRelease,
 } from "../types.js";
 
 export function makeTags(overrides: Partial<RawTags> = {}): RawTags {
@@ -66,6 +67,19 @@ export function makeCandidate(
     artistCredits: [makeCredit()],
     releases: [makeRelease()],
     acoustidScore: null,
+    ...overrides,
+  };
+}
+
+export function makeResolvedRelease(
+  overrides: Partial<ResolvedRelease> = {},
+): ResolvedRelease {
+  return {
+    releaseMbid: "release-mbid",
+    releaseGroupMbid: "rg-mbid",
+    title: "Test Album",
+    releaseYear: 2000,
+    confidence: 0.9,
     ...overrides,
   };
 }

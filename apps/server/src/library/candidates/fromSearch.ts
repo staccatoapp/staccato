@@ -1,7 +1,7 @@
 import type { Evidence, RecordingCandidate } from "../types.js";
 import { searchRecordingsRich } from "../mbLookup.js";
 
-function escapeLuceneTerm(value: string): string {
+export function escapeLuceneTerm(value: string): string {
   return value.replace(/(["\\])/g, "\\$1");
 }
 
@@ -9,7 +9,7 @@ function escapeLuceneTerm(value: string): string {
 // are not part of the canonical recording title and break MusicBrainz's Lucene
 // phrase match. Conservative: only trailing groups, applied repeatedly so
 // "Song [Hidden] (Live)" reduces to "Song". Never returns empty.
-function sanitizeTitleForSearch(title: string): string {
+export function sanitizeTitleForSearch(title: string): string {
   let out = title;
   let prev: string;
   do {

@@ -9,7 +9,7 @@ function toFirstString(
   return Array.isArray(val) ? (val[0] ?? null) : val;
 }
 
-function inferFileFormat(
+export function inferFileFormat(
   filePath: string,
   container: string | undefined,
   codec: string | undefined,
