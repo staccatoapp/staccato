@@ -1,0 +1,293 @@
+name: Tech Debt Agent
+
+on:
+  schedule:
+    - cron: "0 5 * * 1" # Every Monday at 5am UTC
+  workflow_dispatch: # Allow manual triggering for testing
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  resolve-tech-debt:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Query GitHub Project for eligible issues
+        id: find_issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Fetch all items in the "Ready" column of the project that have the "tech debt" label
+          # and do NOT have "agent ignore". Then pick the highest priority one.
+          # Priority order: Urgent > High > Medium > Low
+
+          QUERY='
+          query {
+            organization(login: "staccatoapp") {
+              projectV2(number: 2) {
+                items(first: 100) {
+                  nodes {
+                    id
+                    fieldValues(first: 20) {
+                      nodes {
+                        ... on ProjectV2ItemFieldSingleSelectValue {
+                          name
+                          field { ... on ProjectV2SingleSelectField { name } }
+                        }
+                      }
+                    }
+                    content {
+                      ... on Issue {
+                        number
+                        title
+                        body
+                        url
+                        labels(first: 20) {
+                          nodes { name }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }'
+
+          RESULT=$(gh api graphql -f query="$QUERY")
+
+          # Parse: filter to items where Status == "Ready", has label "tech debt", lacks "agent ignore"
+          # Then rank by priority field: Urgent=1, High=2, Medium=3, Low=4, (none)=5
+          ISSUE=$(echo "$RESULT" | jq -r '
+            .data.organization.projectV2.items.nodes
+            | map(
+                . as $item |
+                (.fieldValues.nodes | map(select(.field.name == "Status")) | .[0].name) as $status |
+                (.fieldValues.nodes | map(select(.field.name == "Priority")) | .[0].name) as $priority |
+                (.content.labels.nodes | map(.name)) as $labels |
+                select(
+                  $status == "Ready" and
+                  ($labels | contains(["tech debt"])) and
+                  ($labels | contains(["agent ignore"]) | not) and
+                  (.content.number != null)
+                ) |
+                {
+                  item_id: $item.id,
+                  number: .content.number,
+                  title: .content.title,
+                  body: .content.body,
+                  url: .content.url,
+                  priority: $priority,
+                  priority_rank: (
+                    if $priority == "Urgent" then 1
+                    elif $priority == "High" then 2
+                    elif $priority == "Medium" then 3
+                    elif $priority == "Low" then 4
+                    else 5 end
+                  )
+                }
+              )
+            | sort_by(.priority_rank)
+            | .[0]
+          ')
+
+          if [ "$ISSUE" = "null" ] || [ -z "$ISSUE" ]; then
+            echo "No eligible tech debt issues found. Stopping."
+            echo "found=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          ISSUE_NUMBER=$(echo "$ISSUE" | jq -r '.number')
+          ISSUE_TITLE=$(echo "$ISSUE" | jq -r '.title')
+          ISSUE_BODY=$(echo "$ISSUE" | jq -r '.body')
+          ITEM_ID=$(echo "$ISSUE" | jq -r '.item_id')
+
+          echo "Found issue #$ISSUE_NUMBER: $ISSUE_TITLE"
+          echo "found=true" >> $GITHUB_OUTPUT
+          echo "issue_number=$ISSUE_NUMBER" >> $GITHUB_OUTPUT
+          echo "issue_title=$ISSUE_TITLE" >> $GITHUB_OUTPUT
+          echo "item_id=$ITEM_ID" >> $GITHUB_OUTPUT
+
+          # Write body to a file to avoid quoting/escaping issues in env
+          echo "$ISSUE_BODY" > /tmp/issue_body.txt
+
+      - name: Run Claude Code agent
+        id: claude_agent
+        if: steps.find_issue.outputs.found == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ steps.find_issue.outputs.issue_number }}
+          ISSUE_TITLE: ${{ steps.find_issue.outputs.issue_title }}
+          ITEM_ID: ${{ steps.find_issue.outputs.item_id }}
+        run: |
+          ISSUE_BODY=$(cat /tmp/issue_body.txt)
+
+          PROMPT="You are an automated tech debt resolution agent running in a CI pipeline. Your job is to attempt to fix a single GitHub issue and open a pull request if you can do so confidently.
+
+          ## The Issue
+          Issue number: #${ISSUE_NUMBER}
+          Title: ${ISSUE_TITLE}
+          Body:
+          ${ISSUE_BODY}
+
+          ## Your decision process
+
+          You must work through the following steps in order:
+
+          ### Step 1: Assess scope and confidence
+          Before writing any code, assess:
+          - Is the scope of this issue small and well-defined? (e.g. a refactor of a single module, removing deprecated code, fixing a known pattern, updating a dependency, improving error handling in one area)
+          - Do you understand exactly what change is needed and where?
+          - Can you confidently make this change without risk of unintended side effects beyond the touched files?
+
+          If ANY of the following are true, you must STOP:
+          - The issue is vague or underspecified
+          - The fix would require changes across many unrelated parts of the codebase
+          - You are unsure which approach is correct
+          - The issue implies an architectural decision that a human should make
+          - The fix requires context you cannot infer from the codebase alone
+          - You are not highly confident the change is correct and safe
+
+          If you decide to stop, output EXACTLY this on its own line:
+          AGENT_DECISION: SKIP
+          Then on the next line, a brief reason (1-2 sentences) starting with SKIP_REASON:
+
+          ### Step 2: Implement the fix
+          If and only if you assessed the issue as safe to fix:
+          1. Explore the codebase to fully understand the relevant code
+          2. Make the necessary changes
+          3. Ensure existing tests still pass (run them if a test command is identifiable from the repo)
+          4. Do not add new dependencies unless strictly necessary and obvious
+
+          ### Step 3: Create a branch and pull request
+          After making the fix:
+          1. Create a branch named: agent/tech-debt-${ISSUE_NUMBER}
+          2. Commit the changes with a clear message referencing the issue
+          3. Push the branch
+          4. Open a pull request with:
+             - Title: [Tech Debt] <concise description of the fix>
+             - Body: Explain what was changed and why, then include on its own line: Closes #${ISSUE_NUMBER}
+             - Base branch: main (or master if that is the default)
+
+          Use the gh CLI for git operations and PR creation.
+
+          If the PR was successfully created, output EXACTLY this on its own line:
+          AGENT_DECISION: SUCCESS
+
+          ## Important constraints
+          - Attempt at most one issue per run (this one)
+          - Do not modify unrelated files
+          - Do not open a PR if you are not confident — a skipped issue is better than a broken PR
+          - Be conservative: when in doubt, SKIP"
+
+          # Run Claude Code in headless mode, capturing output
+          claude -p "$PROMPT" \
+            --allowedTools "Bash,Read,Write,Edit,Glob,Grep" \
+            2>&1 | tee /tmp/claude_output.txt
+
+          # Extract decision from output
+          if grep -q "AGENT_DECISION: SUCCESS" /tmp/claude_output.txt; then
+            echo "decision=success" >> $GITHUB_OUTPUT
+          elif grep -q "AGENT_DECISION: SKIP" /tmp/claude_output.txt; then
+            SKIP_REASON=$(grep "SKIP_REASON:" /tmp/claude_output.txt | sed 's/SKIP_REASON: //')
+            echo "decision=skip" >> $GITHUB_OUTPUT
+            echo "skip_reason=$SKIP_REASON" >> $GITHUB_OUTPUT
+          else
+            echo "decision=unknown" >> $GITHUB_OUTPUT
+            echo "skip_reason=Agent did not produce a clear decision. Manual review required." >> $GITHUB_OUTPUT
+          fi
+
+      - name: Comment and label on skip or unknown
+        if: |
+          steps.find_issue.outputs.found == 'true' &&
+          (steps.claude_agent.outputs.decision == 'skip' || steps.claude_agent.outputs.decision == 'unknown')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ steps.find_issue.outputs.issue_number }}
+          SKIP_REASON: ${{ steps.claude_agent.outputs.skip_reason }}
+        run: |
+          gh issue comment "$ISSUE_NUMBER" \
+            --body "**Tech Debt Agent — Skipped**
+
+          This issue was reviewed by the automated tech debt agent but was not actioned.
+
+          **Reason:** ${SKIP_REASON}
+
+          The \`agent ignore\` label has been added to prevent future automated attempts. Remove it if you'd like the agent to retry after the issue has been clarified or scoped down."
+
+          gh issue edit "$ISSUE_NUMBER" --add-label "agent ignore"
+
+      - name: Move project item to "In review" on success
+        if: |
+          steps.find_issue.outputs.found == 'true' &&
+          steps.claude_agent.outputs.decision == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ITEM_ID: ${{ steps.find_issue.outputs.item_id }}
+        run: |
+          # Get the project and field/option IDs needed to update the Status field
+          METADATA=$(gh api graphql -f query='
+          query {
+            organization(login: "staccatoapp") {
+              projectV2(number: 2) {
+                id
+                fields(first: 20) {
+                  nodes {
+                    ... on ProjectV2SingleSelectField {
+                      id
+                      name
+                      options { id name }
+                    }
+                  }
+                }
+              }
+            }
+          }')
+
+          PROJECT_ID=$(echo "$METADATA" | jq -r '.data.organization.projectV2.id')
+
+          STATUS_FIELD_ID=$(echo "$METADATA" | jq -r '
+            .data.organization.projectV2.fields.nodes
+            | map(select(.name == "Status"))
+            | .[0].id')
+
+          IN_REVIEW_OPTION_ID=$(echo "$METADATA" | jq -r '
+            .data.organization.projectV2.fields.nodes
+            | map(select(.name == "Status"))
+            | .[0].options
+            | map(select(.name == "In review"))
+            | .[0].id')
+
+          gh api graphql -f query='
+          mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+            updateProjectV2ItemFieldValue(input: {
+              projectId: $projectId
+              itemId: $itemId
+              fieldId: $fieldId
+              value: { singleSelectOptionId: $optionId }
+            }) {
+              projectV2Item { id }
+            }
+          }' \
+          -f projectId="$PROJECT_ID" \
+          -f itemId="$ITEM_ID" \
+          -f fieldId="$STATUS_FIELD_ID" \
+          -f optionId="$IN_REVIEW_OPTION_ID"
+
+          echo "Project item moved to In review."
