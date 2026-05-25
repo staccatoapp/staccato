@@ -1,4 +1,3 @@
-import "../src/env.js";
 import { inspect } from "node:util";
 import { fingerprintFile } from "../src/library/evidence/fingerprint.js";
 import { candidatesFromAcoustid } from "../src/library/candidates/fromAcoustid.js";

@@ -1,5 +1,4 @@
 /// <reference types="node" />
-import "./src/env.js";
 import { defineConfig } from "drizzle-kit";
 import { dbPath } from "./src/paths.js";
 

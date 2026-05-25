@@ -1,4 +1,3 @@
-import "../src/env.js";
 import { db } from "../src/db/client.js";
 import { tracks } from "../src/db/schema/tracks.js";
 import { like } from "drizzle-orm";

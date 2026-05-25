@@ -1,4 +1,3 @@
-import "../src/env.js";
 import Database from "better-sqlite3";
 import { inspect } from "node:util";
 import { dbPath } from "../src/paths.js";
