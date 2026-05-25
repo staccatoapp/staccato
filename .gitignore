@@ -54,9 +54,6 @@ data/
 /music/
 /notes
 docs/
-
-# Claude
-.claude/
 .playwright-mcp/
 .claudeignore
 .superpowers/
