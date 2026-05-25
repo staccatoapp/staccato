@@ -1,8 +1,7 @@
 import PQueue from "p-queue";
 import { APP_USER_AGENT } from "../constants.js";
 import { logger } from "../logger.js";
-
-const log = logger.child({ module: "musicbrainz" });
+import { config } from "../config.js";
 import {
   IdentifySearchResponseSchema,
   MetadataAlbumDetailSchema,
@@ -20,6 +19,8 @@ import {
   type MetadataReleaseTrack,
   type MetadataSearchResults,
 } from "@staccato/shared";
+
+const log = logger.child({ module: "musicbrainz" });
 
 export interface RecordingMatch {
   recordingMbid: string;
@@ -44,8 +45,7 @@ function parseReleaseYear(date?: string | null): number | null {
   return Number.isNaN(year) ? null : year;
 }
 
-export const FACADE_BASE =
-  process.env.STACCATO_METADATA_URL ?? "http://localhost:8290/v1";
+export const FACADE_BASE = config.STACCATO_METADATA_URL;
 
 // Throttle knobs for the shared MB queue. Defaults match MusicBrainz's public
 // 1-req/sec limit. When pointed at the hosted façade (STACCATO_METADATA_URL),
@@ -54,14 +54,9 @@ export const FACADE_BASE =
 //   MB_CONCURRENCY   — max simultaneous in-flight requests   (default 1)
 //   MB_INTERVAL_CAP  — max requests started per interval      (default 1)
 //   MB_RATE_LIMIT_MS — interval window in ms; 0 disables it   (default 1100)
-function envInt(name: string, fallback: number, min: number): number {
-  const parsed = parseInt(process.env[name] ?? "", 10);
-  return Number.isFinite(parsed) && parsed >= min ? parsed : fallback;
-}
-
-const MB_CONCURRENCY = envInt("MB_CONCURRENCY", 1, 1);
-const MB_INTERVAL_CAP = envInt("MB_INTERVAL_CAP", 1, 1);
-const MB_INTERVAL_MS = envInt("MB_RATE_LIMIT_MS", 1100, 0);
+const MB_CONCURRENCY = config.MB_CONCURRENCY;
+const MB_INTERVAL_CAP = config.MB_INTERVAL_CAP;
+const MB_INTERVAL_MS = config.MB_RATE_LIMIT_MS;
 
 // Priority lanes for shared external-API queues (MB + CAA). Higher number =
 // runs sooner. INTERACTIVE is reserved for the search route (user typing).

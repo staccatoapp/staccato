@@ -1,6 +1,7 @@
 import { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
 import fp from "fastify-plugin";
 import secureSession from "@fastify/secure-session";
+import { config } from "../config.js";
 
 declare module "@fastify/secure-session" {
   interface SessionData {
@@ -16,7 +17,7 @@ declare module "fastify" {
 
 const sessionPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.register(secureSession, {
-    secret: process.env.STACCATO_SERVER_SESSION_SECRET!,
+    secret: config.STACCATO_SERVER_SESSION_SECRET,
     salt: "peppery-staccato",
     cookieName: "staccato-session",
     cookie: {

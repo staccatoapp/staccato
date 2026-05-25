@@ -1,14 +1,21 @@
+import dotenvFlow from "dotenv-flow";
 import { z } from "zod";
-import { logger } from "./logger.js";
 
-// Coerce a possibly-missing env string into a non-negative integer, falling
-// back when unset/invalid.
-const intFromEnv = (fallback: number) =>
+if (process.env.STACCATO_ENV !== "production") {
+  dotenvFlow.config({
+    node_env: process.env.STACCATO_ENV ?? "development",
+  });
+}
+
+// Coerce a possibly-missing env string into an integer >= min, falling back
+// when unset/invalid. min defaults to 0 (non-negative). Pass min=1 for any
+// field used as a PQueue concurrency or intervalCap.
+const intFromEnv = (fallback: number, min = 0) =>
   z.preprocess((v) => {
     if (v === undefined || v === "") return fallback;
     const n = Number(v);
-    return Number.isInteger(n) && n >= 0 ? n : fallback;
-  }, z.number().int().nonnegative());
+    return Number.isInteger(n) && n >= min ? n : fallback;
+  }, z.number().int().min(min));
 
 // Coerce an env string into a boolean. Unset/invalid → fallback; "false"/"0"
 // (case-insensitive) → false; anything else truthy → true.
@@ -22,6 +29,9 @@ const boolFromEnv = (fallback: boolean) =>
   }, z.boolean());
 
 const ConfigSchema = z.object({
+  STACCATO_ENV: z.string().optional(),
+  STACCATO_LOG_LEVEL: z.string().default("info"),
+  STACCATO_LOG_FORMAT: z.string().default("pretty"),
   // Upstream MusicBrainz ws/2 base. Defaults to the local Phase-1 mirror.
   MB_MIRROR_URL: z.string().url().default("http://localhost:5000/ws/2"),
   PORT: intFromEnv(8290),
@@ -31,7 +41,7 @@ const ConfigSchema = z.object({
   //   MIRROR_CONCURRENCY  — max simultaneous in-flight upstream requests
   //   MIRROR_INTERVAL_CAP — max requests started per interval (0 = uncapped)
   //   MIRROR_INTERVAL_MS  — interval window in ms (0 = no time-window cap)
-  MIRROR_CONCURRENCY: intFromEnv(10),
+  MIRROR_CONCURRENCY: intFromEnv(10, 1),
   MIRROR_INTERVAL_CAP: intFromEnv(0),
   MIRROR_INTERVAL_MS: intFromEnv(0),
 
@@ -46,21 +56,11 @@ const ConfigSchema = z.object({
 
 const parsed = ConfigSchema.safeParse(process.env);
 if (!parsed.success) {
-  logger.fatal({ issues: parsed.error.issues }, "invalid metadata-service config");
+  console.error(
+    "Fatal: invalid metadata-service config\n" +
+      JSON.stringify(parsed.error.flatten().fieldErrors, null, 2),
+  );
   process.exit(1);
 }
 
 export const config = parsed.data;
-
-logger.info(
-  {
-    mirrorUrl: config.MB_MIRROR_URL,
-    port: config.PORT,
-    concurrency: config.MIRROR_CONCURRENCY,
-    intervalCap: config.MIRROR_INTERVAL_CAP,
-    intervalMs: config.MIRROR_INTERVAL_MS,
-    popularityEnabled: config.POPULARITY_ENABLED,
-    listenbrainzUrl: config.LISTENBRAINZ_API_URL,
-  },
-  "metadata-service config loaded",
-);

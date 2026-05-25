@@ -1,4 +1,3 @@
-import "./env.js";
 import Fastify from "fastify";
 import sessionPlugin, { requireAuth } from "./plugins/session.js";
 import authRoutes from "./routes/auth.js";
@@ -23,6 +22,7 @@ import recommendationRoutes from "./routes/recommendations.js";
 import downloadRoutes from "./routes/downloads.js";
 import { startLidarrPoller } from "./lidarr/poller.js";
 import { logger } from "./logger.js";
+import { config } from "./config.js";
 import {
   findUserIdsWithListenbrainzToken,
   resetInflightOnBoot,
@@ -71,7 +71,7 @@ app.register(async (protectedApp) => {
   protectedApp.register(downloadRoutes, { prefix: "/api/downloads" });
 });
 
-if (process.env.STACCATO_ENV !== "development") {
+if (config.STACCATO_ENV !== "development") {
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
   app.register(fastifyStatic, {
     root: path.join(__dirname, "../../web/dist"),
@@ -109,8 +109,8 @@ const start = async () => {
     );
   }
 
-  const musicDir = process.env.STACCATO_SERVER_MUSIC_DIR ?? "./music";
-  const port = Number(process.env.PORT) || 8280;
+  const musicDir = config.STACCATO_SERVER_MUSIC_DIR;
+  const port = config.PORT;
   await app.listen({ port, host: "0.0.0.0" });
 
   startLibraryPipeline(musicDir).catch((err) =>

@@ -1,4 +1,3 @@
-import "./env.js";
 import Fastify from "fastify";
 import { logger } from "./logger.js";
 import { config } from "./config.js";
@@ -11,6 +10,19 @@ import artistRoutes from "./routes/artists.js";
 import artistImageRoutes from "./routes/artist-image.js";
 import coverArtRoutes from "./routes/cover-art.js";
 import searchRoutes from "./routes/search.js";
+
+logger.info(
+  {
+    mirrorUrl: config.MB_MIRROR_URL,
+    port: config.PORT,
+    concurrency: config.MIRROR_CONCURRENCY,
+    intervalCap: config.MIRROR_INTERVAL_CAP,
+    intervalMs: config.MIRROR_INTERVAL_MS,
+    popularityEnabled: config.POPULARITY_ENABLED,
+    listenbrainzUrl: config.LISTENBRAINZ_API_URL,
+  },
+  "metadata-service config loaded",
+);
 
 const app = Fastify({ loggerInstance: logger });
 
