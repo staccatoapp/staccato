@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: ✋ I have a question or need support
+    url: https://discord.gg/uG68axRPF4
+    about: Ask us in Discord! We have a support channel and typically respond ASAP.
+  - name: 💿❓ An album/release isn't what I was expecting (wrong release, artist, track list, etc)
+    url: https://discord.gg/TZgxSbKw3q
+    about: Please share details with us in our Discord's metadata-issues channel - we're always looking to improve how accurate Staccato imports are!
+  - name: 🚨 I have a security vulnerability to report
+    url: mailto:christo.anicolaou@gmail.com
+    about: Please report security vulnerabilities privately via email.

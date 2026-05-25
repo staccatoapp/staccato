@@ -1,0 +1,44 @@
+name: Have a feature or enhancement you'd like to see?
+description: Suggest a new feature or enhancement for Staccato
+title: "[Feature]: "
+labels: ["feature"]
+projects: ["staccatoapp/2"]
+body:
+  - type: checkboxes
+    attributes:
+      label: I have searched the existing issues, both open and closed, to make sure this is not a duplicate feature request.
+      options:
+        - label: "Yes"
+
+  - type: markdown
+    attributes:
+      value: |
+        This issue form is for feature requests or enhancements only!
+
+        If you have a bug report, please go back and use the bug report template instead.
+  - type: textarea
+    validations:
+      required: true
+    attributes:
+      label: What feature or enhancement are you requesting?
+      description: Please let us know what you'd like to see added to Staccato. Be as descriptive as possible to help us understand the request.
+  - type: textarea
+    validations:
+      required: true
+    attributes:
+      label: What problem does this feature request solve?
+      description: Please provide clear and concise description of what the problem is, e.g. I'm always frustrated when [...].
+  - type: textarea
+    attributes:
+      label: Do you have any additional context?
+      description: Add any other context about the feature request here.
+  - type: upload
+    id: screenshots
+    attributes:
+      label: Upload screenshots
+      description: If UI-related, feel free to share any designs that you think may help to illustrate your request.
+    validations:
+      required: false
+  - type: markdown
+    attributes:
+      value: Thank you for sharing your thoughts!
