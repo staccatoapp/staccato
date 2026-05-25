@@ -1,7 +1,7 @@
 import PQueue from "p-queue";
 import { APP_USER_AGENT } from "../constants.js";
 import { logger } from "../logger.js";
-import { config } from "../config.js";
+import { getConfig } from "../config/config.js";
 import {
   IdentifySearchResponseSchema,
   MetadataAlbumDetailSchema,
@@ -38,13 +38,13 @@ export type MBReleaseTrack = MetadataReleaseTrack;
 export type MBReleaseDetails = MetadataReleaseDetail;
 export type ExternalAlbumDetail = MetadataAlbumDetail;
 
-
 function parseReleaseYear(date?: string | null): number | null {
   if (!date) return null;
   const year = parseInt(date.slice(0, 4), 10);
   return Number.isNaN(year) ? null : year;
 }
 
+const config = getConfig();
 export const FACADE_BASE = config.STACCATO_METADATA_URL;
 
 // Throttle knobs for the shared MB queue. Defaults match MusicBrainz's public
@@ -414,4 +414,3 @@ export async function lookupExternalAlbum(
     return null;
   }
 }
-

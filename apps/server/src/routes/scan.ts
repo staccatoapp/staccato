@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { config } from "../config.js";
+import { getConfig } from "../config/config.js";
 import {
   libraryProgress,
   retryResolution,
@@ -19,7 +19,7 @@ const scanRoutes: FastifyPluginAsync = async (fastify) => {
       req.log.warn("scan requested but already in progress");
       return reply.status(409).send({ error: "Scan already in progress" });
     }
-    const musicDir = config.STACCATO_SERVER_MUSIC_DIR;
+    const musicDir = getConfig().STACCATO_SERVER_MUSIC_DIR;
     req.log.info({ musicDir }, "manual scan triggered");
     startManualScan(musicDir).catch((err) =>
       req.log.error({ err }, "manual scan failed"),

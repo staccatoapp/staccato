@@ -17,7 +17,7 @@ export default [
     },
   },
   {
-    files: ["**/src/config.ts"],
+    files: ["**/src/config/config.ts"],
     rules: { "no-restricted-properties": "off" },
   },
 ];

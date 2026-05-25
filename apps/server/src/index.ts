@@ -22,7 +22,7 @@ import recommendationRoutes from "./routes/recommendations.js";
 import downloadRoutes from "./routes/downloads.js";
 import { startLidarrPoller } from "./lidarr/poller.js";
 import { logger } from "./logger.js";
-import { config } from "./config.js";
+import { getConfig } from "./config/config.js";
 import {
   findUserIdsWithListenbrainzToken,
   resetInflightOnBoot,
@@ -71,7 +71,7 @@ app.register(async (protectedApp) => {
   protectedApp.register(downloadRoutes, { prefix: "/api/downloads" });
 });
 
-if (config.STACCATO_ENV !== "development") {
+if (getConfig().STACCATO_ENV !== "development") {
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
   app.register(fastifyStatic, {
     root: path.join(__dirname, "../../web/dist"),
@@ -109,6 +109,7 @@ const start = async () => {
     );
   }
 
+  const config = getConfig();
   const musicDir = config.STACCATO_SERVER_MUSIC_DIR;
   const port = config.PORT;
   await app.listen({ port, host: "0.0.0.0" });

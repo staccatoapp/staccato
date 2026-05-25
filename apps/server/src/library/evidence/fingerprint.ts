@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { logger } from "../../logger.js";
-import { config } from "../../config.js";
+import { getConfig } from "../../config/config.js";
 
 const execFileAsync = promisify(execFile);
 const log = logger.child({ module: "library:fingerprint" });
@@ -15,7 +15,7 @@ export async function fingerprintFile(
   filePath: string,
 ): Promise<FingerprintResult | null> {
   try {
-    const binary = config.STACCATO_SERVER_FPCALC_PATH;
+    const binary = getConfig().STACCATO_SERVER_FPCALC_PATH;
     const { stdout } = await execFileAsync(binary, ["-json", filePath]);
     const parsed = JSON.parse(stdout) as FingerprintResult;
     if (!parsed.fingerprint || typeof parsed.duration !== "number") return null;
@@ -31,7 +31,7 @@ let fpcalcCached: boolean | null = null;
 export async function isFpcalcAvailable(): Promise<boolean> {
   if (fpcalcCached !== null) return fpcalcCached;
   try {
-    const binary = config.STACCATO_SERVER_FPCALC_PATH;
+    const binary = getConfig().STACCATO_SERVER_FPCALC_PATH;
     await execFileAsync(binary, ["-version"]);
     fpcalcCached = true;
   } catch {

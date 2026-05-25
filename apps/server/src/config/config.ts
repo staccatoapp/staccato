@@ -33,13 +33,41 @@ const ConfigSchema = z.object({
   MB_RATE_LIMIT_MS: intFromEnv(1100),
 });
 
-const parsed = ConfigSchema.safeParse(process.env);
-if (!parsed.success) {
-  console.error(
-    "Fatal: invalid server config\n" +
-      JSON.stringify(parsed.error.flatten().fieldErrors, null, 2),
-  );
-  process.exit(1);
+export type Config = z.infer<typeof ConfigSchema>;
+
+class ConfigError extends Error {
+  constructor(fieldErrors: Record<string, string[] | undefined>) {
+    super("Invalid server config\n" + JSON.stringify(fieldErrors, null, 2));
+    this.name = "ConfigError";
+  }
 }
 
-export const config = parsed.data;
+let cached: Config | null = null;
+
+/**
+ * Parse and validate the full server config from the environment, caching the
+ * result. Throws ConfigError on invalid config — the composition root (or Node)
+ * surfaces the message; we never process.exit here so the module stays safe to
+ * import (e.g. under test, where it is mocked).
+ */
+export function getConfig(): Config {
+  if (cached) return cached;
+  const parsed = ConfigSchema.safeParse(process.env);
+  if (!parsed.success) {
+    throw new ConfigError(parsed.error.flatten().fieldErrors);
+  }
+  cached = parsed.data;
+  return cached;
+}
+
+// Log settings are intentionally decoupled from getConfig: both fields have
+// defaults and none are required, so this never throws. That lets logger.ts
+// stay import-safe regardless of whether the full config would validate.
+const LogConfigSchema = z.object({
+  STACCATO_LOG_LEVEL: z.string().default("info"),
+  STACCATO_LOG_FORMAT: z.string().default("pretty"),
+});
+
+export function getLogConfig() {
+  return LogConfigSchema.parse(process.env);
+}

@@ -1,13 +1,17 @@
 import PQueue from "p-queue";
 import { discoverFile, resolveTrack, enrichTrack } from "./worker.js";
 import { logger } from "../logger.js";
-import { config } from "../config.js";
+import { getConfig } from "../config/config.js";
 
 const log = logger.child({ module: "library:queue" });
 
-const DISCOVERY_CONCURRENCY = config.STACCATO_SERVER_LIBRARY_DISCOVERY_CONCURRENCY;
-const RESOLUTION_CONCURRENCY = config.STACCATO_SERVER_LIBRARY_WORKER_CONCURRENCY;
-const ENRICHMENT_CONCURRENCY = config.STACCATO_SERVER_LIBRARY_ENRICHMENT_CONCURRENCY;
+const config = getConfig();
+const DISCOVERY_CONCURRENCY =
+  config.STACCATO_SERVER_LIBRARY_DISCOVERY_CONCURRENCY;
+const RESOLUTION_CONCURRENCY =
+  config.STACCATO_SERVER_LIBRARY_WORKER_CONCURRENCY;
+const ENRICHMENT_CONCURRENCY =
+  config.STACCATO_SERVER_LIBRARY_ENRICHMENT_CONCURRENCY;
 
 // Discovery is local-IO bound (stat + tag read + row insert) and fast, so it
 // runs at higher concurrency to surface pending rows quickly. Resolution is
