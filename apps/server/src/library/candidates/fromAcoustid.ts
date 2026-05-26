@@ -1,7 +1,4 @@
-import {
-  acoustidApiKey,
-  lookupFingerprint,
-} from "../evidence/acoustid.js";
+import { acoustidApiKey, lookupFingerprint } from "../evidence/acoustid.js";
 import type { Evidence, RecordingCandidate } from "../types.js";
 
 const MAX_ACOUSTID_CANDIDATES = 3;

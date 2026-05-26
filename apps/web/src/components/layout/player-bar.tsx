@@ -3,7 +3,15 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import type { PlaybackSession, TrackLyrics } from "@staccato/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Mic2, MicOff, Music2, Pause, Play, SkipBack, SkipForward } from "lucide-react";
+import {
+  Mic2,
+  MicOff,
+  Music2,
+  Pause,
+  Play,
+  SkipBack,
+  SkipForward,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { formatTime } from "@/lib/music";
 import { useVolume } from "@/hooks/useVolume";
@@ -54,7 +62,9 @@ function PlayerBar() {
   const { data: lyricsData } = useQuery<TrackLyrics | null>({
     queryKey: ["lyrics", currentTrack?.id],
     queryFn: async () => {
-      const res = await fetch(`/api/playback/lyrics?trackId=${currentTrack!.id}`);
+      const res = await fetch(
+        `/api/playback/lyrics?trackId=${currentTrack!.id}`,
+      );
       if (res.status === 204) return null;
       if (!res.ok) return null;
       return res.json() as Promise<TrackLyrics>;

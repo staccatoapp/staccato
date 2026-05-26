@@ -154,7 +154,8 @@ function RecommendationDetailPage() {
   }
 
   function addOne(track: RecommendedPlaylistTrack) {
-    if (!track.releaseGroupMbid || !track.artistMbid || !track.artistName) return;
+    if (!track.releaseGroupMbid || !track.artistMbid || !track.artistName)
+      return;
     requestDialog.openSingle({
       subject: "track",
       subjectName: track.title,
@@ -168,7 +169,8 @@ function RecommendationDetailPage() {
   }
 
   function retryOne(track: RecommendedPlaylistTrack, requestId: string) {
-    if (!track.releaseGroupMbid || !track.artistMbid || !track.artistName) return;
+    if (!track.releaseGroupMbid || !track.artistMbid || !track.artistName)
+      return;
     retryDownload.mutate({
       requestId,
       payload: {
@@ -256,11 +258,12 @@ function RecommendationDetailPage() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() =>
-                  playMutation.mutate({ trackIds: localTrackIds, startIndex: 0 })
+                  playMutation.mutate({
+                    trackIds: localTrackIds,
+                    startIndex: 0,
+                  })
                 }
-                disabled={
-                  playMutation.isPending || localTrackIds.length === 0
-                }
+                disabled={playMutation.isPending || localTrackIds.length === 0}
                 className="inline-flex items-center gap-2 h-[38px] px-[18px] rounded-[22px] bg-white text-[oklch(0.15_0_0)] text-sm font-semibold disabled:opacity-60"
                 style={{ boxShadow: "0 2px 12px oklch(0 0 0 / 35%)" }}
               >
@@ -342,11 +345,11 @@ function RecommendationDetailPage() {
             const download = track.releaseGroupMbid
               ? byReleaseGroup.get(track.releaseGroupMbid)
               : undefined;
-            const downloadStatus = download ? toUiStatus(download.status) : null;
+            const downloadStatus = download
+              ? toUiStatus(download.status)
+              : null;
             const addDisabledReason =
-              !track.releaseGroupMbid ||
-              !track.artistMbid ||
-              !track.artistName
+              !track.releaseGroupMbid || !track.artistMbid || !track.artistName
                 ? "Insufficient metadata"
                 : null;
             return (
@@ -366,7 +369,9 @@ function RecommendationDetailPage() {
                   }
                 }}
                 onAddToLibrary={() => addOne(track)}
-                onRetry={download ? () => retryOne(track, download.id) : undefined}
+                onRetry={
+                  download ? () => retryOne(track, download.id) : undefined
+                }
                 onDismiss={() => {
                   if (track.recordingMbid) {
                     setDismissed((s) => new Set(s).add(track.recordingMbid!));

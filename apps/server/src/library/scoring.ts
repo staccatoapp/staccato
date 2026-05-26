@@ -1,9 +1,5 @@
 import { normalizeString } from "../musicbrainz/normalize.js";
-import type {
-  RecordingCandidate,
-  RawTags,
-  ScoredCandidate,
-} from "./types.js";
+import type { RecordingCandidate, RawTags, ScoredCandidate } from "./types.js";
 
 export const AUTO_COMMIT_THRESHOLD = 0.85;
 export const TAG_VERIFIED_SCORE = 1.0;
@@ -48,10 +44,7 @@ function durationAgreement(
   return Math.max(0, 1 - Math.min(1, diff / 5));
 }
 
-function scoreCandidate(
-  candidate: RecordingCandidate,
-  tags: RawTags,
-): number {
+function scoreCandidate(candidate: RecordingCandidate, tags: RawTags): number {
   // Tag-MBID candidates that verified against the MB graph are trusted fully.
   if (candidate.method === "tag_mbid") return TAG_VERIFIED_SCORE;
 
@@ -113,9 +106,7 @@ export function scoreCandidates(
   return scored;
 }
 
-export function pickWinner(
-  scored: ScoredCandidate[],
-): ScoredCandidate | null {
+export function pickWinner(scored: ScoredCandidate[]): ScoredCandidate | null {
   if (scored.length === 0) return null;
   return [...scored].sort((a, b) => b.score - a.score)[0]!;
 }

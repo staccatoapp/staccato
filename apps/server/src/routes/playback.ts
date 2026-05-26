@@ -192,7 +192,9 @@ const playbackRoutes: FastifyPluginAsync = async (fastify) => {
       trackId,
       instrumental: row.instrumental,
       plainLyrics: row.plainLyrics ?? null,
-      syncedLyrics: row.syncedLyrics ? parseSyncedLyrics(row.syncedLyrics) : null,
+      syncedLyrics: row.syncedLyrics
+        ? parseSyncedLyrics(row.syncedLyrics)
+        : null,
     };
 
     return result;
@@ -224,19 +226,20 @@ function buildSessionResponse(session: PlaybackSessionRow) {
   const credits = groupCreditsByTrack(
     listTrackArtistsForTracks(session.trackQueue),
   );
-  const orderedTracks = orderTracksByQueue(session.trackQueue, sessionTracks).map(
-    (t) => ({
-      ...t,
-      coverArtUrl: t.albumId
-        ? resolveAlbumCoverNow({
-            albumId: t.albumId,
-            releaseGroupMbid: t.releaseGroupMbid,
-            coverArtUrl: t.coverArtUrl,
-          })
-        : t.coverArtUrl,
-      artists: credits.get(t.id) ?? [],
-    }),
-  );
+  const orderedTracks = orderTracksByQueue(
+    session.trackQueue,
+    sessionTracks,
+  ).map((t) => ({
+    ...t,
+    coverArtUrl: t.albumId
+      ? resolveAlbumCoverNow({
+          albumId: t.albumId,
+          releaseGroupMbid: t.releaseGroupMbid,
+          coverArtUrl: t.coverArtUrl,
+        })
+      : t.coverArtUrl,
+    artists: credits.get(t.id) ?? [],
+  }));
 
   return {
     trackQueue: orderedTracks,

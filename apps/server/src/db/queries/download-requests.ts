@@ -5,13 +5,21 @@ import { SQLiteUpdateSetSource } from "drizzle-orm/sqlite-core";
 
 export type DownloadRequestRow = typeof downloadRequests.$inferSelect;
 export type NewDownloadRequestRow = typeof downloadRequests.$inferInsert;
-export type DownloadRequestUpdate = SQLiteUpdateSetSource<typeof downloadRequests>;
+export type DownloadRequestUpdate = SQLiteUpdateSetSource<
+  typeof downloadRequests
+>;
 
 export function getDownloadRequest(id: string): DownloadRequestRow | undefined {
-  return db.select().from(downloadRequests).where(eq(downloadRequests.id, id)).get();
+  return db
+    .select()
+    .from(downloadRequests)
+    .where(eq(downloadRequests.id, id))
+    .get();
 }
 
-export function getDownloadRequestsByUser(userId: string): DownloadRequestRow[] {
+export function getDownloadRequestsByUser(
+  userId: string,
+): DownloadRequestRow[] {
   return db
     .select()
     .from(downloadRequests)
@@ -53,7 +61,9 @@ export function findExistingActiveRequest(
     .get();
 }
 
-export function createDownloadRequest(data: NewDownloadRequestRow): DownloadRequestRow {
+export function createDownloadRequest(
+  data: NewDownloadRequestRow,
+): DownloadRequestRow {
   return db.insert(downloadRequests).values(data).returning().get()!;
 }
 
@@ -73,10 +83,7 @@ export function deleteDownloadRequest(id: string, userId: string): boolean {
   const result = db
     .delete(downloadRequests)
     .where(
-      and(
-        eq(downloadRequests.id, id),
-        eq(downloadRequests.userId, userId),
-      ),
+      and(eq(downloadRequests.id, id), eq(downloadRequests.userId, userId)),
     )
     .run();
   return result.changes > 0;

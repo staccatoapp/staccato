@@ -111,7 +111,10 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(404).send({ error: "Playlist not found" });
     }
     if (result === 403) {
-      req.log.warn({ playlistId: id, userId: req.userId }, "playlist access forbidden");
+      req.log.warn(
+        { playlistId: id, userId: req.userId },
+        "playlist access forbidden",
+      );
       return reply.status(403).send({ error: "Forbidden" });
     }
 
@@ -141,7 +144,10 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(404).send({ error: "Playlist not found" });
     }
     if (result === 403) {
-      req.log.warn({ playlistId: id, userId: req.userId }, "playlist access forbidden");
+      req.log.warn(
+        { playlistId: id, userId: req.userId },
+        "playlist access forbidden",
+      );
       return reply.status(403).send({ error: "Forbidden" });
     }
 
@@ -174,7 +180,10 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(404).send({ error: "Playlist not found" });
     }
     if (result === 403) {
-      req.log.warn({ playlistId: id, userId: req.userId }, "playlist access forbidden");
+      req.log.warn(
+        { playlistId: id, userId: req.userId },
+        "playlist access forbidden",
+      );
       return reply.status(403).send({ error: "Forbidden" });
     }
 
@@ -192,7 +201,10 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(404).send({ error: "Playlist not found" });
     }
     if (result === 403) {
-      req.log.warn({ playlistId: id, userId: req.userId }, "playlist access forbidden");
+      req.log.warn(
+        { playlistId: id, userId: req.userId },
+        "playlist access forbidden",
+      );
       return reply.status(403).send({ error: "Forbidden" });
     }
 
@@ -218,13 +230,19 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(404).send({ error: "Playlist not found" });
     }
     if (result === 403) {
-      req.log.warn({ playlistId: id, userId: req.userId }, "playlist access forbidden");
+      req.log.warn(
+        { playlistId: id, userId: req.userId },
+        "playlist access forbidden",
+      );
       return reply.status(403).send({ error: "Forbidden" });
     }
 
     const entry = getPlaylistTrackEntry(entryId, id);
     if (!entry) {
-      req.log.warn({ playlistId: id, entryId }, "playlist track entry not found");
+      req.log.warn(
+        { playlistId: id, entryId },
+        "playlist track entry not found",
+      );
       return reply.status(404).send({ error: "Track entry not found" });
     }
 

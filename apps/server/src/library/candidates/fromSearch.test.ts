@@ -33,13 +33,17 @@ describe("sanitizeTitleForSearch", () => {
   });
 
   it("does not strip mid-title brackets", () => {
-    expect(sanitizeTitleForSearch("Song [Edit] Remix")).toBe("Song [Edit] Remix");
+    expect(sanitizeTitleForSearch("Song [Edit] Remix")).toBe(
+      "Song [Edit] Remix",
+    );
   });
 });
 
 describe("escapeLuceneTerm", () => {
   it("escapes double quotes", () => {
-    expect(escapeLuceneTerm('Title "with" quotes')).toBe('Title \\"with\\" quotes');
+    expect(escapeLuceneTerm('Title "with" quotes')).toBe(
+      'Title \\"with\\" quotes',
+    );
   });
 
   it("escapes backslashes", () => {

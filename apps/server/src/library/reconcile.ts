@@ -15,7 +15,10 @@ export async function reconcile(
 ): Promise<{ discovered: number; pendingResolution: number }> {
   const resetCount = resetResolvingToPending();
   if (resetCount > 0) {
-    log.info({ count: resetCount }, "reset resolving tracks to pending on boot");
+    log.info(
+      { count: resetCount },
+      "reset resolving tracks to pending on boot",
+    );
   }
 
   const onDisk = new Set<string>();

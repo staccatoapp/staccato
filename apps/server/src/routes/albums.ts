@@ -16,10 +16,7 @@ import {
   listTrackArtistsForTracks,
 } from "../db/queries/track-artists.js";
 import { listAlbumArtists } from "../db/queries/album-artists.js";
-import {
-  ensureCoverOnDisk,
-  resolveAlbumCoverNow,
-} from "../coverart/store.js";
+import { ensureCoverOnDisk, resolveAlbumCoverNow } from "../coverart/store.js";
 import {
   lookupExternalAlbum,
   lookupReleaseDetails,
@@ -92,9 +89,7 @@ const albumRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(404).send({ error: "Album not found" });
     }
     const filePaths = getTrackFilePathsInAlbum(albumId);
-    const dirs = [
-      ...new Set(filePaths.map((p) => path.dirname(p) + path.sep)),
-    ];
+    const dirs = [...new Set(filePaths.map((p) => path.dirname(p) + path.sep))];
     const orphans = getOrphanTracksInDirectories(dirs, albumId).map((o) => ({
       id: o.id,
       title: o.title,

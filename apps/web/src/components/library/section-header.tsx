@@ -1,4 +1,10 @@
-export function SectionHeader({ label, count }: { label: string; count: number }) {
+export function SectionHeader({
+  label,
+  count,
+}: {
+  label: string;
+  count: number;
+}) {
   return (
     <div className="flex items-baseline gap-2 mb-3 mt-8 first:mt-0">
       <span className="text-[0.7rem] font-semibold uppercase tracking-widest text-muted-foreground">

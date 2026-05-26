@@ -117,7 +117,10 @@ function TopResultCard({
       className={cardClass}
       onClick={() => onPlayTrack(rec.recordingMbid, rec.artistName, rec.title)}
     >
-      <Cover url={rec.coverArtUrl} seed={`${rec.releaseName ?? ""} ${rec.artistName}`} />
+      <Cover
+        url={rec.coverArtUrl}
+        seed={`${rec.releaseName ?? ""} ${rec.artistName}`}
+      />
       <div className="min-w-0">
         <p className="text-xl font-bold truncate">{rec.title}</p>
         <p className="text-sm text-muted-foreground truncate">
@@ -467,10 +470,14 @@ function ExplorePage() {
                         onPlay={handleRecommendedTrackPlay}
                         onAddToLibrary={() => addTrackToLibrary(track)}
                         onRetry={
-                          download ? () => retryTrack(track, download.id) : undefined
+                          download
+                            ? () => retryTrack(track, download.id)
+                            : undefined
                         }
                         onDismiss={() =>
-                          setRecDismissed((s) => new Set(s).add(track.recordingMbid))
+                          setRecDismissed((s) =>
+                            new Set(s).add(track.recordingMbid),
+                          )
                         }
                       />
                     );

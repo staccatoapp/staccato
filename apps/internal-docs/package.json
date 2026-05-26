@@ -8,7 +8,8 @@
     "dev:remote": "vitepress dev --port 5174 --host",
     "build": "vitepress build",
     "preview": "vitepress preview --port 5174",
-    "lint": "eslint src/ --max-warnings 0"
+    "lint": "eslint src/ --max-warnings=0 && prettier --check src/",
+    "lint:fix": "eslint src/ --max-warnings=0 --fix && prettier --write src/"
   },
   "devDependencies": {
     "@staccato/typescript-config": "workspace:*",

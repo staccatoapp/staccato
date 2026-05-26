@@ -22,7 +22,10 @@ export function updateUserSettings(
   userId: string,
   data: UserSettingsUpdate,
 ): void {
-  db.update(userSettings).set(data).where(eq(userSettings.userId, userId)).run();
+  db.update(userSettings)
+    .set(data)
+    .where(eq(userSettings.userId, userId))
+    .run();
 }
 
 export function getMusicbrainzUsername(userId: string): string | null {

@@ -1,8 +1,5 @@
 import { FastifyPluginAsync } from "fastify";
-import {
-  searchExternalUnified,
-  MB_PRIORITY,
-} from "../musicbrainz/client.js";
+import { searchExternalUnified, MB_PRIORITY } from "../musicbrainz/client.js";
 import { getLocalTrackMbidsByMbids } from "../db/queries/tracks.js";
 import { resolveExternalCoverNow } from "../coverart/store.js";
 import { ensureArtistImageOnDisk } from "../artistimage/store.js";

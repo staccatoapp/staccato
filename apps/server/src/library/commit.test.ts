@@ -26,7 +26,11 @@ import type { RecordingCandidate, ScoredCandidate } from "./types.js";
 
 let testDb: ReturnType<typeof createTestDb>;
 
-vi.mock("../db/client.js", () => ({ get db() { return testDb; } }));
+vi.mock("../db/client.js", () => ({
+  get db() {
+    return testDb;
+  },
+}));
 
 vi.mock("../coverart/store.js", () => ({
   ensureCoverOnDisk: vi.fn().mockResolvedValue(null),
@@ -35,7 +39,8 @@ vi.mock("../artistimage/store.js", () => ({
   ensureArtistImageOnDisk: vi.fn().mockResolvedValue(null),
 }));
 vi.mock("../musicbrainz/client.js", async (importOriginal) => {
-  const real = await importOriginal<typeof import("../musicbrainz/client.js")>();
+  const real =
+    await importOriginal<typeof import("../musicbrainz/client.js")>();
   return { ...real, lookupReleaseDetails: vi.fn().mockResolvedValue(null) };
 });
 
@@ -45,7 +50,9 @@ beforeEach(() => {
 
 // --- Helpers ---
 
-function makeWinner(overrides: Partial<RecordingCandidate> = {}): ScoredCandidate {
+function makeWinner(
+  overrides: Partial<RecordingCandidate> = {},
+): ScoredCandidate {
   return { ...makeCandidate(overrides), score: 0.95 };
 }
 
@@ -53,7 +60,10 @@ function getTrackRow(trackId: string) {
   return db.select().from(tracks).where(eq(tracks.id, trackId)).get();
 }
 
-function setAlbumFields(albumId: string, fields: Partial<typeof albums.$inferInsert>) {
+function setAlbumFields(
+  albumId: string,
+  fields: Partial<typeof albums.$inferInsert>,
+) {
   db.update(albums).set(fields).where(eq(albums.id, albumId)).run();
 }
 
@@ -288,9 +298,18 @@ describe("commitResolution — dominant artist recompute", () => {
     // Artist A resolves 2 tracks, Artist B resolves 1 → Artist A should own the album.
     const localArtist = seedArtist("Artist A");
     const albumId = seedAlbum(localArtist);
-    const track1 = seedTrack(localArtist, albumId, { filePath: "/m/t1.flac", trackNumber: 1 });
-    const track2 = seedTrack(localArtist, albumId, { filePath: "/m/t2.flac", trackNumber: 2 });
-    const track3 = seedTrack(localArtist, albumId, { filePath: "/m/t3.flac", trackNumber: 3 });
+    const track1 = seedTrack(localArtist, albumId, {
+      filePath: "/m/t1.flac",
+      trackNumber: 1,
+    });
+    const track2 = seedTrack(localArtist, albumId, {
+      filePath: "/m/t2.flac",
+      trackNumber: 2,
+    });
+    const track3 = seedTrack(localArtist, albumId, {
+      filePath: "/m/t3.flac",
+      trackNumber: 3,
+    });
 
     const release = makeResolvedRelease({ releaseMbid: "rel-dominant" });
 

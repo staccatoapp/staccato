@@ -49,7 +49,10 @@ const coverArtRoutes: FastifyPluginAsync = async (fastify) => {
         cache.set(mbid, { url: location, expires: Date.now() + CACHE_TTL_MS });
         return reply.redirect(location, 302);
       }
-      request.log.warn({ mbid, status: res.status }, "caa redirect missing location");
+      request.log.warn(
+        { mbid, status: res.status },
+        "caa redirect missing location",
+      );
       return reply.status(502).send({ error: "Upstream redirect malformed" });
     }
 

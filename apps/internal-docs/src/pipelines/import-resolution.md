@@ -44,11 +44,11 @@ the row (the rename is reattached by fingerprint at commit time instead).
 
 Defined in `apps/server/src/library/queue.ts` using `p-queue`. Concurrency is env-tunable:
 
-| Queue | Default | Env var | Why |
-| --- | --- | --- | --- |
-| Discovery | `8` | `STACCATO_SERVER_LIBRARY_DISCOVERY_CONCURRENCY` | Local IO (stat + tag read + insert); fast, run wide. |
-| Resolution | `6` | `STACCATO_SERVER_LIBRARY_WORKER_CONCURRENCY` | MusicBrainz-bound; also gated by the shared MB throttle. |
-| Enrichment | `2` | `STACCATO_SERVER_LIBRARY_ENRICHMENT_CONCURRENCY` | Best-effort background backfill. |
+| Queue      | Default | Env var                                          | Why                                                      |
+| ---------- | ------- | ------------------------------------------------ | -------------------------------------------------------- |
+| Discovery  | `8`     | `STACCATO_SERVER_LIBRARY_DISCOVERY_CONCURRENCY`  | Local IO (stat + tag read + insert); fast, run wide.     |
+| Resolution | `6`     | `STACCATO_SERVER_LIBRARY_WORKER_CONCURRENCY`     | MusicBrainz-bound; also gated by the shared MB throttle. |
+| Enrichment | `2`     | `STACCATO_SERVER_LIBRARY_ENRICHMENT_CONCURRENCY` | Best-effort background backfill.                         |
 
 `drain()` awaits discovery-idle **then** resolution-idle. Enrichment is intentionally excluded
 from `drain()` so eventual-consistency work never blocks scan completion.
@@ -117,15 +117,15 @@ A recording usually belongs to many releases (original, reissues, comps, regiona
 `pickRelease(winner, tags)` (`graphWalk.ts`) walks a ladder and records **how far down it had to
 go** as a confidence score:
 
-| Step | Rule | Confidence |
-| --- | --- | --- |
-| 1 | File's `mbAlbumId` tag matches a release MBID exactly | `1.0` |
-| 1.5 | File's album **title** tag matches a release title (Official preferred; year-matched preferred) | `0.95` / `0.9` |
-| 2 | Exactly one Official album-type release (excludes Compilation/Live/Remix/Soundtrack/etc.) | `0.8` |
-| 3 | Earliest release date wins among the candidate pool | `0.7` / `0.6` |
-| 4 | Country tiebreak (prefer releases with a country set) | `0.5` |
-| 5 | Digital-media preference, when the source file is a digital format | `0.4` |
-| — | Fallback: first remaining, recorded as ambiguous | `0.3` |
+| Step | Rule                                                                                            | Confidence     |
+| ---- | ----------------------------------------------------------------------------------------------- | -------------- |
+| 1    | File's `mbAlbumId` tag matches a release MBID exactly                                           | `1.0`          |
+| 1.5  | File's album **title** tag matches a release title (Official preferred; year-matched preferred) | `0.95` / `0.9` |
+| 2    | Exactly one Official album-type release (excludes Compilation/Live/Remix/Soundtrack/etc.)       | `0.8`          |
+| 3    | Earliest release date wins among the candidate pool                                             | `0.7` / `0.6`  |
+| 4    | Country tiebreak (prefer releases with a country set)                                           | `0.5`          |
+| 5    | Digital-media preference, when the source file is a digital format                              | `0.4`          |
+| —    | Fallback: first remaining, recorded as ambiguous                                                | `0.3`          |
 
 The title-match step (1.5) is deliberately above the studio-album heuristic: user tagging is
 strong evidence, it correctly keeps genuine compilations (e.g. "Greatest Hits"), and it makes

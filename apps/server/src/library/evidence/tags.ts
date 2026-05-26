@@ -27,7 +27,8 @@ export function inferFileFormat(
     const c = container.toUpperCase();
     if (c.includes("FLAC")) return "flac";
     if (c.includes("MPEG")) return "mp3";
-    if (c.includes("MPEG 4") || c.includes("MP4")) return ext === "m4a" ? "aac" : ext;
+    if (c.includes("MPEG 4") || c.includes("MP4"))
+      return ext === "m4a" ? "aac" : ext;
     if (c.includes("OGG")) return ext === "opus" ? "opus" : "vorbis";
   }
   return ext;

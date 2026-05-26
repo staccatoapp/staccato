@@ -128,7 +128,9 @@ function PlaylistDetailPage() {
         >
           <ChevronLeft className="w-4 h-4" /> Playlists
         </Link>
-        <p className="text-sm text-destructive mt-4">Failed to load playlist.</p>
+        <p className="text-sm text-destructive mt-4">
+          Failed to load playlist.
+        </p>
       </div>
     );
 
@@ -168,8 +170,7 @@ function PlaylistDetailPage() {
             </p>
           )}
           <p className="text-xs text-muted-foreground mb-4">
-            {data.tracks.length}{" "}
-            {data.tracks.length === 1 ? "track" : "tracks"}
+            {data.tracks.length} {data.tracks.length === 1 ? "track" : "tracks"}
             {totalSeconds > 0 && (
               <span className="before:content-['·'] before:mx-1.5">
                 {formatTotalDuration(totalSeconds)}
@@ -179,7 +180,10 @@ function PlaylistDetailPage() {
           <div className="flex gap-2">
             <Button
               onClick={() =>
-                playMutation.mutate({ trackIds: orderedTrackIds, startIndex: 0 })
+                playMutation.mutate({
+                  trackIds: orderedTrackIds,
+                  startIndex: 0,
+                })
               }
               disabled={data.tracks.length === 0 || playMutation.isPending}
               className="gap-2"

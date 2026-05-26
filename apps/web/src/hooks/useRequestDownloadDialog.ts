@@ -70,9 +70,7 @@ export function useRequestDownloadDialog() {
 
   const qualityProfiles = optionsQuery.data?.qualityProfiles ?? null;
   const defaultQualityProfileId =
-    settingsQuery.data?.qualityProfileId ??
-    qualityProfiles?.[0]?.id ??
-    null;
+    settingsQuery.data?.qualityProfileId ?? qualityProfiles?.[0]?.id ?? null;
 
   useEffect(() => {
     if (!open) return;

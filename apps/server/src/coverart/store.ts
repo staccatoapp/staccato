@@ -50,7 +50,10 @@ export async function ensureCoverOnDisk(
 
   const promise = (async (): Promise<string | null> => {
     try {
-      const remoteUrl = await fetchCoverArtUrlForGroup(releaseGroupMbid, priority);
+      const remoteUrl = await fetchCoverArtUrlForGroup(
+        releaseGroupMbid,
+        priority,
+      );
       if (!remoteUrl) return null;
 
       const res = await fetch(remoteUrl);

@@ -103,10 +103,7 @@ export function claimForRefresh(
     .update(recommendationCache)
     .set({ inflight: 1, updatedAt: now })
     .where(
-      and(
-        eq(recommendationCache.id, id),
-        eq(recommendationCache.inflight, 0),
-      ),
+      and(eq(recommendationCache.id, id), eq(recommendationCache.inflight, 0)),
     )
     .returning()
     .get();

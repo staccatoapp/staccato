@@ -35,9 +35,7 @@ export function toArtistCredits(
   }));
 }
 
-function toReleases(
-  raw: ReleaseRich[] | null | undefined,
-): MetadataRelease[] {
+function toReleases(raw: ReleaseRich[] | null | undefined): MetadataRelease[] {
   if (!raw) return [];
   return raw.map((r) => ({
     releaseMbid: r.id,

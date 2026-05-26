@@ -34,7 +34,8 @@ export function combinedScore(
 // An entity's identity string, against which query coverage is measured.
 // Artists are their name; tracks/albums combine title + primary artist — this is
 // what routes "Frank Ocean" → artist but "Frank Ocean Lost" → track.
-const recIdentity = (r: MetadataSearchRecording) => `${r.title} ${r.artistName}`;
+const recIdentity = (r: MetadataSearchRecording) =>
+  `${r.title} ${r.artistName}`;
 const relIdentity = (r: MetadataSearchRelease) => `${r.title} ${r.artistName}`;
 
 // Items arrive with listenCount already attached by the route; lexScore is the
@@ -90,7 +91,8 @@ export function rankUnified(query: string, inputs: RankInputs): RankResult {
   artScored.sort(byScore);
   relScored.sort(byScore);
 
-  let top: { type: MetadataSearchTopResult["type"]; mbid: string } | null = null;
+  let top: { type: MetadataSearchTopResult["type"]; mbid: string } | null =
+    null;
   let topScore = -Infinity;
   for (const c of [...recScored, ...artScored, ...relScored]) {
     if (c.score > topScore) {

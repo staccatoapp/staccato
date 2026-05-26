@@ -79,7 +79,9 @@ function PlaylistsPage() {
       {items.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
           <ListMusic className="w-12 h-12 mb-4 opacity-30" />
-          <p className="text-sm">No playlists yet. Create one to get started.</p>
+          <p className="text-sm">
+            No playlists yet. Create one to get started.
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">

@@ -107,7 +107,7 @@ export const listenbrainzPlaylistsSource: RecommendationSource<
           }
           const rec = recMap.get(t.recordingMbid);
           const trackCoverArtUrl = rec?.releaseGroupMbid
-            ? coverArtMap.get(rec.releaseGroupMbid) ?? null
+            ? (coverArtMap.get(rec.releaseGroupMbid) ?? null)
             : null;
           return {
             recordingMbid: t.recordingMbid,

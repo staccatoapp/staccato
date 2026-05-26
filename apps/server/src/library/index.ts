@@ -1,13 +1,14 @@
 import { logger } from "../logger.js";
 import { reconcile } from "./reconcile.js";
 import { startWatcher } from "./watcher.js";
-import { drain, enqueueDiscovery, enqueueResolution, queueSize } from "./queue.js";
-import { walkAudioFiles } from "./walk.js";
 import {
-  completeProgress,
-  libraryProgress,
-  resetProgress,
-} from "./state.js";
+  drain,
+  enqueueDiscovery,
+  enqueueResolution,
+  queueSize,
+} from "./queue.js";
+import { walkAudioFiles } from "./walk.js";
+import { completeProgress, libraryProgress, resetProgress } from "./state.js";
 import {
   getFailedTrackPaths,
   getLowConfidenceTrackPaths,

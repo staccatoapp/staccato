@@ -1,7 +1,4 @@
-import type {
-  RecommendedPlaylist,
-  RecommendedTrack,
-} from "@staccato/shared";
+import type { RecommendedPlaylist, RecommendedTrack } from "@staccato/shared";
 import {
   getLocalTrackMbidsByMbids,
   getTracksByMusicbrainzIds,

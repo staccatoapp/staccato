@@ -137,9 +137,15 @@ const artistRoutes: FastifyPluginAsync = async (fastify) => {
       logger.debug(`Local artist of ID ${localId} found`);
       const libraryAlbums = getDiscographyAlbumsByArtistId(localRow.id);
       const detail = localRow.musicbrainzId
-        ? await lookupArtistDetail(localRow.musicbrainzId, MB_PRIORITY.PAGE_LOAD)
+        ? await lookupArtistDetail(
+            localRow.musicbrainzId,
+            MB_PRIORITY.PAGE_LOAD,
+          )
         : null;
-      const albums = mergeDiscography(detail?.releaseGroups ?? [], libraryAlbums);
+      const albums = mergeDiscography(
+        detail?.releaseGroups ?? [],
+        libraryAlbums,
+      );
 
       // A collaborative album the artist co-owns now lands in Discography. Make
       // sure it can't also surface in Appears On via a track/guest credit.

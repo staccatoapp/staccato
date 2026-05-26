@@ -8,9 +8,7 @@ export type PlaybackSessionUpdate = SQLiteUpdateSetSource<
   typeof playbackSession
 >;
 
-export function getOrCreatePlaybackSession(
-  userId: string,
-): PlaybackSessionRow {
+export function getOrCreatePlaybackSession(userId: string): PlaybackSessionRow {
   return db
     .insert(playbackSession)
     .values({ userId, trackQueue: [] })

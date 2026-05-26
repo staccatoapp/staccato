@@ -2,7 +2,10 @@ import chokidar from "chokidar";
 import { logger } from "../logger.js";
 import { enqueueDiscovery } from "./queue.js";
 import { isAudioFile } from "./walk.js";
-import { markPathPendingRemoval, janitorSweepPendingRemoval } from "./worker.js";
+import {
+  markPathPendingRemoval,
+  janitorSweepPendingRemoval,
+} from "./worker.js";
 
 const log = logger.child({ module: "library:watcher" });
 

@@ -35,10 +35,7 @@ export async function lookupItunesPreview(
       previewUrl: track.previewUrl,
     };
   } catch (err) {
-    log.warn(
-      { err, artistName, trackTitle },
-      "itunes preview lookup failed",
-    );
+    log.warn({ err, artistName, trackTitle }, "itunes preview lookup failed");
     return null;
   }
 }

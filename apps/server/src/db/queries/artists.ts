@@ -90,7 +90,9 @@ export type ArtistDetailsRow = {
   imageUrl: string | null;
 };
 
-export function getArtistDetails(artistId: string): ArtistDetailsRow | undefined {
+export function getArtistDetails(
+  artistId: string,
+): ArtistDetailsRow | undefined {
   return db
     .select({
       id: artists.id,
@@ -116,7 +118,9 @@ export function getArtistIdByMbid(artistMbid: string): string | null {
 // find-or-create to decide whether a discovered placeholder row is still
 // unclaimed (no MBID) and matches the credit by name. `getArtistDetails`
 // coalesces the name and omits normalizedName, so it can't serve this.
-export function getArtistRowById(artistId: string):
+export function getArtistRowById(
+  artistId: string,
+):
   | { id: string; normalizedName: string | null; musicbrainzId: string | null }
   | undefined {
   return db

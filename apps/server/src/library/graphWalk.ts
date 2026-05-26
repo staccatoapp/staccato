@@ -24,7 +24,8 @@ const DIGITAL_FORMATS = new Set(["Digital Media", "Digital", "File"]);
 
 function isAlbumRelease(r: ReleaseCandidate): boolean {
   if (!r.primaryType || !ALBUM_PRIMARY_TYPES.has(r.primaryType)) return false;
-  if (r.secondaryTypes.some((t) => EXCLUDE_SECONDARY_TYPES.has(t))) return false;
+  if (r.secondaryTypes.some((t) => EXCLUDE_SECONDARY_TYPES.has(t)))
+    return false;
   return true;
 }
 

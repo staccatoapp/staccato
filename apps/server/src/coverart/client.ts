@@ -36,10 +36,9 @@ async function throttledCaaFetch(
       "interactive caa call queued behind backlog",
     );
   }
-  const res = await caaQueue.add(
-    () => fetch(url, { redirect: "manual" }),
-    { priority },
-  );
+  const res = await caaQueue.add(() => fetch(url, { redirect: "manual" }), {
+    priority,
+  });
   if (!res) throw new Error("caa queue returned no response");
   return res;
 }
@@ -54,7 +53,10 @@ export async function fetchCoverArtUrlForGroup(
   return caaFetch(facadeCoverArtUrl(releaseGroupMbid), priority);
 }
 
-async function caaFetch(url: string, priority: MbPriority): Promise<string | null> {
+async function caaFetch(
+  url: string,
+  priority: MbPriority,
+): Promise<string | null> {
   if (coverArtCache.has(url)) {
     return coverArtCache.get(url) ?? null;
   }

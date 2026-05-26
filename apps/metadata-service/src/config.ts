@@ -48,7 +48,10 @@ const ConfigSchema = z.object({
   // ListenBrainz popularity (search ranking signal). Unauthenticated, global,
   // cacheable. POPULARITY_ENABLED lets the public service turn it off if abused;
   // when off (or on failure) search degrades to relevance-only ranking.
-  LISTENBRAINZ_API_URL: z.string().url().default("https://api.listenbrainz.org/1"),
+  LISTENBRAINZ_API_URL: z
+    .string()
+    .url()
+    .default("https://api.listenbrainz.org/1"),
   POPULARITY_ENABLED: boolFromEnv(true),
   POPULARITY_TTL_MS: intFromEnv(24 * 60 * 60 * 1000), // 24h
   POPULARITY_TIMEOUT_MS: intFromEnv(4000),

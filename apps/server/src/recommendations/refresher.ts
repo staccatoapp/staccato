@@ -20,11 +20,12 @@ let intervalHandle: NodeJS.Timeout | null = null;
 export function startRefresher(): void {
   if (intervalHandle) return;
   intervalHandle = setInterval(() => {
-    tick().catch((err) =>
-      log.error({ err }, "refresher tick failed"),
-    );
+    tick().catch((err) => log.error({ err }, "refresher tick failed"));
   }, TICK_INTERVAL_MS);
-  log.info({ intervalMs: TICK_INTERVAL_MS }, "recommendation refresher started");
+  log.info(
+    { intervalMs: TICK_INTERVAL_MS },
+    "recommendation refresher started",
+  );
 }
 
 export function stopRefresher(): void {
@@ -128,4 +129,3 @@ export async function refreshOne(rowId: string): Promise<void> {
     );
   }
 }
-

@@ -73,9 +73,7 @@ export const MBReleaseSearchResponseSchema = z.object({
       "label-info": z
         .array(
           z.object({
-            label: z
-              .object({ name: z.string().nullish() })
-              .nullish(),
+            label: z.object({ name: z.string().nullish() }).nullish(),
           }),
         )
         .nullish(),

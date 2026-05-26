@@ -4,7 +4,10 @@ import { trackLyrics } from "../schema/track-lyrics.js";
 import { tracks } from "../schema/tracks.js";
 import { artists } from "../schema/artists.js";
 import { albums } from "../schema/albums.js";
-import type { NewTrackLyricsRow, TrackLyricsRow } from "../schema/track-lyrics.js";
+import type {
+  NewTrackLyricsRow,
+  TrackLyricsRow,
+} from "../schema/track-lyrics.js";
 
 export function getLyricsByTrackId(
   trackId: string,
@@ -34,7 +37,9 @@ export function getTrackMetaForLyrics(
     .select({
       artistName: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
       trackTitle: sql<string>`COALESCE(${tracks.canonicalTitle}, ${tracks.title})`,
-      albumTitle: sql<string | null>`COALESCE(${albums.canonicalTitle}, ${albums.title})`,
+      albumTitle: sql<
+        string | null
+      >`COALESCE(${albums.canonicalTitle}, ${albums.title})`,
       durationSeconds: tracks.durationSeconds,
     })
     .from(tracks)

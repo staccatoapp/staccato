@@ -20,16 +20,16 @@ This page maps the moving parts so the rest of the docs have somewhere to anchor
 
 ## The workspaces
 
-| Workspace | Package | Purpose | Entry point |
-| --- | --- | --- | --- |
-| `apps/server` | `@staccato/server` | Primary Fastify backend: REST API, the music import/resolution pipeline, the SQLite DB, and (in prod) serving the web SPA. | `apps/server/src/index.ts` |
-| `apps/web` | `@staccato/web` | The React SPA — the user-facing player and library browser. | `apps/web/src/main.tsx` |
-| `apps/metadata-service` | `@staccato/metadata-service` | A Fastify façade in front of a MusicBrainz mirror. Normalises MB wire shapes to shared DTOs, throttles, and adds popularity ranking. | `apps/metadata-service/src/index.ts` |
-| `apps/docs` | `@staccato/docs` | **Public** VitePress site (user docs). Deployed separately; not in the Docker image. | `apps/docs/.vitepress/config.ts` |
-| `apps/internal-docs` | `@staccato/internal-docs` | **This** site. Local-only developer docs. Never deployed. | `apps/internal-docs/.vitepress/config.ts` |
-| `packages/shared` | `@staccato/shared` | Cross-app types: zod schemas for API and metadata-service DTOs, plus pure TS domain types. | `packages/shared/src/index.ts` |
-| `packages/eslint-config` | `@staccato/eslint-config` | Shared ESLint flat-config presets (`./base`, `./react-internal`). | — |
-| `packages/typescript-config` | `@staccato/typescript-config` | Shared `tsconfig` bases. | — |
+| Workspace                    | Package                       | Purpose                                                                                                                              | Entry point                               |
+| ---------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------- |
+| `apps/server`                | `@staccato/server`            | Primary Fastify backend: REST API, the music import/resolution pipeline, the SQLite DB, and (in prod) serving the web SPA.           | `apps/server/src/index.ts`                |
+| `apps/web`                   | `@staccato/web`               | The React SPA — the user-facing player and library browser.                                                                          | `apps/web/src/main.tsx`                   |
+| `apps/metadata-service`      | `@staccato/metadata-service`  | A Fastify façade in front of a MusicBrainz mirror. Normalises MB wire shapes to shared DTOs, throttles, and adds popularity ranking. | `apps/metadata-service/src/index.ts`      |
+| `apps/docs`                  | `@staccato/docs`              | **Public** VitePress site (user docs). Deployed separately; not in the Docker image.                                                 | `apps/docs/.vitepress/config.ts`          |
+| `apps/internal-docs`         | `@staccato/internal-docs`     | **This** site. Local-only developer docs. Never deployed.                                                                            | `apps/internal-docs/.vitepress/config.ts` |
+| `packages/shared`            | `@staccato/shared`            | Cross-app types: zod schemas for API and metadata-service DTOs, plus pure TS domain types.                                           | `packages/shared/src/index.ts`            |
+| `packages/eslint-config`     | `@staccato/eslint-config`     | Shared ESLint flat-config presets (`./base`, `./react-internal`).                                                                    | —                                         |
+| `packages/typescript-config` | `@staccato/typescript-config` | Shared `tsconfig` bases.                                                                                                             | —                                         |
 
 ::: tip Type boundaries
 Anything crossing an app boundary (e.g. `server` → `web`, or `server` → `metadata-service`)
@@ -118,13 +118,13 @@ pnpm studio       # drizzle-kit studio — browse the DB
 
 Ports and inspectors during `turbo dev`:
 
-| App | Port | Node inspector |
-| --- | --- | --- |
-| `server` | `8280` | `9329` |
-| `metadata-service` | `8290` | `9330` |
-| `web` (Vite) | Vite default | — |
-| `docs` (public) | VitePress default | — |
-| `internal-docs` (this) | `5174` | — |
+| App                    | Port              | Node inspector |
+| ---------------------- | ----------------- | -------------- |
+| `server`               | `8280`            | `9329`         |
+| `metadata-service`     | `8290`            | `9330`         |
+| `web` (Vite)           | Vite default      | —              |
+| `docs` (public)        | VitePress default | —              |
+| `internal-docs` (this) | `5174`            | —              |
 
 ::: warning Build order
 `@staccato/shared` must be built before `server` and `web` consume it. Turborepo handles this

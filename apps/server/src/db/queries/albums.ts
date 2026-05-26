@@ -356,7 +356,9 @@ export function upsertAlbumForDiscovery(
       and(
         eq(albums.artistId, artistId),
         eq(albums.normalizedTitle, normalizedInput),
-        releaseMbid ? eq(albums.releaseMbid, releaseMbid) : isNull(albums.releaseMbid),
+        releaseMbid
+          ? eq(albums.releaseMbid, releaseMbid)
+          : isNull(albums.releaseMbid),
       ),
     )
     .get();

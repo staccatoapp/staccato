@@ -1,8 +1,5 @@
 import { FastifyPluginAsync } from "fastify";
-import {
-  CreateDownloadRequestSchema,
-  DownloadRequest,
-} from "@staccato/shared";
+import { CreateDownloadRequestSchema, DownloadRequest } from "@staccato/shared";
 import {
   createDownloadRequest,
   deleteDownloadRequest,
@@ -31,7 +28,10 @@ const downloadRoutes: FastifyPluginAsync = async (app) => {
   app.post("/", async (req, reply) => {
     const body = CreateDownloadRequestSchema.parse(req.body);
 
-    const existing = findExistingActiveRequest(req.userId, body.releaseGroupMbid);
+    const existing = findExistingActiveRequest(
+      req.userId,
+      body.releaseGroupMbid,
+    );
     if (existing) {
       return reply
         .status(409)
@@ -52,7 +52,10 @@ const downloadRoutes: FastifyPluginAsync = async (app) => {
         ? { qualityProfileId: body.qualityProfileId }
         : undefined;
     submitToLidarr(row.id, req.log, override).catch((err) =>
-      req.log.error({ err, requestId: row.id }, "[downloads] submitToLidarr failed"),
+      req.log.error(
+        { err, requestId: row.id },
+        "[downloads] submitToLidarr failed",
+      ),
     );
 
     return reply.status(202).send(toDto(row));

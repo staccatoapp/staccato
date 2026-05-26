@@ -38,8 +38,9 @@ export const recommendationCache = sqliteTable(
     updatedAt: integer("updated_at").notNull(),
   },
   (table) => ({
-    userSourceKindUnique: uniqueIndex("recommendation_cache_user_source_kind")
-      .on(table.userId, table.source, table.kind),
+    userSourceKindUnique: uniqueIndex(
+      "recommendation_cache_user_source_kind",
+    ).on(table.userId, table.source, table.kind),
     dueIdx: index("idx_recommendation_cache_due")
       .on(table.nextRefreshAt)
       .where(sql`${table.inflight} = 0`),
@@ -47,5 +48,4 @@ export const recommendationCache = sqliteTable(
 );
 
 export type RecommendationCacheRow = typeof recommendationCache.$inferSelect;
-export type NewRecommendationCacheRow =
-  typeof recommendationCache.$inferInsert;
+export type NewRecommendationCacheRow = typeof recommendationCache.$inferInsert;

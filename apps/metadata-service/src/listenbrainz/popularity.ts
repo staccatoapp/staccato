@@ -66,15 +66,18 @@ export async function fetchPopularity(
     config.POPULARITY_TIMEOUT_MS,
   );
   try {
-    const res = await fetch(`${config.LISTENBRAINZ_API_URL}/popularity/${kind}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "User-Agent": MIRROR_USER_AGENT,
+    const res = await fetch(
+      `${config.LISTENBRAINZ_API_URL}/popularity/${kind}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent": MIRROR_USER_AGENT,
+        },
+        body: JSON.stringify({ [mbidKey]: misses }),
+        signal: controller.signal,
       },
-      body: JSON.stringify({ [mbidKey]: misses }),
-      signal: controller.signal,
-    });
+    );
     if (!res.ok) {
       log.warn(
         { status: res.status, kind, count: misses.length },

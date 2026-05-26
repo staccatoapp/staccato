@@ -99,7 +99,8 @@ const searchRoutes: FastifyPluginAsync = async (fastify) => {
     let relEntries: ReturnType<typeof toMetadataSearchReleases> = [];
     if (relJson) {
       const parsed = ReleaseSearchResponseSchema.safeParse(relJson);
-      if (parsed.success) relEntries = toMetadataSearchReleases(parsed.data.releases);
+      if (parsed.success)
+        relEntries = toMetadataSearchReleases(parsed.data.releases);
       else
         request.log.error(
           { issues: parsed.error.issues },

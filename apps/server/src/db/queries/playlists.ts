@@ -101,9 +101,7 @@ export function getPlaylistTrackCounts(
     .all();
 }
 
-export function getPlaylistCoverArtUrls(
-  playlistIds: string[],
-): {
+export function getPlaylistCoverArtUrls(playlistIds: string[]): {
   playlistId: string;
   albumId: string;
   releaseGroupMbid: string | null;
@@ -151,9 +149,7 @@ export function getPlaylistTracks(playlistId: string): PlaylistTrackRow[] {
     .all();
 }
 
-export function getMaxPlaylistTrackPosition(
-  playlistId: string,
-): number | null {
+export function getMaxPlaylistTrackPosition(playlistId: string): number | null {
   const result = db
     .select({ maxPos: sql<number | null>`max(position)` })
     .from(playlistTracks)

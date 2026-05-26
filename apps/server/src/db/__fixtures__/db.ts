@@ -37,8 +37,11 @@ export function seedTrack(
   albumId: string | null,
   overrides: { title?: string; filePath?: string; trackNumber?: number } = {},
 ): string {
-  const { title = "Test Track", filePath = "/music/test.flac", trackNumber = 1 } =
-    overrides;
+  const {
+    title = "Test Track",
+    filePath = "/music/test.flac",
+    trackNumber = 1,
+  } = overrides;
   const trackId = upsertDiscoveredTrack(
     {
       filePath,

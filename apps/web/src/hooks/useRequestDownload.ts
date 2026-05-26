@@ -13,7 +13,9 @@ export function useRequestDownload() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? `Download request failed (${res.status})`);
+        throw new Error(
+          data.error ?? `Download request failed (${res.status})`,
+        );
       }
       return res.json();
     },

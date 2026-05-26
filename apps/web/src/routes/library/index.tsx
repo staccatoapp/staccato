@@ -162,13 +162,17 @@ function LibraryPage() {
   const countLabel = (() => {
     switch (activeTab) {
       case "albums":
-        return albumsQuery.isSuccess ? `${albumsQuery.total} albums` : "Loading…";
+        return albumsQuery.isSuccess
+          ? `${albumsQuery.total} albums`
+          : "Loading…";
       case "artists":
         return artistsQuery.isSuccess
           ? `${artistsQuery.total} artists`
           : "Loading…";
       case "tracks":
-        return tracksQuery.isSuccess ? `${tracksQuery.total} tracks` : "Loading…";
+        return tracksQuery.isSuccess
+          ? `${tracksQuery.total} tracks`
+          : "Loading…";
       case "playlists":
         return playlistsQuery.isSuccess
           ? `${playlistsQuery.total} playlists`

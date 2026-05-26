@@ -112,10 +112,7 @@ export function TrackRow({
           active ? "opacity-100" : "opacity-0",
         )}
       >
-        <AddToPlaylistDropdown
-          trackId={track.id}
-          onOpenChange={setDropOpen}
-        />
+        <AddToPlaylistDropdown trackId={track.id} onOpenChange={setDropOpen} />
       </div>
 
       {/* Duration */}

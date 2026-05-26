@@ -103,8 +103,7 @@ async function lbFetch(url: string, token: string): Promise<Response> {
     headers: { Authorization: `Token ${token}` },
   });
   const remaining = Number(res.headers.get("X-RateLimit-Remaining") ?? 1);
-  const resetInMs =
-    Number(res.headers.get("X-RateLimit-Reset-In") ?? 0) * 1000;
+  const resetInMs = Number(res.headers.get("X-RateLimit-Reset-In") ?? 0) * 1000;
   if (remaining === 0 && resetInMs > 0) {
     log.debug({ sleepMs: resetInMs, url }, "lb rate-limit backoff");
     await sleep(resetInMs);
@@ -116,14 +115,10 @@ function extractPlaylistId(identifier: string): string {
   return identifier.split("/").filter(Boolean).pop() ?? identifier;
 }
 
-function extractRecordingMbid(
-  identifier: string | string[],
-): string | null {
+function extractRecordingMbid(identifier: string | string[]): string | null {
   const id = Array.isArray(identifier) ? identifier[0] : identifier;
   if (!id) return null;
-  const match = id.match(
-    /musicbrainz\.org\/recording\/([0-9a-f-]{36})/i,
-  );
+  const match = id.match(/musicbrainz\.org\/recording\/([0-9a-f-]{36})/i);
   return match?.[1] ?? null;
 }
 
@@ -169,10 +164,7 @@ export async function getPlaylistDetail(
   token: string,
 ): Promise<LBPlaylistDetail | null> {
   try {
-    const res = await lbFetch(
-      `${LB_API_BASE}/playlist/${playlistId}`,
-      token,
-    );
+    const res = await lbFetch(`${LB_API_BASE}/playlist/${playlistId}`, token);
     if (!res.ok) {
       log.warn(
         { status: res.status, operation: "getPlaylistDetail", playlistId },
@@ -224,9 +216,7 @@ export async function getCFRecommendations(
       return [];
     }
     const data = LBCFRecommendationsSchema.parse(await res.json());
-    return data.payload.mbids
-      .slice(0, count)
-      .map((m) => m.recording_mbid);
+    return data.payload.mbids.slice(0, count).map((m) => m.recording_mbid);
   } catch (err) {
     log.warn(
       { err, operation: "getCFRecommendations", username },

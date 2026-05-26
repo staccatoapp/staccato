@@ -18,7 +18,11 @@ export function usePreviewAudio() {
     if (audioRef.current) audioRef.current.volume = volume / 100;
   }, [volume]);
 
-  function handlePreview(recordingMbid: string, artistName: string, title: string) {
+  function handlePreview(
+    recordingMbid: string,
+    artistName: string,
+    title: string,
+  ) {
     const audio = audioRef.current;
     if (!audio) return;
     if (playingMbid === recordingMbid) {

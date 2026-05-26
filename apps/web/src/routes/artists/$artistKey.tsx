@@ -39,9 +39,7 @@ function discographyKey(item: ArtistDiscographyItem): string {
 
 function Discography({ items }: { items: ArtistDiscographyItem[] }) {
   if (items.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">No releases found.</p>
-    );
+    return <p className="text-sm text-muted-foreground">No releases found.</p>;
   }
   return (
     <div
@@ -101,7 +99,7 @@ function ArtistDetailPage() {
   const imageUrl = data.artist.imageUrl;
   const subtitle =
     data.source === "external"
-      ? data.artist.disambiguation ?? undefined
+      ? (data.artist.disambiguation ?? undefined)
       : undefined;
   const albumCount = data.albums.length;
 

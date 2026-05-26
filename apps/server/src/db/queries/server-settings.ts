@@ -12,7 +12,9 @@ export function getOrCreateServerSettings(): ServerSettingsRow {
   return db.insert(serverSettings).values({}).returning().get()!;
 }
 
-export function updateServerSettings(data: ServerSettingsUpdate): ServerSettingsRow {
+export function updateServerSettings(
+  data: ServerSettingsUpdate,
+): ServerSettingsRow {
   const settings = getOrCreateServerSettings();
   return db
     .update(serverSettings)

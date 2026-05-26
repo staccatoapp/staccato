@@ -158,14 +158,21 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.send(result);
     }
     try {
-      const [qualityProfiles, metadataProfiles, rootFolders] = await Promise.all([
-        client.getQualityProfiles(),
-        client.getMetadataProfiles(),
-        client.getRootFolders(),
-      ]);
+      const [qualityProfiles, metadataProfiles, rootFolders] =
+        await Promise.all([
+          client.getQualityProfiles(),
+          client.getMetadataProfiles(),
+          client.getRootFolders(),
+        ]);
       const options: LidarrOptions = {
-        qualityProfiles: qualityProfiles.map((p) => ({ id: p.id, name: p.name })),
-        metadataProfiles: metadataProfiles.map((p) => ({ id: p.id, name: p.name })),
+        qualityProfiles: qualityProfiles.map((p) => ({
+          id: p.id,
+          name: p.name,
+        })),
+        metadataProfiles: metadataProfiles.map((p) => ({
+          id: p.id,
+          name: p.name,
+        })),
         rootFolders: rootFolders.map((r) => ({ id: r.id, path: r.path })),
       };
       const result: LidarrTestResult = { connected: true, options };
@@ -184,20 +191,29 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
     }
     const client = new LidarrClient(settings.lidarrUrl, settings.lidarrApiKey);
     try {
-      const [qualityProfiles, metadataProfiles, rootFolders] = await Promise.all([
-        client.getQualityProfiles(),
-        client.getMetadataProfiles(),
-        client.getRootFolders(),
-      ]);
+      const [qualityProfiles, metadataProfiles, rootFolders] =
+        await Promise.all([
+          client.getQualityProfiles(),
+          client.getMetadataProfiles(),
+          client.getRootFolders(),
+        ]);
       const options: LidarrOptions = {
-        qualityProfiles: qualityProfiles.map((p) => ({ id: p.id, name: p.name })),
-        metadataProfiles: metadataProfiles.map((p) => ({ id: p.id, name: p.name })),
+        qualityProfiles: qualityProfiles.map((p) => ({
+          id: p.id,
+          name: p.name,
+        })),
+        metadataProfiles: metadataProfiles.map((p) => ({
+          id: p.id,
+          name: p.name,
+        })),
         rootFolders: rootFolders.map((r) => ({ id: r.id, path: r.path })),
       };
       return reply.send(options);
     } catch (err) {
       req.log.warn({ err }, "lidarr options fetch failed");
-      return reply.status(502).send({ error: "Failed to fetch Lidarr options" });
+      return reply
+        .status(502)
+        .send({ error: "Failed to fetch Lidarr options" });
     }
   });
 };

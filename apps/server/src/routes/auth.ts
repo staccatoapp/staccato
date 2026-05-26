@@ -26,15 +26,16 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     const passwordHash = await argon2.hash(password, { type: argon2.argon2id });
     const user = createUser({ username, passwordHash, isAdmin: true });
     req.session.set("userId", user.id);
-    req.log.info({ userId: user.id, username: user.username }, "initial admin user created");
-    return reply
-      .code(201)
-      .send({
-        id: user.id,
-        username: user.username,
-        isAdmin: user.isAdmin,
-        onboardingComplete: user.onboardingComplete,
-      });
+    req.log.info(
+      { userId: user.id, username: user.username },
+      "initial admin user created",
+    );
+    return reply.code(201).send({
+      id: user.id,
+      username: user.username,
+      isAdmin: user.isAdmin,
+      onboardingComplete: user.onboardingComplete,
+    });
   });
 
   fastify.post("/login", async (req, reply) => {
@@ -51,7 +52,10 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     req.session.set("userId", user.id);
-    req.log.info({ userId: user.id, username: user.username }, "user logged in");
+    req.log.info(
+      { userId: user.id, username: user.username },
+      "user logged in",
+    );
     return {
       id: user.id,
       username: user.username,

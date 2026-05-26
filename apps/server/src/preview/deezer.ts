@@ -30,10 +30,7 @@ export async function lookupDeezerPreview(
     if (!track?.preview) return null;
     return { deezerTrackId: String(track.id), previewUrl: track.preview };
   } catch (err) {
-    log.warn(
-      { err, artistName, trackTitle },
-      "deezer preview lookup failed",
-    );
+    log.warn({ err, artistName, trackTitle }, "deezer preview lookup failed");
     return null;
   }
 }

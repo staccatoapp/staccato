@@ -19,16 +19,18 @@ import {
   updateTrackByTrackId,
 } from "../db/queries/tracks.js";
 import { computePrimaryFlags } from "@staccato/shared";
-import { normalizeString, lookupReleaseDetails, MB_PRIORITY } from "../musicbrainz/client.js";
+import {
+  normalizeString,
+  lookupReleaseDetails,
+  MB_PRIORITY,
+} from "../musicbrainz/client.js";
 import { upsertTrackFts } from "../db/queries/tracks-fts.js";
 import { replaceTrackArtists } from "../db/queries/track-artists.js";
 import { replaceAlbumArtists } from "../db/queries/album-artists.js";
 import { ensureCoverOnDisk } from "../coverart/store.js";
 import { ensureArtistImageOnDisk } from "../artistimage/store.js";
 import type { ScoredCandidate, ResolvedRelease, RawTags } from "./types.js";
-import {
-  AUTO_COMMIT_THRESHOLD,
-} from "./scoring.js";
+import { AUTO_COMMIT_THRESHOLD } from "./scoring.js";
 
 const log = logger.child({ module: "library:commit" });
 
@@ -69,10 +71,7 @@ async function populateAlbumArtists(
       }));
       replaceAlbumArtists(albumId, credits);
     } catch (err) {
-      log.warn(
-        { err, releaseMbid, albumId },
-        "album artist population failed",
-      );
+      log.warn({ err, releaseMbid, albumId }, "album artist population failed");
     } finally {
       albumArtistsInflight.delete(key);
     }

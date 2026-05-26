@@ -1,5 +1,14 @@
 import { useState } from "react";
-import { Check, Clock, Download, Pause, Play, Plus, RotateCw, X } from "lucide-react";
+import {
+  Check,
+  Clock,
+  Download,
+  Pause,
+  Play,
+  Plus,
+  RotateCw,
+  X,
+} from "lucide-react";
 import { generateAlbumGradient, formatMs } from "@/lib/music";
 import type { UiDownloadStatus } from "@/hooks/useDownloads";
 
@@ -17,11 +26,17 @@ export interface TrackRowData {
 const GRID_WITH_ACTIONS = "40px 40px 1fr 1fr 1fr 32px 52px 34px 34px";
 const GRID_NO_ACTIONS = "40px 40px 1fr 1fr 1fr 32px 52px";
 
-export function RecommendedTrackListHeader({ showActions = true }: { showActions?: boolean }) {
+export function RecommendedTrackListHeader({
+  showActions = true,
+}: {
+  showActions?: boolean;
+}) {
   return (
     <div
       className="grid items-center gap-3 px-2 pb-2 border-b border-border mb-1 text-[0.7rem] font-semibold uppercase tracking-[0.06em] text-muted-foreground"
-      style={{ gridTemplateColumns: showActions ? GRID_WITH_ACTIONS : GRID_NO_ACTIONS }}
+      style={{
+        gridTemplateColumns: showActions ? GRID_WITH_ACTIONS : GRID_NO_ACTIONS,
+      }}
     >
       <div className="text-center">#</div>
       <div />
@@ -86,7 +101,10 @@ export function RecommendedTrackRow({
         style={{ color: isPlaying ? "oklch(0.7 0.15 250)" : undefined }}
       >
         {isPlaying ? (
-          <span className="flex justify-center" style={{ color: "oklch(0.7 0.15 250)" }}>
+          <span
+            className="flex justify-center"
+            style={{ color: "oklch(0.7 0.15 250)" }}
+          >
             <Pause className="w-3 h-3" fill="currentColor" />
           </span>
         ) : (
