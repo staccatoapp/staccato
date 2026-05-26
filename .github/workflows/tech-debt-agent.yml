@@ -181,7 +181,7 @@ jobs:
           2. Commit the changes with a clear message referencing the issue
           3. Push the branch
           4. Before creating the PR, read the file at .github/PULL_REQUEST_TEMPLATE/pull-request-template.md. Use it as the structure for the PR body, filling in each section appropriately based on the changes you made. Do not omit or skip sections. Always include Closes #${ISSUE_NUMBER} in the body.
-          4. Open the PR with a title in the format: "[Tech Debt] <concise description of the fix>".
+          4. Open the PR with a title in the format: [Tech Debt] <concise description of the fix>.
 
           Use the gh CLI for git operations and PR creation.
 
