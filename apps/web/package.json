@@ -8,8 +8,8 @@
     "dev:remote": "vite --host",
     "build": "tsc -b && vite build",
     "check-types": "tsc -b",
-    "lint": "eslint src/ --max-warnings=0 && prettier --check src/",
-    "lint:fix": "eslint src/ --max-warnings=0 --fix && prettier --write src/",
+    "lint": "eslint src/ --max-warnings=0 && prettier --check src/ --ignore-path ../../.prettierignore",
+    "lint:fix": "eslint src/ --max-warnings=0 --fix && prettier --write src/ --ignore-path ../../.prettierignore",
     "preview": "vite preview"
   },
   "dependencies": {
