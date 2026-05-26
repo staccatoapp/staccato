@@ -1,8 +1,8 @@
 name: Tech Debt Agent
 
 on:
-  schedule:
-    - cron: "0 5 * * 1" # Every Monday at 5am UTC
+  # schedule:
+  # - cron: "0 5 * * 1" # Every Monday at 5am UTC
   workflow_dispatch: # Allow manual triggering for testing
 
 permissions:
@@ -31,7 +31,7 @@ jobs:
       - name: Query GitHub Project for eligible issues
         id: find_issue
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           # Fetch all items in the "Ready" column of the project that have the "tech debt" label
           # and do NOT have "agent ignore". Then pick the highest priority one.
@@ -131,7 +131,7 @@ jobs:
         if: steps.find_issue.outputs.found == 'true'
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
           ISSUE_NUMBER: ${{ steps.find_issue.outputs.issue_number }}
           ISSUE_TITLE: ${{ steps.find_issue.outputs.issue_title }}
           ITEM_ID: ${{ steps.find_issue.outputs.item_id }}
@@ -180,10 +180,8 @@ jobs:
           1. Create a branch named: agent/tech-debt-${ISSUE_NUMBER}
           2. Commit the changes with a clear message referencing the issue
           3. Push the branch
-          4. Open a pull request with:
-             - Title: [Tech Debt] <concise description of the fix>
-             - Body: Explain what was changed and why, then include on its own line: Closes #${ISSUE_NUMBER}
-             - Base branch: main (or master if that is the default)
+          4. Before creating the PR, read the file at .github/PULL_REQUEST_TEMPLATE/pull-request-template.md. Use it as the structure for the PR body, filling in each section appropriately based on the changes you made. Do not omit or skip sections. Always include Closes #${ISSUE_NUMBER} in the body.
+          4. Open the PR with a title in the format: "[Tech Debt] <concise description of the fix>".
 
           Use the gh CLI for git operations and PR creation.
 
@@ -197,8 +195,11 @@ jobs:
           - Be conservative: when in doubt, SKIP"
 
           # Run Claude Code in headless mode, capturing output
-          claude -p "$PROMPT" \
+          claude --bare -p "$PROMPT" \
+            --settings '{"model":"claude-sonnet-4-6"}' \
             --allowedTools "Bash,Read,Write,Edit,Glob,Grep" \
+            --max-budget-usd 3 \
+            --permission-mode dontAsk \
             2>&1 | tee /tmp/claude_output.txt
 
           # Extract decision from output
@@ -218,7 +219,7 @@ jobs:
           steps.find_issue.outputs.found == 'true' &&
           (steps.claude_agent.outputs.decision == 'skip' || steps.claude_agent.outputs.decision == 'unknown')
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
           ISSUE_NUMBER: ${{ steps.find_issue.outputs.issue_number }}
           SKIP_REASON: ${{ steps.claude_agent.outputs.skip_reason }}
         run: |
@@ -238,7 +239,7 @@ jobs:
           steps.find_issue.outputs.found == 'true' &&
           steps.claude_agent.outputs.decision == 'success'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
           ITEM_ID: ${{ steps.find_issue.outputs.item_id }}
         run: |
           # Get the project and field/option IDs needed to update the Status field
