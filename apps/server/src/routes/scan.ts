@@ -1,4 +1,5 @@
 import { FastifyPluginAsync } from "fastify";
+import { requireAdmin } from "../plugins/session.js";
 import { z } from "zod";
 import { getConfig } from "../config/config.js";
 import {
@@ -14,7 +15,7 @@ const retryBodySchema = z.object({
 });
 
 const scanRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.post("/scan", async (req, reply) => {
+  fastify.post("/scan", { preHandler: requireAdmin }, async (req, reply) => {
     if (libraryProgress.running) {
       req.log.warn("scan requested but already in progress");
       return reply.status(409).send({ error: "Scan already in progress" });
@@ -37,7 +38,7 @@ const scanRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-  fastify.post("/resolve/retry", async (req, reply) => {
+  fastify.post("/resolve/retry", { preHandler: requireAdmin }, async (req, reply) => {
     const parsed = retryBodySchema.safeParse(req.body);
     if (!parsed.success) {
       return reply
