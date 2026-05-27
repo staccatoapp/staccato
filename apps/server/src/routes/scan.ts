@@ -38,16 +38,20 @@ const scanRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-  fastify.post("/resolve/retry", { preHandler: requireAdmin }, async (req, reply) => {
-    const parsed = retryBodySchema.safeParse(req.body);
-    if (!parsed.success) {
-      return reply
-        .status(400)
-        .send({ error: "Invalid retry options", details: parsed.error });
-    }
-    const result = await retryResolution(parsed.data);
-    return reply.status(202).send(result);
-  });
+  fastify.post(
+    "/resolve/retry",
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const parsed = retryBodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return reply
+          .status(400)
+          .send({ error: "Invalid retry options", details: parsed.error });
+      }
+      const result = await retryResolution(parsed.data);
+      return reply.status(202).send(result);
+    },
+  );
 };
 
 export default scanRoutes;
