@@ -94,9 +94,9 @@ Add unit tests (and integration tests where the change crosses a boundary) cover
 Run and confirm each passes, fixing and re-running on failure:
 
 ```bash
-pnpm lint:fix      # eslint --fix (--max-warnings 0) + prettier --write; exits non-zero if unfixable issues remain
-pnpm check-types   # tsc across the monorepo
-pnpm test          # vitest
+pnpm lint:fix --force  # --force bypasses turbo cache so lint runs on every package, not just ones turbo considers dirty
+pnpm check-types       # tsc across the monorepo
+pnpm test              # vitest
 pnpm build         # production build
 ```
 
@@ -122,7 +122,7 @@ If something genuinely can't be verified here (missing service/dep), state exact
 
 - **Summarising the issue and diving straight to code** — skips both gates; the most common failure. Confirm requirements, then get plan approval.
 - **Running `gh`/`git` through PowerShell** — multi-line bodies and `\` continuations break. Use the Bash tool.
-- **Inlining the PR body** — em-dashes/curly quotes mangle on the command line. Use `--body-file` with a UTF-8 file.
+- **Inlining the PR body** — em-dashes/curly quotes mangle on the command line. Use `--body-file` with a UTF-8 file. Pass an **absolute path** to `--body-file`; `gh` does not resolve relative paths from the repo root when invoked via Bash.
 - **Claiming "tests pass" without output** — run `pnpm test`/`lint`/`check-types`/`build` and show it.
 - **Re-deriving planning/TDD/clarify logic inline** — defer to the referenced sub-skills instead of duplicating them.
 - **Generic branch names** (`fix/...`, `patch-1`) — this repo uses `agent/<issue#>-<slug>`.

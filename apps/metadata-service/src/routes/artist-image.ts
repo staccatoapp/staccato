@@ -113,8 +113,7 @@ const artistImageRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(404).send({ error: "No image for artist" });
     }
     const filename =
-      wdParsed.data.entities[qid]?.claims?.P18?.[0]?.mainsnak?.datavalue
-        ?.value;
+      wdParsed.data.entities[qid]?.claims?.P18?.[0]?.mainsnak?.datavalue?.value;
     if (!filename) {
       return reply.status(404).send({ error: "No image for artist" });
     }
