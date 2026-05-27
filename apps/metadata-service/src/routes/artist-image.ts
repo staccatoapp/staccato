@@ -1,6 +1,38 @@
 import type { FastifyPluginAsync } from "fastify";
+import { z } from "zod";
 import { MetadataArtistImageSchema } from "@staccato/shared";
 import { mirrorFetch } from "../mirror/client.js";
+
+export const ArtistUrlRelsSchema = z.object({
+  relations: z
+    .array(
+      z.object({
+        type: z.string(),
+        url: z.object({ resource: z.string() }),
+      }),
+    )
+    .optional(),
+});
+
+export const WikidataEntitySchema = z.object({
+  entities: z.record(
+    z.object({
+      claims: z
+        .object({
+          P18: z
+            .array(
+              z.object({
+                mainsnak: z.object({
+                  datavalue: z.object({ value: z.string() }).optional(),
+                }),
+              }),
+            )
+            .optional(),
+        })
+        .optional(),
+    }),
+  ),
+});
 
 const MBID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -36,10 +68,17 @@ const artistImageRoutes: FastifyPluginAsync = async (fastify) => {
         .status(mbRes.status < 500 ? 404 : 502)
         .send({ error: "No image for artist" });
     }
-    const mbData = (await mbRes.json()) as {
-      relations?: Array<{ type: string; url: { resource: string } }>;
-    };
-    const wikidataRel = mbData.relations?.find((r) => r.type === "wikidata");
+    const mbParsed = ArtistUrlRelsSchema.safeParse(await mbRes.json());
+    if (!mbParsed.success) {
+      request.log.warn(
+        { err: mbParsed.error, mbid },
+        "mb artist url-rels response failed schema validation",
+      );
+      return reply.status(404).send({ error: "No image for artist" });
+    }
+    const wikidataRel = mbParsed.data.relations?.find(
+      (r) => r.type === "wikidata",
+    );
     const qid = wikidataRel?.url.resource.split("/wiki/")[1];
     if (!qid) {
       return reply.status(404).send({ error: "No Wikidata relation" });
@@ -65,18 +104,16 @@ const artistImageRoutes: FastifyPluginAsync = async (fastify) => {
         .status(wdRes.status < 500 ? 404 : 502)
         .send({ error: "No image for artist" });
     }
-    const wdData = (await wdRes.json()) as {
-      entities: Record<
-        string,
-        {
-          claims?: {
-            P18?: Array<{ mainsnak: { datavalue?: { value: string } } }>;
-          };
-        }
-      >;
-    };
+    const wdParsed = WikidataEntitySchema.safeParse(await wdRes.json());
+    if (!wdParsed.success) {
+      request.log.warn(
+        { err: wdParsed.error, mbid, qid },
+        "wikidata entity response failed schema validation",
+      );
+      return reply.status(404).send({ error: "No image for artist" });
+    }
     const filename =
-      wdData.entities[qid]?.claims?.P18?.[0]?.mainsnak?.datavalue?.value;
+      wdParsed.data.entities[qid]?.claims?.P18?.[0]?.mainsnak?.datavalue?.value;
     if (!filename) {
       return reply.status(404).send({ error: "No image for artist" });
     }

@@ -1,4 +1,5 @@
 import PQueue from "p-queue";
+import { z } from "zod";
 import { logger } from "../../logger.js";
 import { getConfig } from "../../config/config.js";
 
@@ -37,18 +38,34 @@ async function throttledFetch(url: string): Promise<Response> {
   return res;
 }
 
-interface AcoustIdResponse {
-  status: string;
-  results?: Array<{
-    score: number;
-    recordings?: Array<{
-      id: string;
-      title?: string;
-      duration?: number;
-      artists?: Array<{ id: string; name: string; joinphrase?: string }>;
-    }>;
-  }>;
-}
+export const AcoustIdResponseSchema = z.object({
+  status: z.string(),
+  results: z
+    .array(
+      z.object({
+        score: z.number(),
+        recordings: z
+          .array(
+            z.object({
+              id: z.string(),
+              title: z.string().optional(),
+              duration: z.number().optional(),
+              artists: z
+                .array(
+                  z.object({
+                    id: z.string(),
+                    name: z.string(),
+                    joinphrase: z.string().optional(),
+                  }),
+                )
+                .optional(),
+            }),
+          )
+          .optional(),
+      }),
+    )
+    .optional(),
+});
 
 // Request recording-level metadata inline (title, duration, artists) so the
 // resolver can score AcoustID candidates without a per-candidate MusicBrainz
@@ -78,7 +95,15 @@ export async function lookupFingerprint(
       return [];
     }
 
-    const data = (await res.json()) as AcoustIdResponse;
+    const parsed = AcoustIdResponseSchema.safeParse(await res.json());
+    if (!parsed.success) {
+      log.warn(
+        { err: parsed.error, durationSec: Math.round(duration) },
+        "acoustid response failed schema validation",
+      );
+      return [];
+    }
+    const data = parsed.data;
     if (data.status !== "ok" || !data.results?.length) return [];
 
     // A recording id can appear under multiple results; keep the highest score.
