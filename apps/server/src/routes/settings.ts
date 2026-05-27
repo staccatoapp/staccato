@@ -8,6 +8,7 @@ import {
   LidarrTestResult,
   LidarrOptions,
 } from "@staccato/shared";
+import { requireAdmin } from "../plugins/session.js";
 import { validateToken } from "../listenbrainz/client.js";
 import {
   getOrCreateUserSettings,
@@ -134,7 +135,7 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
     return reply.send(response);
   });
 
-  fastify.patch("/lidarr", async (req, reply) => {
+  fastify.patch("/lidarr", { preHandler: requireAdmin }, async (req, reply) => {
     const body = UpdateLidarrSettingsSchema.parse(req.body);
     const update: ServerSettingsUpdate = {};
     if (body.url !== undefined) update.lidarrUrl = body.url ?? null;
@@ -149,7 +150,7 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
     return reply.status(204).send();
   });
 
-  fastify.post("/lidarr/test", async (req, reply) => {
+  fastify.post("/lidarr/test", { preHandler: requireAdmin }, async (req, reply) => {
     const body = TestLidarrConnectionSchema.parse(req.body);
     const client = new LidarrClient(body.url, body.apiKey);
     const connected = await client.testConnection();
