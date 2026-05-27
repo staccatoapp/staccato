@@ -8,6 +8,7 @@ import {
   LidarrTestResult,
   LidarrOptions,
 } from "@staccato/shared";
+import { requireAdmin } from "../plugins/session.js";
 import { validateToken } from "../listenbrainz/client.js";
 import {
   getOrCreateUserSettings,
@@ -134,7 +135,7 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
     return reply.send(response);
   });
 
-  fastify.patch("/lidarr", async (req, reply) => {
+  fastify.patch("/lidarr", { preHandler: requireAdmin }, async (req, reply) => {
     const body = UpdateLidarrSettingsSchema.parse(req.body);
     const update: ServerSettingsUpdate = {};
     if (body.url !== undefined) update.lidarrUrl = body.url ?? null;
@@ -149,40 +150,44 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
     return reply.status(204).send();
   });
 
-  fastify.post("/lidarr/test", async (req, reply) => {
-    const body = TestLidarrConnectionSchema.parse(req.body);
-    const client = new LidarrClient(body.url, body.apiKey);
-    const connected = await client.testConnection();
-    if (!connected) {
-      const result: LidarrTestResult = { connected: false, options: null };
-      return reply.send(result);
-    }
-    try {
-      const [qualityProfiles, metadataProfiles, rootFolders] =
-        await Promise.all([
-          client.getQualityProfiles(),
-          client.getMetadataProfiles(),
-          client.getRootFolders(),
-        ]);
-      const options: LidarrOptions = {
-        qualityProfiles: qualityProfiles.map((p) => ({
-          id: p.id,
-          name: p.name,
-        })),
-        metadataProfiles: metadataProfiles.map((p) => ({
-          id: p.id,
-          name: p.name,
-        })),
-        rootFolders: rootFolders.map((r) => ({ id: r.id, path: r.path })),
-      };
-      const result: LidarrTestResult = { connected: true, options };
-      return reply.send(result);
-    } catch (err) {
-      req.log.warn({ err }, "lidarr connected but option fetch failed");
-      const result: LidarrTestResult = { connected: false, options: null };
-      return reply.send(result);
-    }
-  });
+  fastify.post(
+    "/lidarr/test",
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const body = TestLidarrConnectionSchema.parse(req.body);
+      const client = new LidarrClient(body.url, body.apiKey);
+      const connected = await client.testConnection();
+      if (!connected) {
+        const result: LidarrTestResult = { connected: false, options: null };
+        return reply.send(result);
+      }
+      try {
+        const [qualityProfiles, metadataProfiles, rootFolders] =
+          await Promise.all([
+            client.getQualityProfiles(),
+            client.getMetadataProfiles(),
+            client.getRootFolders(),
+          ]);
+        const options: LidarrOptions = {
+          qualityProfiles: qualityProfiles.map((p) => ({
+            id: p.id,
+            name: p.name,
+          })),
+          metadataProfiles: metadataProfiles.map((p) => ({
+            id: p.id,
+            name: p.name,
+          })),
+          rootFolders: rootFolders.map((r) => ({ id: r.id, path: r.path })),
+        };
+        const result: LidarrTestResult = { connected: true, options };
+        return reply.send(result);
+      } catch (err) {
+        req.log.warn({ err }, "lidarr connected but option fetch failed");
+        const result: LidarrTestResult = { connected: false, options: null };
+        return reply.send(result);
+      }
+    },
+  );
 
   fastify.get("/lidarr/options", async (req, reply) => {
     const settings = getOrCreateServerSettings();
