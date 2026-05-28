@@ -31,7 +31,9 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { currentUserQueryOptions } from "@/hooks/useCurrentUser";
+import { AddUserDialog } from "@/components/admin/AddUserDialog";
 import type {
+  AdminUserResponse,
   LidarrOptions,
   LidarrSettings,
   LidarrTestResult,
@@ -674,107 +676,123 @@ function IntegrationsTab() {
 // ── Users tab ─────────────────────────────────────────────────────────────
 
 function UsersTab() {
-  const placeholderUsers = [
-    {
-      name: "admin",
-      email: "admin@localhost",
-      role: "admin" as const,
-      lastSeen: "just now",
+  const queryClient = useQueryClient();
+  const [addUserOpen, setAddUserOpen] = useState(false);
+
+  const {
+    data: users,
+    isLoading,
+    isError,
+  } = useQuery({
+    queryKey: ["admin-users"],
+    queryFn: async (): Promise<AdminUserResponse[]> => {
+      const res = await fetch("/api/admin/users");
+      if (!res.ok) throw new Error("Failed to fetch users");
+      return res.json();
     },
-  ];
-  const adminCount = placeholderUsers.filter((u) => u.role === "admin").length;
+  });
+
+  const userCount = users?.length ?? 0;
+  const adminCount = users?.filter((u) => u.isAdmin).length ?? 0;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <Button
-          disabled
-          title="Coming soon"
-          className="gap-1.5 opacity-40 cursor-not-allowed"
-        >
+        <Button className="gap-2" onClick={() => setAddUserOpen(true)}>
           <Plus className="w-3.5 h-3.5" />
           Add user
         </Button>
         <span className="ml-auto text-xs text-muted-foreground tabular-nums">
-          {placeholderUsers.length}{" "}
-          {placeholderUsers.length === 1 ? "user" : "users"} · {adminCount}{" "}
-          admin
+          {userCount} {userCount === 1 ? "user" : "users"} · {adminCount} admin
         </span>
       </div>
 
-      <div className="border border-border rounded-xl overflow-hidden">
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr>
-              <th className="px-3.5 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-widest text-muted-foreground bg-muted/30">
-                Username
-              </th>
-              <th className="px-3.5 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-widest text-muted-foreground bg-muted/30">
-                Role
-              </th>
-              <th className="px-3.5 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-widest text-muted-foreground bg-muted/30">
-                Last seen
-              </th>
-              <th className="px-3.5 py-3 bg-muted/30 w-10" />
-            </tr>
-          </thead>
-          <tbody>
-            {placeholderUsers.map((u, i) => (
-              <tr key={u.name} className="hover:bg-accent/30 transition-colors">
-                <td
-                  className={cn(
-                    "px-3.5 py-3",
-                    i < placeholderUsers.length - 1 && "border-b border-border",
-                  )}
-                >
-                  <div className="font-medium text-foreground">{u.name}</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">
-                    {u.email}
-                  </div>
-                </td>
-                <td
-                  className={cn(
-                    "px-3.5 py-3",
-                    i < placeholderUsers.length - 1 && "border-b border-border",
-                  )}
-                >
-                  <span
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">Loading users…</p>
+      ) : isError ? (
+        <p className="text-sm text-destructive">Failed to load users.</p>
+      ) : !users?.length ? (
+        <p className="text-sm text-muted-foreground">No users found.</p>
+      ) : (
+        <div className="border border-border rounded-xl overflow-hidden">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr>
+                <th className="px-3.5 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-widest text-muted-foreground bg-muted/30">
+                  Username
+                </th>
+                <th className="px-3.5 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-widest text-muted-foreground bg-muted/30">
+                  Role
+                </th>
+                <th className="px-3.5 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-widest text-muted-foreground bg-muted/30">
+                  Last seen
+                </th>
+                <th className="px-3.5 py-3 bg-muted/30 w-10" />
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((u, i) => (
+                <tr key={u.id} className="hover:bg-accent/30 transition-colors">
+                  <td
                     className={cn(
-                      "inline-flex items-center gap-1 text-[0.7rem] font-medium px-2 py-0.5 rounded capitalize",
-                      u.role === "admin"
-                        ? "text-primary bg-primary/10"
-                        : "text-muted-foreground bg-muted",
+                      "px-3.5 py-3",
+                      i < users.length - 1 && "border-b border-border",
                     )}
                   >
-                    {u.role === "admin" && (
-                      <ShieldCheck className="w-2.5 h-2.5" />
+                    <div className="font-medium text-foreground">
+                      {u.username}
+                    </div>
+                  </td>
+                  <td
+                    className={cn(
+                      "px-3.5 py-3",
+                      i < users.length - 1 && "border-b border-border",
                     )}
-                    {u.role}
-                  </span>
-                </td>
-                <td
-                  className={cn(
-                    "px-3.5 py-3 text-muted-foreground",
-                    i < placeholderUsers.length - 1 && "border-b border-border",
-                  )}
-                >
-                  {u.lastSeen}
-                </td>
-                <td
-                  className={cn(
-                    "px-3.5 py-3",
-                    i < placeholderUsers.length - 1 && "border-b border-border",
-                  )}
-                >
-                  <button className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
-                    <MoreHorizontal className="w-3.5 h-3.5" />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                  >
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1 text-[0.7rem] font-medium px-2 py-0.5 rounded capitalize",
+                        u.isAdmin
+                          ? "text-primary bg-primary/10"
+                          : "text-muted-foreground bg-muted",
+                      )}
+                    >
+                      {u.isAdmin && <ShieldCheck className="w-2.5 h-2.5" />}
+                      {u.isAdmin ? "admin" : "user"}
+                    </span>
+                  </td>
+                  <td
+                    className={cn(
+                      "px-3.5 py-3 text-muted-foreground",
+                      i < users.length - 1 && "border-b border-border",
+                    )}
+                  >
+                    {"—"}
+                  </td>
+                  <td
+                    className={cn(
+                      "px-3.5 py-3",
+                      i < users.length - 1 && "border-b border-border",
+                    )}
+                  >
+                    <button className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+                      <MoreHorizontal className="w-3.5 h-3.5" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <AddUserDialog
+        open={addUserOpen}
+        onOpenChange={setAddUserOpen}
+        onSuccess={() =>
+          queryClient.invalidateQueries({ queryKey: ["admin-users"] })
+        }
+      />
     </div>
   );
 }

@@ -2,8 +2,8 @@ import { FastifyPluginAsync } from "fastify";
 import * as argon2 from "argon2";
 import {
   AuthenticatedUserResponseSchema,
+  CreateUserSchema,
   LoginSchema,
-  SetupSchema,
 } from "@staccato/shared";
 import {
   createUser,
@@ -26,7 +26,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       req.log.warn("setup attempted but already complete");
       return reply.code(409).send({ error: "Setup already complete" });
     }
-    const { username, password } = SetupSchema.parse(req.body);
+    const { username, password } = CreateUserSchema.parse(req.body);
     const passwordHash = await argon2.hash(password, { type: argon2.argon2id });
     const user = createUser({ username, passwordHash, isAdmin: true });
     req.session.set("userId", user.id);

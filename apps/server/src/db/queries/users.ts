@@ -37,3 +37,7 @@ export function markOnboardingComplete(id: string): void {
     .where(eq(users.id, id))
     .run();
 }
+
+export function listUsers(): UserRow[] {
+  return db.select().from(users).all();
+}
