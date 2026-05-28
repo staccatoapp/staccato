@@ -15,6 +15,7 @@ import { Route as PlaylistsIndexRouteImport } from './routes/playlists/index'
 import { Route as OnboardingIndexRouteImport } from './routes/onboarding/index'
 import { Route as LibraryIndexRouteImport } from './routes/library/index'
 import { Route as ExploreIndexRouteImport } from './routes/explore/index'
+import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as PlaylistsPlaylistIdRouteImport } from './routes/playlists/$playlistId'
 import { Route as ArtistsArtistKeyRouteImport } from './routes/artists/$artistKey'
 import { Route as AlbumsAlbumKeyRouteImport } from './routes/albums/$albumKey'
@@ -50,6 +51,11 @@ const ExploreIndexRoute = ExploreIndexRouteImport.update({
   path: '/explore/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlaylistsPlaylistIdRoute = PlaylistsPlaylistIdRouteImport.update({
   id: '/playlists/$playlistId',
   path: '/playlists/$playlistId',
@@ -77,6 +83,7 @@ export interface FileRoutesByFullPath {
   '/albums/$albumKey': typeof AlbumsAlbumKeyRoute
   '/artists/$artistKey': typeof ArtistsArtistKeyRoute
   '/playlists/$playlistId': typeof PlaylistsPlaylistIdRoute
+  '/admin/': typeof AdminIndexRoute
   '/explore/': typeof ExploreIndexRoute
   '/library/': typeof LibraryIndexRoute
   '/onboarding/': typeof OnboardingIndexRoute
@@ -89,6 +96,7 @@ export interface FileRoutesByTo {
   '/albums/$albumKey': typeof AlbumsAlbumKeyRoute
   '/artists/$artistKey': typeof ArtistsArtistKeyRoute
   '/playlists/$playlistId': typeof PlaylistsPlaylistIdRoute
+  '/admin': typeof AdminIndexRoute
   '/explore': typeof ExploreIndexRoute
   '/library': typeof LibraryIndexRoute
   '/onboarding': typeof OnboardingIndexRoute
@@ -102,6 +110,7 @@ export interface FileRoutesById {
   '/albums/$albumKey': typeof AlbumsAlbumKeyRoute
   '/artists/$artistKey': typeof ArtistsArtistKeyRoute
   '/playlists/$playlistId': typeof PlaylistsPlaylistIdRoute
+  '/admin/': typeof AdminIndexRoute
   '/explore/': typeof ExploreIndexRoute
   '/library/': typeof LibraryIndexRoute
   '/onboarding/': typeof OnboardingIndexRoute
@@ -116,6 +125,7 @@ export interface FileRouteTypes {
     | '/albums/$albumKey'
     | '/artists/$artistKey'
     | '/playlists/$playlistId'
+    | '/admin/'
     | '/explore/'
     | '/library/'
     | '/onboarding/'
@@ -128,6 +138,7 @@ export interface FileRouteTypes {
     | '/albums/$albumKey'
     | '/artists/$artistKey'
     | '/playlists/$playlistId'
+    | '/admin'
     | '/explore'
     | '/library'
     | '/onboarding'
@@ -140,6 +151,7 @@ export interface FileRouteTypes {
     | '/albums/$albumKey'
     | '/artists/$artistKey'
     | '/playlists/$playlistId'
+    | '/admin/'
     | '/explore/'
     | '/library/'
     | '/onboarding/'
@@ -153,6 +165,7 @@ export interface RootRouteChildren {
   AlbumsAlbumKeyRoute: typeof AlbumsAlbumKeyRoute
   ArtistsArtistKeyRoute: typeof ArtistsArtistKeyRoute
   PlaylistsPlaylistIdRoute: typeof PlaylistsPlaylistIdRoute
+  AdminIndexRoute: typeof AdminIndexRoute
   ExploreIndexRoute: typeof ExploreIndexRoute
   LibraryIndexRoute: typeof LibraryIndexRoute
   OnboardingIndexRoute: typeof OnboardingIndexRoute
@@ -205,6 +218,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ExploreIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/playlists/$playlistId': {
       id: '/playlists/$playlistId'
       path: '/playlists/$playlistId'
@@ -241,6 +261,7 @@ const rootRouteChildren: RootRouteChildren = {
   AlbumsAlbumKeyRoute: AlbumsAlbumKeyRoute,
   ArtistsArtistKeyRoute: ArtistsArtistKeyRoute,
   PlaylistsPlaylistIdRoute: PlaylistsPlaylistIdRoute,
+  AdminIndexRoute: AdminIndexRoute,
   ExploreIndexRoute: ExploreIndexRoute,
   LibraryIndexRoute: LibraryIndexRoute,
   OnboardingIndexRoute: OnboardingIndexRoute,

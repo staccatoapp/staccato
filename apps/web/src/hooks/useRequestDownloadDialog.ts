@@ -50,7 +50,7 @@ export function useRequestDownloadDialog() {
   const settingsQuery = useQuery({
     queryKey: ["lidarr-settings"],
     queryFn: async (): Promise<LidarrSettings> => {
-      const res = await fetch("/api/settings/lidarr");
+      const res = await fetch("/api/admin/lidarr");
       if (!res.ok) throw new Error("Failed to fetch Lidarr settings");
       return res.json();
     },
@@ -60,7 +60,7 @@ export function useRequestDownloadDialog() {
   const optionsQuery = useQuery({
     queryKey: ["lidarr-options"],
     queryFn: async (): Promise<LidarrOptions> => {
-      const res = await fetch("/api/settings/lidarr/options");
+      const res = await fetch("/api/admin/lidarr/options");
       if (!res.ok) throw new Error("Failed to fetch Lidarr options");
       return res.json();
     },

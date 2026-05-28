@@ -1,13 +1,12 @@
 import { FastifyPluginAsync } from "fastify";
-import { requireAdmin } from "../plugins/session.js";
 import { z } from "zod";
-import { getConfig } from "../config/config.js";
+import { getConfig } from "../../config/config.js";
 import {
   libraryProgress,
   retryResolution,
   startManualScan,
-} from "../library/index.js";
-import { countTracksByStatus } from "../db/queries/tracks.js";
+} from "../../library/index.js";
+import { countTracksByStatus } from "../../db/queries/tracks.js";
 
 const retryBodySchema = z.object({
   scope: z.enum(["failed", "low_confidence"]),
@@ -15,7 +14,7 @@ const retryBodySchema = z.object({
 });
 
 const scanRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.post("/scan", { preHandler: requireAdmin }, async (req, reply) => {
+  fastify.post("/scan", async (req, reply) => {
     if (libraryProgress.running) {
       req.log.warn("scan requested but already in progress");
       return reply.status(409).send({ error: "Scan already in progress" });
@@ -38,20 +37,16 @@ const scanRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-  fastify.post(
-    "/resolve/retry",
-    { preHandler: requireAdmin },
-    async (req, reply) => {
-      const parsed = retryBodySchema.safeParse(req.body);
-      if (!parsed.success) {
-        return reply
-          .status(400)
-          .send({ error: "Invalid retry options", details: parsed.error });
-      }
-      const result = await retryResolution(parsed.data);
-      return reply.status(202).send(result);
-    },
-  );
+  fastify.post("/resolve/retry", async (req, reply) => {
+    const parsed = retryBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply
+        .status(400)
+        .send({ error: "Invalid retry options", details: parsed.error });
+    }
+    const result = await retryResolution(parsed.data);
+    return reply.status(202).send(result);
+  });
 };
 
 export default scanRoutes;

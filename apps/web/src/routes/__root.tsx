@@ -2,64 +2,98 @@ import { useState } from "react";
 import {
   Link,
   Outlet,
-  createRootRoute,
+  createRootRouteWithContext,
+  isRedirect,
   redirect,
   useRouterState,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
-import {
-  QueryClient,
-  QueryClientProvider,
-  useQuery,
-} from "@tanstack/react-query";
+import { QueryClient, useQuery } from "@tanstack/react-query";
 import {
   Compass,
-  Disc3,
   Library,
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PlaybackSession } from "@staccato/shared";
 import { PlayerBar } from "@/components/layout/player-bar";
 import { Toaster } from "@/components/ui/sonner";
+import {
+  useCurrentUser,
+  currentUserQueryOptions,
+} from "@/hooks/useCurrentUser";
 
-const queryClient = new QueryClient();
-
-export const Route = createRootRoute({
-  beforeLoad: async ({ location }) => {
-    const res = await fetch("/api/auth/me");
-    if (location.pathname.startsWith("/onboarding")) {
-      if (res.ok) throw redirect({ to: "/library" });
-      return;
-    }
-    if (!res.ok) throw redirect({ to: "/onboarding" });
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
+  {
+    beforeLoad: async ({ context, location }) => {
+      try {
+        await context.queryClient.ensureQueryData(currentUserQueryOptions);
+        if (location.pathname.startsWith("/onboarding")) {
+          throw redirect({ to: "/library" });
+        }
+      } catch (err) {
+        if (isRedirect(err)) throw err;
+        if (!location.pathname.startsWith("/onboarding")) {
+          throw redirect({ to: "/onboarding" });
+        }
+      }
+    },
+    component: RootComponent,
+    notFoundComponent: () => (
+      <div className="p-6">
+        <p className="text-muted-foreground text-sm">Page not found.</p>
+        <Link
+          to="/library"
+          className="text-sm text-primary underline mt-2 inline-block"
+        >
+          Go to Library
+        </Link>
+      </div>
+    ),
   },
-  component: RootComponent,
-  notFoundComponent: () => (
-    <div className="p-6">
-      <p className="text-muted-foreground text-sm">Page not found.</p>
-      <Link
-        to="/library"
-        className="text-sm text-primary underline mt-2 inline-block"
-      >
-        Go to Library
-      </Link>
-    </div>
-  ),
-});
+);
+
+function StaccatoMark({ className }: { className?: string }) {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 64 64"
+      fill="currentColor"
+      role="img"
+      aria-label="Staccato"
+      className={className}
+    >
+      <rect x="7" y="21" width="6" height="22" rx="1.5" />
+      <rect x="18" y="15" width="6" height="34" rx="1.5" />
+      <rect x="29" y="24" width="6" height="16" rx="1.5" />
+      <rect x="40" y="10" width="6" height="44" rx="1.5" />
+      <rect x="51" y="20" width="6" height="24" rx="1.5" />
+    </svg>
+  );
+}
 
 const NAV_ITEMS = [
   { to: "/library" as const, label: "Library", icon: Library },
   { to: "/explore" as const, label: "Explore", icon: Compass },
   { to: "/settings" as const, label: "Settings", icon: Settings },
+  {
+    to: "/admin" as const,
+    label: "Admin",
+    icon: ShieldCheck,
+    isAdmin: true,
+  },
 ] as const;
 
 function Sidebar() {
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem("sidebar-collapsed") === "true",
   );
+
+  const { data: currentUser } = useCurrentUser();
 
   const toggle = () => {
     setCollapsed((c) => {
@@ -84,13 +118,13 @@ function Sidebar() {
       >
         {!collapsed && (
           <div className="flex items-center gap-2 min-w-0">
-            <Disc3 className="w-5 h-5 text-primary shrink-0" />
+            <StaccatoMark className="w-5 h-5 text-primary shrink-0" />
             <span className="font-bold tracking-tight whitespace-nowrap">
               Staccato
             </span>
           </div>
         )}
-        {collapsed && <Disc3 className="w-5 h-5 text-primary" />}
+        {collapsed && <StaccatoMark className="w-5 h-5 text-primary" />}
         <button
           onClick={toggle}
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -109,22 +143,51 @@ function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 flex flex-col gap-0.5 px-2">
-        {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
-          <Link
-            key={label}
-            to={to}
-            title={collapsed ? label : undefined}
-            activeProps={{ className: "bg-accent text-foreground" }}
-            className={cn(
-              "flex items-center rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors",
-              collapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2",
-            )}
-          >
-            <Icon className="w-4 h-4 shrink-0" />
-            {!collapsed && label}
-          </Link>
-        ))}
+        {NAV_ITEMS.filter(
+          (item) =>
+            !("isAdmin" in item && item.isAdmin) || currentUser?.isAdmin,
+        ).map(({ to, label, icon: Icon, ...rest }) => {
+          const isAdmin = "isAdmin" in rest && rest.isAdmin;
+          return (
+            <Link
+              key={label}
+              to={to}
+              title={collapsed ? label : undefined}
+              activeProps={{ className: "bg-accent text-foreground" }}
+              className={cn(
+                "flex items-center rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors",
+                collapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2",
+              )}
+            >
+              <Icon
+                className={cn("w-4 h-4 shrink-0", isAdmin && "text-primary")}
+              />
+              {!collapsed && label}
+            </Link>
+          );
+        })}
       </nav>
+
+      {/* Status tile */}
+      <div className="border-t border-border pt-3 mt-1 px-2">
+        {collapsed ? (
+          <div className="flex justify-center py-1">
+            <StaccatoMark className="w-4 h-4 text-primary" />
+          </div>
+        ) : (
+          <div className="flex items-center gap-2.5 px-1 py-1">
+            <StaccatoMark className="w-4 h-4 text-primary shrink-0" />
+            <div className="min-w-0 flex flex-col leading-tight">
+              <span className="text-[0.78rem] font-semibold text-foreground truncate tracking-tight">
+                Staccato
+              </span>
+              <span className="text-[0.68rem] font-medium text-muted-foreground tabular-nums mt-0.5">
+                v—
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
     </aside>
   );
 }
@@ -159,9 +222,9 @@ function RootComponent() {
   const { location } = useRouterState();
   const isOnboarding = location.pathname.startsWith("/onboarding");
   return (
-    <QueryClientProvider client={queryClient}>
+    <>
       {isOnboarding ? <Outlet /> : <LayoutContent />}
       <Toaster richColors position="bottom-center" />
-    </QueryClientProvider>
+    </>
   );
 }

@@ -5,6 +5,7 @@ export * from "./types/zod/api/recommendations.js";
 export * from "./types/zod/api/albums.js";
 export * from "./types/zod/api/artists.js";
 export * from "./types/zod/api/credits.js";
+export * from "./types/zod/api/error.js";
 
 export * from "./types/zod/metadata/recording.js";
 export * from "./types/zod/metadata/release.js";
@@ -12,8 +13,6 @@ export * from "./types/zod/metadata/album.js";
 export * from "./types/zod/metadata/artist.js";
 export * from "./types/zod/metadata/search.js";
 export * from "./types/zod/metadata/asset.js";
-
-export * from "./types/typescript/auth.js";
 
 export * from "./types/typescript/artists.js";
 export * from "./types/typescript/albums.js";

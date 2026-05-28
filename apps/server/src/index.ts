@@ -1,7 +1,6 @@
 import Fastify from "fastify";
 import sessionPlugin, { requireAuth } from "./plugins/session.js";
 import authRoutes from "./routes/auth.js";
-import scanRoutes from "./routes/scan.js";
 import fastifyStatic from "@fastify/static";
 import { runMigrations } from "./db/migrate.js";
 import { startLibraryPipeline } from "./library/index.js";
@@ -31,6 +30,7 @@ import {
 import { startRefresher, tick } from "./recommendations/refresher.js";
 import { listRegisteredSources } from "./recommendations/source.js";
 import "./recommendations/sources/index.js";
+import adminRoutes from "./routes/admin/index.js";
 
 const app = Fastify({ loggerInstance: logger });
 
@@ -55,7 +55,7 @@ app.register(authRoutes, { prefix: "/api/auth" });
 
 app.register(async (protectedApp) => {
   protectedApp.addHook("preHandler", requireAuth);
-  protectedApp.register(scanRoutes, { prefix: "/api/library" });
+  protectedApp.register(adminRoutes, { prefix: "/api/admin" });
   protectedApp.register(libraryRoutes, { prefix: "/api/library" });
   protectedApp.register(albumRoutes, { prefix: "/api/albums" });
   protectedApp.register(artistRoutes, { prefix: "/api/artists" });

@@ -1,6 +1,10 @@
 import { FastifyPluginAsync } from "fastify";
 import * as argon2 from "argon2";
-import { LoginSchema, SetupSchema } from "@staccato/shared";
+import {
+  AuthenticatedUserResponseSchema,
+  LoginSchema,
+  SetupSchema,
+} from "@staccato/shared";
 import {
   createUser,
   findUserById,
@@ -30,12 +34,14 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       { userId: user.id, username: user.username },
       "initial admin user created",
     );
-    return reply.code(201).send({
-      id: user.id,
-      username: user.username,
-      isAdmin: user.isAdmin,
-      onboardingComplete: user.onboardingComplete,
-    });
+    return reply.code(201).send(
+      AuthenticatedUserResponseSchema.parse({
+        id: user.id,
+        username: user.username,
+        isAdmin: user.isAdmin,
+        onboardingComplete: user.onboardingComplete,
+      }),
+    );
   });
 
   fastify.post("/login", async (req, reply) => {
@@ -56,12 +62,12 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       { userId: user.id, username: user.username },
       "user logged in",
     );
-    return {
+    return AuthenticatedUserResponseSchema.parse({
       id: user.id,
       username: user.username,
       isAdmin: user.isAdmin,
       onboardingComplete: user.onboardingComplete,
-    };
+    });
   });
 
   fastify.post("/logout", { preHandler: requireAuth }, async (req, reply) => {
@@ -75,12 +81,12 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       req.log.warn({ userId: req.userId }, "GET /me: session userId not in db");
       return reply.code(404).send({ error: "User not found" });
     }
-    return {
+    return AuthenticatedUserResponseSchema.parse({
       id: user.id,
       username: user.username,
       isAdmin: user.isAdmin,
       onboardingComplete: user.onboardingComplete,
-    };
+    });
   });
 
   fastify.post(
