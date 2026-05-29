@@ -30,6 +30,7 @@ import {
   applyAlbumIdentification,
   confirmAlbumMatch,
 } from "../library/identify.js";
+import { requireAdmin } from "../plugins/session.js";
 
 const CUID2_RE = /^[a-z0-9]{24}$/;
 const MBID_RE =
@@ -42,129 +43,139 @@ const IdentifySearchQuerySchema = z.object({
 });
 
 const albumRoutes: FastifyPluginAsync = async (fastify) => {
-  // ─── Identify Album: search MusicBrainz for the correct release ──────────
-  fastify.get("/identify/search", async (request, reply) => {
-    const parsed = IdentifySearchQuerySchema.safeParse(request.query);
-    if (!parsed.success) {
-      return reply.status(400).send({ error: "Invalid search query" });
-    }
-    const { release, artist, year } = parsed.data;
-    if (!release.trim() && !artist.trim()) {
-      return { results: [] };
-    }
-    const results = await searchReleasesForIdentify(
-      { release, artist, year },
-      25,
-      MB_PRIORITY.INTERACTIVE,
-    );
-    return { results };
-  });
+  // Edit and Identify mutate shared library metadata, so they are admin-only.
+  // Grouped under one requireAdmin preHandler (mirrors routes/admin/index.ts).
+  // The public GET /:albumKey detail route stays outside this scope.
+  await fastify.register(async (admin) => {
+    admin.addHook("preHandler", requireAdmin);
 
-  // ─── Identify Album: candidate release tracklist for comparison ──────────
-  fastify.get("/identify/release/:releaseMbid", async (request, reply) => {
-    const { releaseMbid } = request.params as { releaseMbid: string };
-    if (!MBID_RE.test(releaseMbid)) {
-      return reply.status(400).send({ error: "Invalid release id" });
-    }
-    const details = await lookupReleaseDetails(
-      releaseMbid,
-      MB_PRIORITY.PAGE_LOAD,
-    );
-    if (!details) {
-      return reply.status(502).send({ error: "MusicBrainz lookup failed" });
-    }
-    return {
-      tracks: details.tracks.map((t) => ({
-        disc: t.discPosition,
-        track: t.trackPosition,
-        recordingMbid: t.recordingMbid,
-        title: t.title,
-        durationSeconds:
-          t.durationMs == null ? null : Math.round(t.durationMs / 1000),
-      })),
-    };
-  });
+    // ─── Identify Album: search MusicBrainz for the correct release ────────
+    admin.get("/identify/search", async (request, reply) => {
+      const parsed = IdentifySearchQuerySchema.safeParse(request.query);
+      if (!parsed.success) {
+        return reply.status(400).send({ error: "Invalid search query" });
+      }
+      const { release, artist, year } = parsed.data;
+      if (!release.trim() && !artist.trim()) {
+        return { results: [] };
+      }
+      const results = await searchReleasesForIdentify(
+        { release, artist, year },
+        25,
+        MB_PRIORITY.INTERACTIVE,
+      );
+      return { results };
+    });
 
-  // ─── Identify Album: orphan tracks in the same folder, stranded elsewhere ─
-  fastify.get("/:albumId/identify/orphans", async (request, reply) => {
-    const { albumId } = request.params as { albumId: string };
-    if (!CUID2_RE.test(albumId)) {
-      return reply.status(404).send({ error: "Album not found" });
-    }
-    const filePaths = getTrackFilePathsInAlbum(albumId);
-    const dirs = [...new Set(filePaths.map((p) => path.dirname(p) + path.sep))];
-    const orphans = getOrphanTracksInDirectories(dirs, albumId).map((o) => ({
-      id: o.id,
-      title: o.title,
-      trackNumber: o.trackNumber,
-      discNumber: o.discNumber,
-      durationSeconds: o.durationSeconds,
-      sourceAlbumId: o.sourceAlbumId,
-      sourceAlbumTitle: o.sourceAlbumTitle,
-      artistName: o.artistName,
-    }));
-    return { orphans };
-  });
+    // ─── Identify Album: candidate release tracklist for comparison ────────
+    admin.get("/identify/release/:releaseMbid", async (request, reply) => {
+      const { releaseMbid } = request.params as { releaseMbid: string };
+      if (!MBID_RE.test(releaseMbid)) {
+        return reply.status(400).send({ error: "Invalid release id" });
+      }
+      const details = await lookupReleaseDetails(
+        releaseMbid,
+        MB_PRIORITY.PAGE_LOAD,
+      );
+      if (!details) {
+        return reply.status(502).send({ error: "MusicBrainz lookup failed" });
+      }
+      return {
+        tracks: details.tracks.map((t) => ({
+          disc: t.discPosition,
+          track: t.trackPosition,
+          recordingMbid: t.recordingMbid,
+          title: t.title,
+          durationSeconds:
+            t.durationMs == null ? null : Math.round(t.durationMs / 1000),
+        })),
+      };
+    });
 
-  // ─── Identify Album: apply the chosen release to a local album ───────────
-  fastify.post("/:albumId/identify", async (request, reply) => {
-    const { albumId } = request.params as { albumId: string };
-    if (!CUID2_RE.test(albumId)) {
-      return reply.status(404).send({ error: "Album not found" });
-    }
-    const parsed = IdentifyApplyRequestSchema.safeParse(request.body);
-    if (!parsed.success) {
-      return reply.status(400).send({ error: "Invalid request body" });
-    }
-    const result = await applyAlbumIdentification(
-      albumId,
-      parsed.data.releaseMbid,
-      parsed.data.releaseGroupMbid,
-      parsed.data.adoptTrackIds,
-      request.log,
-    );
-    if (!result.ok) {
-      if (result.reason === "not_found") {
+    // ─── Identify Album: orphan tracks in the same folder, stranded elsewhere
+    admin.get("/:albumId/identify/orphans", async (request, reply) => {
+      const { albumId } = request.params as { albumId: string };
+      if (!CUID2_RE.test(albumId)) {
         return reply.status(404).send({ error: "Album not found" });
       }
-      return reply.status(502).send({ error: "MusicBrainz lookup failed" });
-    }
-    return result;
-  });
+      const filePaths = getTrackFilePathsInAlbum(albumId);
+      const dirs = [
+        ...new Set(filePaths.map((p) => path.dirname(p) + path.sep)),
+      ];
+      const orphans = getOrphanTracksInDirectories(dirs, albumId).map((o) => ({
+        id: o.id,
+        title: o.title,
+        trackNumber: o.trackNumber,
+        discNumber: o.discNumber,
+        durationSeconds: o.durationSeconds,
+        sourceAlbumId: o.sourceAlbumId,
+        sourceAlbumTitle: o.sourceAlbumTitle,
+        artistName: o.artistName,
+      }));
+      return { orphans };
+    });
 
-  // ─── Confirm Album Match: mark current automated match as accepted ─────────
-  fastify.post("/:albumId/confirm-match", async (request, reply) => {
-    const { albumId } = request.params as { albumId: string };
-    if (!CUID2_RE.test(albumId)) {
-      return reply.status(404).send({ error: "Album not found" });
-    }
-    const result = await confirmAlbumMatch(albumId, request.log);
-    if (!result.ok) {
-      return reply.status(404).send({ error: "Album not found" });
-    }
-    return result;
-  });
+    // ─── Identify Album: apply the chosen release to a local album ─────────
+    admin.post("/:albumId/identify", async (request, reply) => {
+      const { albumId } = request.params as { albumId: string };
+      if (!CUID2_RE.test(albumId)) {
+        return reply.status(404).send({ error: "Album not found" });
+      }
+      const parsed = IdentifyApplyRequestSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({ error: "Invalid request body" });
+      }
+      const result = await applyAlbumIdentification(
+        albumId,
+        parsed.data.releaseMbid,
+        parsed.data.releaseGroupMbid,
+        parsed.data.adoptTrackIds,
+        request.log,
+      );
+      if (!result.ok) {
+        if (result.reason === "not_found") {
+          return reply.status(404).send({ error: "Album not found" });
+        }
+        return reply.status(502).send({ error: "MusicBrainz lookup failed" });
+      }
+      return result;
+    });
 
-  // ─── Edit Album: persist manual metadata/tracklist edits ─────────────────
-  // Contract is live (validated here); persistence is a deliberate follow-up,
-  // so a valid request currently returns 501. The dialog wires Save to this
-  // endpoint now so the request/response shape can't drift before Phase 2.
-  fastify.patch("/:albumId", async (request, reply) => {
-    const { albumId } = request.params as { albumId: string };
-    if (!CUID2_RE.test(albumId)) {
-      return reply.status(404).send({ error: "Album not found" });
-    }
-    const parsed = AlbumEditRequestSchema.safeParse(request.body);
-    if (!parsed.success) {
-      return reply.status(400).send({ error: "Invalid request body" });
-    }
-    request.log.info(
-      { albumId, trackCount: parsed.data.tracks.length },
-      "album edit received (persistence not yet implemented)",
-    );
-    return reply
-      .status(501)
-      .send({ error: "Album editing not yet implemented" });
+    // ─── Confirm Album Match: mark current automated match as accepted ─────
+    admin.post("/:albumId/confirm-match", async (request, reply) => {
+      const { albumId } = request.params as { albumId: string };
+      if (!CUID2_RE.test(albumId)) {
+        return reply.status(404).send({ error: "Album not found" });
+      }
+      const result = await confirmAlbumMatch(albumId, request.log);
+      if (!result.ok) {
+        return reply.status(404).send({ error: "Album not found" });
+      }
+      return result;
+    });
+
+    // ─── Edit Album: persist manual metadata/tracklist edits ───────────────
+    // Contract is live (validated here); persistence is a deliberate
+    // follow-up, so a valid request currently returns 501. The dialog wires
+    // Save to this endpoint now so the request/response shape can't drift
+    // before Phase 2.
+    admin.patch("/:albumId", async (request, reply) => {
+      const { albumId } = request.params as { albumId: string };
+      if (!CUID2_RE.test(albumId)) {
+        return reply.status(404).send({ error: "Album not found" });
+      }
+      const parsed = AlbumEditRequestSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({ error: "Invalid request body" });
+      }
+      request.log.info(
+        { albumId, trackCount: parsed.data.tracks.length },
+        "album edit received (persistence not yet implemented)",
+      );
+      return reply
+        .status(501)
+        .send({ error: "Album editing not yet implemented" });
+    });
   });
 
   fastify.get("/:albumKey", async (request, reply) => {

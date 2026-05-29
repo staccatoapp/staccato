@@ -35,6 +35,7 @@ import { FeaturedArtists } from "@/components/music/FeaturedArtists";
 import { IdentifyAlbumDialog } from "@/components/music/IdentifyAlbumDialog";
 import { EditAlbumDialog } from "@/components/music/EditAlbumDialog";
 import { toUiStatus, useDownloads } from "@/hooks/useDownloads";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useRetryDownload } from "@/hooks/useRequestDownload";
 import { useRequestDownloadDialog } from "@/hooks/useRequestDownloadDialog";
 import { RequestDownloadDialog } from "@/components/downloads/RequestDownloadDialog";
@@ -110,6 +111,9 @@ function LocalAlbumView({
   const { album, tracks } = data;
   const [identifyOpen, setIdentifyOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  // Edit and Identify mutate shared library metadata, so the actions menu and
+  // its dialogs are admin-only. The server also enforces this (requireAdmin).
+  const isAdmin = useCurrentUser().data?.isAdmin ?? false;
 
   const { data: serverSettings } = useQuery<ServerSettings>({
     queryKey: ["server-settings"],
@@ -229,24 +233,26 @@ function LocalAlbumView({
           <Play className="w-4 h-4" />
           Play Album
         </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            aria-label="Album actions"
-            className={buttonVariants({ variant: "outline", size: "icon" })}
-          >
-            <MoreHorizontal className="w-4 h-4" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem onClick={() => setEditOpen(true)}>
-              <Pencil className="w-4 h-4" />
-              Edit
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setIdentifyOpen(true)}>
-              <Search className="w-4 h-4" />
-              Identify
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {isAdmin && (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              aria-label="Album actions"
+              className={buttonVariants({ variant: "outline", size: "icon" })}
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => setEditOpen(true)}>
+                <Pencil className="w-4 h-4" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setIdentifyOpen(true)}>
+                <Search className="w-4 h-4" />
+                Identify
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
         {hasPlaylists && (
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -381,38 +387,42 @@ function LocalAlbumView({
         />
       </div>
 
-      <IdentifyAlbumDialog
-        open={identifyOpen}
-        onOpenChange={setIdentifyOpen}
-        albumKey={albumKey}
-        album={{
-          id: album.id,
-          title: album.title,
-          artistName: album.artistName,
-          releaseMbid: album.releaseMbid,
-          releaseGroupMbid: album.releaseGroupMbid,
-        }}
-        currentTracks={tracks.map((t) => ({
-          title: t.title,
-          trackNumber: t.trackNumber,
-          discNumber: t.discNumber,
-          durationSeconds: t.durationSeconds,
-        }))}
-      />
+      {isAdmin && (
+        <>
+          <IdentifyAlbumDialog
+            open={identifyOpen}
+            onOpenChange={setIdentifyOpen}
+            albumKey={albumKey}
+            album={{
+              id: album.id,
+              title: album.title,
+              artistName: album.artistName,
+              releaseMbid: album.releaseMbid,
+              releaseGroupMbid: album.releaseGroupMbid,
+            }}
+            currentTracks={tracks.map((t) => ({
+              title: t.title,
+              trackNumber: t.trackNumber,
+              discNumber: t.discNumber,
+              durationSeconds: t.durationSeconds,
+            }))}
+          />
 
-      <EditAlbumDialog
-        open={editOpen}
-        onOpenChange={setEditOpen}
-        albumKey={albumKey}
-        album={{
-          id: album.id,
-          title: album.title,
-          artistName: album.artistName,
-          releaseYear: album.releaseYear,
-          coverArtUrl: album.coverArtUrl,
-        }}
-        tracks={tracks}
-      />
+          <EditAlbumDialog
+            open={editOpen}
+            onOpenChange={setEditOpen}
+            albumKey={albumKey}
+            album={{
+              id: album.id,
+              title: album.title,
+              artistName: album.artistName,
+              releaseYear: album.releaseYear,
+              coverArtUrl: album.coverArtUrl,
+            }}
+            tracks={tracks}
+          />
+        </>
+      )}
     </div>
   );
 }
