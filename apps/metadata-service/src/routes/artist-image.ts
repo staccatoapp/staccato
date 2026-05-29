@@ -44,7 +44,7 @@ const MBID_RE =
 // 404 when any hop yields nothing; 502 on an upstream HTTP error.
 const artistImageRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/artists/:mbid/image", async (request, reply) => {
-    const { mbid } = request.params as { mbid: string };
+    const { mbid } = z.object({ mbid: z.string() }).parse(request.params);
     if (!MBID_RE.test(mbid)) {
       return reply.status(400).send({ error: "Invalid artist mbid" });
     }

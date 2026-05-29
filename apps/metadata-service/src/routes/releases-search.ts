@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
+import { z } from "zod";
 import { IdentifySearchResponseSchema } from "@staccato/shared";
 import { mirrorFetch } from "../mirror/client.js";
 import { ReleaseSearchRichSchema } from "../mirror/schemas.js";
@@ -17,12 +18,14 @@ function quotePhrase(value: string): string {
 // their files. Serves the server's searchReleasesForIdentify.
 const releaseSearchRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/releases/search", async (request, reply) => {
-    const { release, artist, year, limit } = request.query as {
-      release?: string;
-      artist?: string;
-      year?: string;
-      limit?: string;
-    };
+    const { release, artist, year, limit } = z
+      .object({
+        release: z.string().optional(),
+        artist: z.string().optional(),
+        year: z.string().optional(),
+        limit: z.string().optional(),
+      })
+      .parse(request.query);
     const limitNum = Math.min(Math.max(Number(limit) || 25, 1), 100);
 
     const clauses: string[] = [];

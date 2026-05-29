@@ -1,4 +1,5 @@
 import type { FastifyBaseLogger, FastifyPluginAsync } from "fastify";
+import { z } from "zod";
 import { MetadataSearchResultsSchema } from "@staccato/shared";
 import { mirrorFetch } from "../mirror/client.js";
 import {
@@ -42,7 +43,9 @@ async function fetchJson(
 // and selecting a cross-category top result. Serves /api/search/external.
 const searchRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/search", async (request, reply) => {
-    const { q, limit } = request.query as { q?: string; limit?: string };
+    const { q, limit } = z
+      .object({ q: z.string().optional(), limit: z.string().optional() })
+      .parse(request.query);
     if (!q || !q.trim()) {
       return reply.status(400).send({ error: "Missing query" });
     }

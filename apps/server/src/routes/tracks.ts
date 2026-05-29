@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { FastifyPluginAsync } from "fastify";
+import { z } from "zod";
 import { getTrackForStream } from "../db/queries/tracks.js";
 
 const MIME: Record<string, string> = {
@@ -14,7 +15,7 @@ const MIME: Record<string, string> = {
 
 const tracksRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/tracks/:id/stream", async (req, reply) => {
-    const { id } = req.params as { id: string };
+    const { id } = z.object({ id: z.string() }).parse(req.params);
     const track = getTrackForStream(id);
 
     if (!track) {

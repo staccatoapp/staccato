@@ -1,4 +1,5 @@
 import { FastifyPluginAsync } from "fastify";
+import { z } from "zod";
 import type { ArtistDiscographyItem } from "@staccato/shared";
 import { getArtistDetails, getArtistIdByMbid } from "../db/queries/artists.js";
 import {
@@ -120,7 +121,9 @@ function mergeDiscography(
 
 const artistRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/:artistKey", async (request, reply) => {
-    const { artistKey } = request.params as { artistKey: string };
+    const { artistKey } = z
+      .object({ artistKey: z.string() })
+      .parse(request.params);
 
     const isCuid2 = CUID2_RE.test(artistKey);
     const isMbid = MBID_RE.test(artistKey);
