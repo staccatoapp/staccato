@@ -152,12 +152,14 @@ function LibraryPage() {
     },
   });
 
-  const handlePlayTracks = (tracks: TrackListItem[], startIndex: number) => {
-    playMutation.mutate({
-      trackIds: tracks.map((t) => t.id),
-      startIndex,
-    });
-  };
+  // playMutation.mutate is stable (TanStack Query guarantee), so this callback is too
+  const { mutate: playMutate } = playMutation;
+  const handlePlayTracks = useCallback(
+    (tracks: TrackListItem[], startIndex: number) => {
+      playMutate({ trackIds: tracks.map((t) => t.id), startIndex });
+    },
+    [playMutate],
+  );
 
   const countLabel = (() => {
     switch (activeTab) {
@@ -246,9 +248,7 @@ function LibraryPage() {
 
   const playTracks = useCallback(
     (i: number) => handlePlayTracks(tracksQuery.items, i),
-    // handlePlayTracks captures playMutation which is stable from useMutation
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tracksQuery.items],
+    [tracksQuery.items, handlePlayTracks],
   );
 
   return (

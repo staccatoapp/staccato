@@ -1,11 +1,12 @@
 import { useEffect, useRef } from "react";
+import { useAudioTime } from "@/hooks/useAudioTime";
 import { Mic2, Music2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { PlaybackTrack, TrackLyrics } from "@staccato/shared";
 
 interface LyricsPanelProps {
   track: PlaybackTrack | null | undefined;
-  currentTime: number;
+  audioRef: React.RefObject<HTMLAudioElement | null>;
   isOpen: boolean;
   onClose: () => void;
   onSeek: (time: number) => void;
@@ -14,12 +15,13 @@ interface LyricsPanelProps {
 
 export function LyricsPanel({
   track,
-  currentTime,
+  audioRef,
   isOpen,
   onClose,
   onSeek,
   lyrics,
 }: LyricsPanelProps) {
+  const currentTime = useAudioTime(audioRef);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lineRefs = useRef<(HTMLParagraphElement | null)[]>([]);
   const prevTrackIdRef = useRef<string | null>(null);

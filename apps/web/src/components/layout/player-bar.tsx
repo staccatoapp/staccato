@@ -13,29 +13,20 @@ import {
   SkipForward,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { formatTime } from "@/lib/music";
 import { useVolume } from "@/hooks/useVolume";
+import { getSliderValue } from "@/lib/slider";
 import { LyricsPanel } from "./lyrics-panel";
+import { SeekBar } from "./seek-bar";
 import { FeaturedArtists } from "@/components/music/FeaturedArtists";
-
-function getSliderValue(
-  value: number | readonly number[],
-  fallback: number,
-): number {
-  return typeof value === "number" ? value : (value[0] ?? fallback);
-}
 
 function PlayerBar() {
   const queryClient = useQueryClient();
 
   const audioRef = useRef<HTMLAudioElement>(null);
-  const isSeekingRef = useRef(false);
   const currentTrackIndexRef = useRef(0);
   const accumulatedPlayTimeRef = useRef(0);
   const lastTrackedAudioTimeRef = useRef<number | null>(null);
 
-  const [currentTime, setCurrentTime] = useState(0);
-  const [seekDisplay, setSeekDisplay] = useState(0);
   const { volume, setVolume } = useVolume();
   const [displayVolume, setDisplayVolume] = useState(volume);
   const [lyricsOpen, setLyricsOpen] = useState(false);
@@ -59,6 +50,14 @@ function PlayerBar() {
   const currentTrack =
     playbackSession?.trackQueue?.[playbackSession?.currentTrackIndex];
 
+  // Refs so track-change / play-state effects can read the latest values without subscribing
+  const playbackSessionRef = useRef(playbackSession);
+  playbackSessionRef.current = playbackSession;
+  const currentTrackRef = useRef(currentTrack);
+  currentTrackRef.current = currentTrack;
+  const volumeRef = useRef(volume);
+  volumeRef.current = volume;
+
   const { data: lyricsData } = useQuery<TrackLyrics | null>({
     queryKey: ["lyrics", currentTrack?.id],
     queryFn: async () => {
@@ -80,61 +79,37 @@ function PlayerBar() {
     currentTrackIndexRef.current = playbackSession?.currentTrackIndex ?? 0;
   }, [playbackSession?.currentTrackIndex]);
 
-  // Effect: track source change
+  // Effect: track source change — deps on id only; reads session/volume via refs
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio || !currentTrack) return;
+    const ct = currentTrackRef.current;
+    if (!audio || !ct) return;
     const currentTrackPosition =
-      playbackSession?.currentTrackPositionInSeconds ?? 0;
-    audio.src = `/api/tracks/${currentTrack.id}/stream`;
-    audio.volume = volume / 100;
+      playbackSessionRef.current?.currentTrackPositionInSeconds ?? 0;
+    audio.src = `/api/tracks/${ct.id}/stream`;
+    audio.volume = volumeRef.current / 100;
     audio.currentTime = currentTrackPosition;
     accumulatedPlayTimeRef.current =
-      playbackSession?.currentTrackAccumulatedPlayTimeInSeconds ?? 0;
+      playbackSessionRef.current?.currentTrackAccumulatedPlayTimeInSeconds ?? 0;
     lastTrackedAudioTimeRef.current = currentTrackPosition;
-    setCurrentTime(currentTrackPosition);
-    setSeekDisplay(currentTrackPosition);
-    if (playbackSession?.isPlaying) audio.play().catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (playbackSessionRef.current?.isPlaying) audio.play().catch(() => {});
   }, [currentTrack?.id]);
 
-  // Effect: isPlaying sync
+  // Effect: isPlaying sync — deps on isPlaying only; reads currentTrack via ref
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio || !currentTrack) return;
-    if (playbackSession?.isPlaying) {
+    if (!audio || !currentTrackRef.current) return;
+    if (playbackSessionRef.current?.isPlaying) {
       audio.play().catch(() => {});
     } else {
       audio.pause();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playbackSession?.isPlaying]);
 
   // Mount effect: audio event listeners + position sync interval
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-
-    const handleTimeUpdate = () => {
-      const nextTime = audio.currentTime;
-      const previousTime = lastTrackedAudioTimeRef.current;
-      if (
-        previousTime != null &&
-        !audio.paused &&
-        !audio.seeking &&
-        !isSeekingRef.current
-      ) {
-        const naturalPlayDelta = nextTime - previousTime;
-        if (naturalPlayDelta > 0) {
-          accumulatedPlayTimeRef.current += naturalPlayDelta;
-        }
-      }
-      lastTrackedAudioTimeRef.current = nextTime;
-      setCurrentTime(nextTime);
-      if (!isSeekingRef.current) {
-        setSeekDisplay(nextTime);
-      }
-    };
 
     const handleEnded = () => {
       const session = queryClient.getQueryData<PlaybackSession>([
@@ -146,8 +121,6 @@ function PlayerBar() {
       if (isLastTrack) {
         audio.currentTime = 0;
         lastTrackedAudioTimeRef.current = 0;
-        setCurrentTime(0);
-        setSeekDisplay(0);
       }
       fetch("/api/playback/session/state", {
         method: "PUT",
@@ -187,7 +160,6 @@ function PlayerBar() {
       });
     };
 
-    audio.addEventListener("timeupdate", handleTimeUpdate);
     audio.addEventListener("ended", handleEnded);
     audio.addEventListener("pause", handlePause);
 
@@ -215,14 +187,12 @@ function PlayerBar() {
     window.addEventListener("staccato:preview-start", handlePreviewStart);
 
     return () => {
-      audio.removeEventListener("timeupdate", handleTimeUpdate);
       audio.removeEventListener("ended", handleEnded);
       audio.removeEventListener("pause", handlePause);
       clearInterval(interval);
       window.removeEventListener("staccato:preview-start", handlePreviewStart);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [queryClient]);
 
   const stateMutation = useMutation({
     mutationFn: async (state: {
@@ -281,8 +251,6 @@ function PlayerBar() {
     if (isLastTrack && audioRef.current) {
       audioRef.current.currentTime = 0;
       lastTrackedAudioTimeRef.current = 0;
-      setCurrentTime(0);
-      setSeekDisplay(0);
     }
     stateMutation.mutate({
       isPlaying: !isLastTrack,
@@ -300,8 +268,6 @@ function PlayerBar() {
     if (audioRef.current.currentTime > 3) {
       audioRef.current.currentTime = 0;
       lastTrackedAudioTimeRef.current = 0;
-      setCurrentTime(0);
-      setSeekDisplay(0);
       stateMutation.mutate({
         isPlaying: playbackSession.isPlaying,
         currentTrackIndex: playbackSession.currentTrackIndex,
@@ -315,8 +281,6 @@ function PlayerBar() {
       if (isSameTrack) {
         audioRef.current.currentTime = 0;
         lastTrackedAudioTimeRef.current = 0;
-        setCurrentTime(0);
-        setSeekDisplay(0);
       }
       stateMutation.mutate({
         isPlaying: playbackSession.isPlaying,
@@ -342,17 +306,9 @@ function PlayerBar() {
     setVolume(getSliderValue(value, displayVolume));
   };
 
-  const handleSeekChange = (value: number | readonly number[]) => {
-    const v = getSliderValue(value, seekDisplay);
-    isSeekingRef.current = true;
-    setSeekDisplay(v);
-  };
-
   const seekToTime = (time: number) => {
     lastTrackedAudioTimeRef.current = time;
     if (audioRef.current) audioRef.current.currentTime = time;
-    setCurrentTime(time);
-    setSeekDisplay(time);
     stateMutation.mutate({
       isPlaying: playbackSession?.isPlaying ?? false,
       currentTrackIndex: playbackSession?.currentTrackIndex ?? 0,
@@ -363,17 +319,12 @@ function PlayerBar() {
     });
   };
 
-  const handleSeekCommitted = (value: number | readonly number[]) => {
-    isSeekingRef.current = false;
-    seekToTime(getSliderValue(value, seekDisplay));
-  };
-
   return (
     <>
       <audio ref={audioRef} />
       <LyricsPanel
         track={currentTrack}
-        currentTime={currentTime}
+        audioRef={audioRef}
         isOpen={lyricsOpen}
         onClose={() => setLyricsOpen(false)}
         onSeek={seekToTime}
@@ -424,23 +375,15 @@ function PlayerBar() {
                 <SkipForward className="w-4 h-4" />
               </Button>
             </div>
-            <div className="flex items-center gap-2 w-full mt-2">
-              <span className="text-xs text-muted-foreground tabular-nums">
-                {formatTime(currentTime)}
-              </span>
-              <Slider
-                value={[seekDisplay]}
-                min={0}
-                max={currentTrack?.durationSeconds ?? 1}
-                step={1}
-                onValueChange={handleSeekChange}
-                onValueCommitted={handleSeekCommitted}
-                className="flex-1"
-              />
-              <span className="text-xs text-muted-foreground tabular-nums">
-                {formatTime(currentTrack?.durationSeconds ?? 0)}
-              </span>
-            </div>
+            <SeekBar
+              audioRef={audioRef}
+              duration={currentTrack?.durationSeconds ?? 1}
+              trackId={currentTrack?.id}
+              initialTime={playbackSession?.currentTrackPositionInSeconds ?? 0}
+              onSeek={seekToTime}
+              accumulatedPlayTimeRef={accumulatedPlayTimeRef}
+              lastTrackedAudioTimeRef={lastTrackedAudioTimeRef}
+            />
           </div>
 
           {/* Right extras: Lyrics button */}
