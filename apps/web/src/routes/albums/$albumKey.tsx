@@ -6,6 +6,7 @@ import {
   Clock,
   Download,
   MoreHorizontal,
+  Pencil,
   Play,
   Plus,
   RotateCw,
@@ -32,6 +33,7 @@ import { AlbumDetailSkeleton } from "@/components/music/AlbumDetailSkeleton";
 import { TrackList } from "@/components/music/TrackList";
 import { FeaturedArtists } from "@/components/music/FeaturedArtists";
 import { IdentifyAlbumDialog } from "@/components/music/IdentifyAlbumDialog";
+import { EditAlbumDialog } from "@/components/music/EditAlbumDialog";
 import { toUiStatus, useDownloads } from "@/hooks/useDownloads";
 import { useRetryDownload } from "@/hooks/useRequestDownload";
 import { useRequestDownloadDialog } from "@/hooks/useRequestDownloadDialog";
@@ -107,6 +109,7 @@ function LocalAlbumView({
   const { albumKey } = Route.useParams();
   const { album, tracks } = data;
   const [identifyOpen, setIdentifyOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   const { data: serverSettings } = useQuery<ServerSettings>({
     queryKey: ["server-settings"],
@@ -234,6 +237,10 @@ function LocalAlbumView({
             <MoreHorizontal className="w-4 h-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent>
+            <DropdownMenuItem onClick={() => setEditOpen(true)}>
+              <Pencil className="w-4 h-4" />
+              Edit
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setIdentifyOpen(true)}>
               <Search className="w-4 h-4" />
               Identify
@@ -391,6 +398,20 @@ function LocalAlbumView({
           discNumber: t.discNumber,
           durationSeconds: t.durationSeconds,
         }))}
+      />
+
+      <EditAlbumDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        albumKey={albumKey}
+        album={{
+          id: album.id,
+          title: album.title,
+          artistName: album.artistName,
+          releaseYear: album.releaseYear,
+          coverArtUrl: album.coverArtUrl,
+        }}
+        tracks={tracks}
       />
     </div>
   );

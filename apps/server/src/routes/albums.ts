@@ -1,7 +1,10 @@
 import path from "node:path";
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { IdentifyApplyRequestSchema } from "@staccato/shared";
+import {
+  AlbumEditRequestSchema,
+  IdentifyApplyRequestSchema,
+} from "@staccato/shared";
 import {
   getAlbumByMbid,
   getAlbumWithArtistDetails,
@@ -140,6 +143,28 @@ const albumRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(404).send({ error: "Album not found" });
     }
     return result;
+  });
+
+  // ─── Edit Album: persist manual metadata/tracklist edits ─────────────────
+  // Contract is live (validated here); persistence is a deliberate follow-up,
+  // so a valid request currently returns 501. The dialog wires Save to this
+  // endpoint now so the request/response shape can't drift before Phase 2.
+  fastify.patch("/:albumId", async (request, reply) => {
+    const { albumId } = request.params as { albumId: string };
+    if (!CUID2_RE.test(albumId)) {
+      return reply.status(404).send({ error: "Album not found" });
+    }
+    const parsed = AlbumEditRequestSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: "Invalid request body" });
+    }
+    request.log.info(
+      { albumId, trackCount: parsed.data.tracks.length },
+      "album edit received (persistence not yet implemented)",
+    );
+    return reply
+      .status(501)
+      .send({ error: "Album editing not yet implemented" });
   });
 
   fastify.get("/:albumKey", async (request, reply) => {
