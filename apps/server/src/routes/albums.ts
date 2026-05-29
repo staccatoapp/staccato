@@ -59,7 +59,9 @@ const albumRoutes: FastifyPluginAsync = async (fastify) => {
 
   // ─── Identify Album: candidate release tracklist for comparison ──────────
   fastify.get("/identify/release/:releaseMbid", async (request, reply) => {
-    const { releaseMbid } = request.params as { releaseMbid: string };
+    const { releaseMbid } = z
+      .object({ releaseMbid: z.string() })
+      .parse(request.params);
     if (!MBID_RE.test(releaseMbid)) {
       return reply.status(400).send({ error: "Invalid release id" });
     }
@@ -84,7 +86,7 @@ const albumRoutes: FastifyPluginAsync = async (fastify) => {
 
   // ─── Identify Album: orphan tracks in the same folder, stranded elsewhere ─
   fastify.get("/:albumId/identify/orphans", async (request, reply) => {
-    const { albumId } = request.params as { albumId: string };
+    const { albumId } = z.object({ albumId: z.string() }).parse(request.params);
     if (!CUID2_RE.test(albumId)) {
       return reply.status(404).send({ error: "Album not found" });
     }
@@ -105,7 +107,7 @@ const albumRoutes: FastifyPluginAsync = async (fastify) => {
 
   // ─── Identify Album: apply the chosen release to a local album ───────────
   fastify.post("/:albumId/identify", async (request, reply) => {
-    const { albumId } = request.params as { albumId: string };
+    const { albumId } = z.object({ albumId: z.string() }).parse(request.params);
     if (!CUID2_RE.test(albumId)) {
       return reply.status(404).send({ error: "Album not found" });
     }
@@ -131,7 +133,7 @@ const albumRoutes: FastifyPluginAsync = async (fastify) => {
 
   // ─── Confirm Album Match: mark current automated match as accepted ─────────
   fastify.post("/:albumId/confirm-match", async (request, reply) => {
-    const { albumId } = request.params as { albumId: string };
+    const { albumId } = z.object({ albumId: z.string() }).parse(request.params);
     if (!CUID2_RE.test(albumId)) {
       return reply.status(404).send({ error: "Album not found" });
     }
@@ -143,7 +145,9 @@ const albumRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   fastify.get("/:albumKey", async (request, reply) => {
-    const { albumKey } = request.params as { albumKey: string };
+    const { albumKey } = z
+      .object({ albumKey: z.string() })
+      .parse(request.params);
 
     const isCuid2 = CUID2_RE.test(albumKey);
     const isMbid = MBID_RE.test(albumKey);

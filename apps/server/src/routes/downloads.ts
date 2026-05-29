@@ -1,4 +1,5 @@
 import { FastifyPluginAsync } from "fastify";
+import { z } from "zod";
 import { CreateDownloadRequestSchema, DownloadRequest } from "@staccato/shared";
 import {
   createDownloadRequest,
@@ -67,7 +68,7 @@ const downloadRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.delete("/:id", async (req, reply) => {
-    const { id } = req.params as { id: string };
+    const { id } = z.object({ id: z.string() }).parse(req.params);
     const deleted = deleteDownloadRequest(id, req.userId);
     if (!deleted) return reply.status(404).send({ error: "Not found" });
     return reply.status(204).send();
