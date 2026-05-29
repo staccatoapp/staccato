@@ -73,6 +73,8 @@ Stop and ask the user if **any** of these hold: expected behaviour under-specifi
 
 Cover: files created/modified, the change per file, tests to add/update, and how it'll be verified. **Present the plan through plan mode (`ExitPlanMode`)** so approval is an explicit gate — no code changes until approved. Revise and re-present on feedback.
 
+> **Note:** `writing-plans` defaults to saving plans under `docs/superpowers/plans/`. When plan mode is active, the plan mode system message specifies its own file path — use that path instead.
+
 ### Phase 4 — Implement on a branch
 
 1. Branch from `main`: `git checkout -b agent/<issue#>-<short-slug>` (e.g. `agent/42-queue-race`).
