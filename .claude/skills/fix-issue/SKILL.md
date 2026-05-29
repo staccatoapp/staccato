@@ -77,8 +77,9 @@ Cover: files created/modified, the change per file, tests to add/update, and how
 
 ### Phase 4 — Implement on a branch
 
-1. Branch from `main`: `git checkout -b agent/<issue#>-<short-slug>` (e.g. `agent/42-queue-race`).
-2. Make surgical changes that follow existing patterns; no unrelated churn.
+**REQUIRED SUB-SKILL:** use `superpowers:using-git-worktrees` to create an isolated workspace. Consent is implicit — skip the consent gate and go straight to Step 1. Use branch name `agent/<issue#>-<short-slug>` (e.g. `agent/42-queue-race`). If the native `EnterWorktree` tool is available, prefer it (Step 1a).
+
+1. Make surgical changes that follow existing patterns; no unrelated churn.
 3. Honour Staccato conventions (`CLAUDE.md`):
    - Cross-app-boundary types use **zod** in `packages/shared/src/types/zod`, with validation at use sites; prefer the shared package for non-project-specific helpers.
    - **Logging:** every `catch` logs; every external call site (MusicBrainz/AcoustID/Lidarr/Cover Art) logs failures with context. Object-first: `log.warn({ err, operation, ...ids }, "message")` — never string interpolation. Pick the level per the log-level guidance in `CLAUDE.md`.
@@ -122,6 +123,7 @@ If something genuinely can't be verified here (missing service/dep), state exact
 
 ## Common Mistakes
 
+- **Skipping the worktree setup** — Phase 4 always starts with `superpowers:using-git-worktrees`. Don't fall back to a bare `git checkout -b`.
 - **Summarising the issue and diving straight to code** — skips both gates; the most common failure. Confirm requirements, then get plan approval.
 - **Running `gh`/`git` through PowerShell** — multi-line bodies and `\` continuations break. Use the Bash tool.
 - **Inlining the PR body** — em-dashes/curly quotes mangle on the command line. Use `--body-file` with a UTF-8 file. Pass an **absolute path** to `--body-file`; `gh` does not resolve relative paths from the repo root when invoked via Bash.
