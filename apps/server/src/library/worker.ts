@@ -32,6 +32,7 @@ import { pickWinner, scoreCandidates } from "./scoring.js";
 import { pickRelease } from "./graphWalk.js";
 import { commitResolution } from "./commit.js";
 import { lookupRecordingRich } from "./mbLookup.js";
+import { normalizeString } from "../musicbrainz/client.js";
 import { enqueueEnrichment, enqueueResolution } from "./queue.js";
 import { libraryProgress } from "./state.js";
 import type {
@@ -399,7 +400,11 @@ export async function enrichTrack(
       const credits = rich.artistCredits.map((c, idx) => {
         const existing = getArtistIdByMbid(c.mbid);
         const aId = existing ?? upsertArtist(c.name, c.mbid);
-        if (existing) updateArtist(existing, { canonicalName: c.name });
+        if (existing)
+          updateArtist(existing, {
+            canonicalName: c.name,
+            normalizedCanonicalName: normalizeString(c.name),
+          });
         return { artistId: aId, position: idx, joinPhrase: c.joinPhrase };
       });
       if (credits.length > 0) replaceTrackArtists(trackId, credits);
