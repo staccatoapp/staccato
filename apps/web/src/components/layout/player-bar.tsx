@@ -50,6 +50,14 @@ function PlayerBar() {
   const currentTrack =
     playbackSession?.trackQueue?.[playbackSession?.currentTrackIndex];
 
+  // Refs so track-change / play-state effects can read the latest values without subscribing
+  const playbackSessionRef = useRef(playbackSession);
+  playbackSessionRef.current = playbackSession;
+  const currentTrackRef = useRef(currentTrack);
+  currentTrackRef.current = currentTrack;
+  const volumeRef = useRef(volume);
+  volumeRef.current = volume;
+
   const { data: lyricsData } = useQuery<TrackLyrics | null>({
     queryKey: ["lyrics", currentTrack?.id],
     queryFn: async () => {
@@ -71,32 +79,31 @@ function PlayerBar() {
     currentTrackIndexRef.current = playbackSession?.currentTrackIndex ?? 0;
   }, [playbackSession?.currentTrackIndex]);
 
-  // Effect: track source change
+  // Effect: track source change — deps on id only; reads session/volume via refs
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio || !currentTrack) return;
+    const ct = currentTrackRef.current;
+    if (!audio || !ct) return;
     const currentTrackPosition =
-      playbackSession?.currentTrackPositionInSeconds ?? 0;
-    audio.src = `/api/tracks/${currentTrack.id}/stream`;
-    audio.volume = volume / 100;
+      playbackSessionRef.current?.currentTrackPositionInSeconds ?? 0;
+    audio.src = `/api/tracks/${ct.id}/stream`;
+    audio.volume = volumeRef.current / 100;
     audio.currentTime = currentTrackPosition;
     accumulatedPlayTimeRef.current =
-      playbackSession?.currentTrackAccumulatedPlayTimeInSeconds ?? 0;
+      playbackSessionRef.current?.currentTrackAccumulatedPlayTimeInSeconds ?? 0;
     lastTrackedAudioTimeRef.current = currentTrackPosition;
-    if (playbackSession?.isPlaying) audio.play().catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (playbackSessionRef.current?.isPlaying) audio.play().catch(() => {});
   }, [currentTrack?.id]);
 
-  // Effect: isPlaying sync
+  // Effect: isPlaying sync — deps on isPlaying only; reads currentTrack via ref
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio || !currentTrack) return;
-    if (playbackSession?.isPlaying) {
+    if (!audio || !currentTrackRef.current) return;
+    if (playbackSessionRef.current?.isPlaying) {
       audio.play().catch(() => {});
     } else {
       audio.pause();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playbackSession?.isPlaying]);
 
   // Mount effect: audio event listeners + position sync interval
@@ -185,8 +192,7 @@ function PlayerBar() {
       clearInterval(interval);
       window.removeEventListener("staccato:preview-start", handlePreviewStart);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [queryClient]);
 
   const stateMutation = useMutation({
     mutationFn: async (state: {

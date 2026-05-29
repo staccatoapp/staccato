@@ -26,11 +26,14 @@ export function SeekBar({
   const [seekDisplay, setSeekDisplay] = useState(initialTime);
   const isSeekingRef = useRef(false);
 
+  // Ref so the track-reset effect reads the latest initialTime without subscribing to it
+  const initialTimeRef = useRef(initialTime);
+  initialTimeRef.current = initialTime;
+
   // Reset position when track changes
   useEffect(() => {
-    setCurrentTime(initialTime);
-    setSeekDisplay(initialTime);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setCurrentTime(initialTimeRef.current);
+    setSeekDisplay(initialTimeRef.current);
   }, [trackId]);
 
   // Register timeupdate listener for the lifetime of the component
@@ -63,8 +66,7 @@ export function SeekBar({
     return () => {
       audio.removeEventListener("timeupdate", handleTimeUpdate);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [audioRef, lastTrackedAudioTimeRef, accumulatedPlayTimeRef]);
 
   const handleSeekChange = (value: number | readonly number[]) => {
     const v = getSliderValue(value, seekDisplay);

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
+import { useAudioTime } from "@/hooks/useAudioTime";
 import { Mic2, Music2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { PlaybackTrack, TrackLyrics } from "@staccato/shared";
@@ -20,18 +21,7 @@ export function LyricsPanel({
   onSeek,
   lyrics,
 }: LyricsPanelProps) {
-  const [currentTime, setCurrentTime] = useState(0);
-
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
-    audio.addEventListener("timeupdate", handleTimeUpdate);
-    return () => {
-      audio.removeEventListener("timeupdate", handleTimeUpdate);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const currentTime = useAudioTime(audioRef);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lineRefs = useRef<(HTMLParagraphElement | null)[]>([]);
   const prevTrackIdRef = useRef<string | null>(null);
