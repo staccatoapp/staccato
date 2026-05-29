@@ -79,6 +79,13 @@ Cover: files created/modified, the change per file, tests to add/update, and how
 
 **REQUIRED SUB-SKILL:** use `superpowers:using-git-worktrees` to create an isolated workspace. Consent is implicit — skip the consent gate and go straight to Step 1. Use branch name `agent/<issue#>-<short-slug>` (e.g. `agent/42-queue-race`). If the native `EnterWorktree` tool is available, prefer it (Step 1a).
 
+**WORKTREE PATH DISCIPLINE** — once `EnterWorktree` runs, the session cwd is the worktree (e.g. `C:\Projects\staccato\.claude\worktrees\agent+10-…`). Every subsequent operation must stay inside that path:
+- **Bash**: do not prefix commands with `cd /c/Projects/staccato &&` or any path to the main repo checkout — run `pnpm`, `git`, and `gh` directly so they resolve from the worktree cwd.
+- **Explore agents**: pass the worktree path as the search root, not the main repo path. The worktree path is printed in `EnterWorktree`'s output — use it explicitly in agent prompts.
+- **Read / Edit / Write**: use absolute paths rooted at the worktree, not at `C:\Projects\staccato\`. Translate any main-repo paths returned by explorers before using them.
+
+Violating this causes all edits to land in the main repo's working tree, defeating the isolation and forcing a manual branch creation at commit time.
+
 1. Make surgical changes that follow existing patterns; no unrelated churn.
 3. Honour Staccato conventions (`CLAUDE.md`):
    - Cross-app-boundary types use **zod** in `packages/shared/src/types/zod`, with validation at use sites; prefer the shared package for non-project-specific helpers.
