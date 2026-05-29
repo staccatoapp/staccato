@@ -36,6 +36,22 @@ export interface SourceTrack {
   artists: TrackArtistCredit[];
 }
 
+// A candidate track returned by GET /api/library/search, selectable in the
+// "Add tracks" pane and handed back to the dialog to append to the draft.
+export interface AddTrackItem {
+  id: string;
+  title: string;
+  artistName: string;
+  albumTitle: string | null;
+  durationSeconds: number | null;
+  artists: {
+    artistId: string;
+    name: string;
+    joinPhrase: string | null;
+    position: number;
+  }[];
+}
+
 // Normalize a track's credits into the ordered draft model. Falls back to a
 // single credit naming the album artist when a track carries no credits, so the
 // editor always has at least one row to show.
