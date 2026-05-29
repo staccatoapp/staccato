@@ -141,3 +141,49 @@ export const ConfirmMatchResponseSchema = z.object({
   confirmed: z.number(),
 });
 export type ConfirmMatchResponse = z.infer<typeof ConfirmMatchResponseSchema>;
+
+// ─── Edit Album dialog ──────────────────────────────────────
+// The save payload for manual album edits. The dialog sends the *full*
+// post-edit album + ordered track list; the (future) server handler diffs it
+// against the album's current tracks to derive removals, and treats any trackId
+// not currently on this album as an attach-from-library. Edits write directly
+// to the canonical rows ("overwrite" model) — there is no per-field lock, so a
+// later file re-tag / retry-resolution / sibling re-resolve can overwrite them.
+//
+// Credits carry name + joinPhrase only (no artistId): manual edits are free
+// text, so the server resolves or creates artist rows by name when persistence
+// lands. joinPhrase follows MusicBrainz semantics — the connector placed *after*
+// this credit (e.g. " feat. ", " & "); the last credit's joinPhrase is unused.
+export const AlbumEditCreditSchema = z.object({
+  name: z.string(),
+  joinPhrase: z.string().nullable(),
+  position: z.number(),
+});
+export type AlbumEditCredit = z.infer<typeof AlbumEditCreditSchema>;
+
+export const AlbumEditTrackSchema = z.object({
+  trackId: z.string(),
+  title: z.string(),
+  trackNumber: z.number(),
+  discNumber: z.number(),
+  artists: z.array(AlbumEditCreditSchema),
+});
+export type AlbumEditTrack = z.infer<typeof AlbumEditTrackSchema>;
+
+export const AlbumEditRequestSchema = z.object({
+  title: z.string(),
+  artistName: z.string(),
+  releaseYear: z.number().nullable(),
+  coverArtUrl: z.string().nullable(),
+  tracks: z.array(AlbumEditTrackSchema),
+});
+export type AlbumEditRequest = z.infer<typeof AlbumEditRequestSchema>;
+
+export const AlbumEditResponseSchema = z.object({
+  ok: z.literal(true),
+  albumId: z.string(),
+  updatedTracks: z.number(),
+  removedTracks: z.number(),
+  attachedTracks: z.number(),
+});
+export type AlbumEditResponse = z.infer<typeof AlbumEditResponseSchema>;
