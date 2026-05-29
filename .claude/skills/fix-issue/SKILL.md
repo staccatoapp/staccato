@@ -138,3 +138,4 @@ If something genuinely can't be verified here (missing service/dep), state exact
 - **Re-deriving planning/TDD/clarify logic inline** — defer to the referenced sub-skills instead of duplicating them.
 - **Generic branch names** (`fix/...`, `patch-1`) — this repo uses `agent/<issue#>-<slug>`.
 - **Skipping a `catch`/external-call log** — fails review under the Staccato logging rules; add it during Phase 4, not after.
+- **Editing main-repo files after entering the worktree** — if Read/Edit/Write paths or Bash `cd` commands point at `C:\Projects\staccato\` instead of the worktree path, all changes land in the main checkout. The worktree provides zero isolation and you'll have to create the branch manually at commit time. Use the worktree path printed by `EnterWorktree` for everything.
