@@ -34,9 +34,10 @@ function requireOwnPlaylist(
 const playlistRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/", async (req) => {
     const userId = req.userId;
-    const paginationOptions = parsePagination(
-      req.query as Record<string, unknown>,
-    );
+    const query = z
+      .object({ limit: z.string().optional(), offset: z.string().optional() })
+      .parse(req.query);
+    const paginationOptions = parsePagination(query);
 
     const userPlaylists = getUserPlaylists(userId, paginationOptions);
     const total = countUserPlaylists(userId);
@@ -104,7 +105,7 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   fastify.get("/:id", async (req, reply) => {
-    const { id } = req.params as { id: string };
+    const { id } = z.object({ id: z.string() }).parse(req.params);
     const result = requireOwnPlaylist(id, req.userId);
     if (result === 404) {
       req.log.warn({ playlistId: id }, "playlist not found");
@@ -137,7 +138,7 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   fastify.put("/:id", async (req, reply) => {
-    const { id } = req.params as { id: string };
+    const { id } = z.object({ id: z.string() }).parse(req.params);
     const result = requireOwnPlaylist(id, req.userId);
     if (result === 404) {
       req.log.warn({ playlistId: id }, "playlist not found");
@@ -173,7 +174,7 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   fastify.delete("/:id", async (req, reply) => {
-    const { id } = req.params as { id: string };
+    const { id } = z.object({ id: z.string() }).parse(req.params);
     const result = requireOwnPlaylist(id, req.userId);
     if (result === 404) {
       req.log.warn({ playlistId: id }, "playlist not found");
@@ -194,7 +195,7 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   fastify.post("/:id/tracks", async (req, reply) => {
-    const { id } = req.params as { id: string };
+    const { id } = z.object({ id: z.string() }).parse(req.params);
     const result = requireOwnPlaylist(id, req.userId);
     if (result === 404) {
       req.log.warn({ playlistId: id }, "playlist not found");
@@ -223,7 +224,9 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   fastify.delete("/:id/tracks/:entryId", async (req, reply) => {
-    const { id, entryId } = req.params as { id: string; entryId: string };
+    const { id, entryId } = z
+      .object({ id: z.string(), entryId: z.string() })
+      .parse(req.params);
     const result = requireOwnPlaylist(id, req.userId);
     if (result === 404) {
       req.log.warn({ playlistId: id }, "playlist not found");

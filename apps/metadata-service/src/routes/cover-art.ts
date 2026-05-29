@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
+import { z } from "zod";
 import { MIRROR_USER_AGENT } from "../constants.js";
 
 const MBID_RE =
@@ -21,7 +22,7 @@ const cache = new Map<string, { url: string | null; expires: number }>();
 // the 302 to the image). 302 → cover found; 404 → no cover; 502 → upstream error.
 const coverArtRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/cover-art/release-group/:mbid", async (request, reply) => {
-    const { mbid } = request.params as { mbid: string };
+    const { mbid } = z.object({ mbid: z.string() }).parse(request.params);
     if (!MBID_RE.test(mbid)) {
       return reply.status(400).send({ error: "Invalid release-group mbid" });
     }

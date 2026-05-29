@@ -1,4 +1,5 @@
 import type { FastifyBaseLogger, FastifyPluginAsync } from "fastify";
+import { z } from "zod";
 import {
   MetadataArtistDetailSchema,
   type MetadataArtistReleaseGroup,
@@ -66,7 +67,7 @@ async function fetchReleaseGroups(
 // discography). The discography fetch runs concurrently with the artist lookup.
 const artistRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/artists/:mbid", async (request, reply) => {
-    const { mbid } = request.params as { mbid: string };
+    const { mbid } = z.object({ mbid: z.string() }).parse(request.params);
     if (!MBID_RE.test(mbid)) {
       return reply.status(400).send({ error: "Invalid artist mbid" });
     }

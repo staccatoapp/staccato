@@ -1,4 +1,5 @@
 import { FastifyPluginAsync } from "fastify";
+import { z } from "zod";
 import { searchExternalUnified, MB_PRIORITY } from "../musicbrainz/client.js";
 import { getLocalTrackMbidsByMbids } from "../db/queries/tracks.js";
 import { resolveExternalCoverNow } from "../coverart/store.js";
@@ -40,10 +41,9 @@ const searchRoutes: FastifyPluginAsync = async (fastify) => {
   // recording/artist/release indexes; the server adds local-library marking,
   // cover art, and artist images. Replaces the old per-type field-scoped search.
   fastify.get("/external", async (request) => {
-    const { q, limit: rawLimit } = request.query as {
-      q?: string;
-      limit?: string;
-    };
+    const { q, limit: rawLimit } = z
+      .object({ q: z.string().optional(), limit: z.string().optional() })
+      .parse(request.query);
 
     const query = q?.trim() ?? "";
     if (query.length < 2) return EMPTY;

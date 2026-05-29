@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
+import { z } from "zod";
 import {
   MetadataRecordingSchema,
   MetadataRecordingSearchResponseSchema,
@@ -25,10 +26,9 @@ const recordingRoutes: FastifyPluginAsync = async (fastify) => {
   // Registered before /recordings/:mbid for clarity — Fastify's radix router
   // matches the static "search" segment first regardless of order.
   fastify.get("/recordings/search", async (request, reply) => {
-    const { query, limit } = request.query as {
-      query?: string;
-      limit?: string;
-    };
+    const { query, limit } = z
+      .object({ query: z.string().optional(), limit: z.string().optional() })
+      .parse(request.query);
     if (!query) {
       return reply.status(400).send({ error: "Missing query" });
     }
@@ -72,7 +72,7 @@ const recordingRoutes: FastifyPluginAsync = async (fastify) => {
 
   // Smoke lookup (3.0). Expanded into the full R1 in 3.1.
   fastify.get("/recordings/:mbid", async (request, reply) => {
-    const { mbid } = request.params as { mbid: string };
+    const { mbid } = z.object({ mbid: z.string() }).parse(request.params);
     if (!MBID_RE.test(mbid)) {
       return reply.status(400).send({ error: "Invalid recording mbid" });
     }
