@@ -186,14 +186,6 @@ export function EditAlbumDialog({
                   {album.title} · {album.artistName}
                 </p>
               </div>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => onOpenChange(false)}
-                aria-label="Close"
-              >
-                <X className="size-4" />
-              </Button>
             </div>
             <div className="flex gap-1">
               {tabs.map((t) => {
