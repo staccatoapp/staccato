@@ -104,7 +104,10 @@ function resolveArtistRow(
   //    its display name but never reassign its identity.
   const existing = getArtistIdByMbid(mbArtistId);
   if (existing) {
-    updateArtist(existing, { canonicalName: mbArtistName });
+    updateArtist(existing, {
+      canonicalName: mbArtistName,
+      normalizedCanonicalName: normalizeString(mbArtistName),
+    });
     return existing;
   }
 
@@ -122,6 +125,7 @@ function resolveArtistRow(
     updateArtist(localArtistId, {
       musicbrainzId: mbArtistId,
       canonicalName: mbArtistName,
+      normalizedCanonicalName: normalizeString(mbArtistName),
     });
     return localArtistId;
   }
@@ -136,7 +140,10 @@ function resolveArtistRow(
 function ensureArtistByMbid(mbid: string, name: string): string {
   const existing = getArtistIdByMbid(mbid);
   if (existing) {
-    updateArtist(existing, { canonicalName: name });
+    updateArtist(existing, {
+      canonicalName: name,
+      normalizedCanonicalName: normalizeString(name),
+    });
     return existing;
   }
   return upsertArtist(name, mbid);

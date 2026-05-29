@@ -11,6 +11,7 @@ import {
   sql,
 } from "drizzle-orm";
 import { db } from "../client.js";
+import { logger } from "../../logger.js";
 import { artists } from "../schema/artists.js";
 import { albums } from "../schema/albums.js";
 import { albumArtists } from "../schema/album-artists.js";
@@ -205,32 +206,15 @@ export function upsertArtist(name: string, mbid?: string | null): string {
     return sqlMatch.id;
   }
 
-  const allArtists = db
-    .select({
-      id: artists.id,
-      name: artists.name,
-      normalizedName: artists.normalizedName,
-      canonicalName: artists.canonicalName,
-      musicbrainzId: artists.musicbrainzId,
-    })
+  const byCanonical = db
+    .select({ id: artists.id, musicbrainzId: artists.musicbrainzId })
     .from(artists)
-    .all();
-  const match = allArtists.find(
-    (a) =>
-      (a.normalizedName == null &&
-        normalizeString(a.name) === normalizedInput) ||
-      (a.canonicalName != null &&
-        normalizeString(a.canonicalName) === normalizedInput),
-  );
-  if (match) {
-    if (match.normalizedName == null) {
-      db.update(artists)
-        .set({ normalizedName: normalizeString(match.name) })
-        .where(eq(artists.id, match.id))
-        .run();
-    }
-    if (mbid && !match.musicbrainzId) trySetArtistMbid(match.id, mbid);
-    return match.id;
+    .where(eq(artists.normalizedCanonicalName, normalizedInput))
+    .get();
+  if (byCanonical) {
+    if (mbid && !byCanonical.musicbrainzId)
+      trySetArtistMbid(byCanonical.id, mbid);
+    return byCanonical.id;
   }
 
   return db
@@ -246,6 +230,47 @@ export function upsertArtist(name: string, mbid?: string | null): string {
     })
     .returning({ id: artists.id })
     .get()!.id;
+}
+
+export function backfillArtistNormalizedNames(): void {
+  const log = logger.child({ module: "db:artists" });
+
+  const withoutNormalized = db
+    .select({ id: artists.id, name: artists.name })
+    .from(artists)
+    .where(isNull(artists.normalizedName))
+    .all();
+  for (const row of withoutNormalized) {
+    db.update(artists)
+      .set({ normalizedName: normalizeString(row.name) })
+      .where(eq(artists.id, row.id))
+      .run();
+  }
+
+  const withoutNormalizedCanonical = db
+    .select({ id: artists.id, canonicalName: artists.canonicalName })
+    .from(artists)
+    .where(
+      and(
+        isNotNull(artists.canonicalName),
+        isNull(artists.normalizedCanonicalName),
+      ),
+    )
+    .all();
+  for (const row of withoutNormalizedCanonical) {
+    db.update(artists)
+      .set({ normalizedCanonicalName: normalizeString(row.canonicalName!) })
+      .where(eq(artists.id, row.id))
+      .run();
+  }
+
+  log.info(
+    {
+      normalizedNameCount: withoutNormalized.length,
+      normalizedCanonicalNameCount: withoutNormalizedCanonical.length,
+    },
+    "artist normalized name backfill complete",
+  );
 }
 
 function trySetArtistMbid(artistId: string, mbid: string): void {

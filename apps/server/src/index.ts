@@ -27,6 +27,7 @@ import {
   resetInflightOnBoot,
   upsertWarmingRow,
 } from "./db/queries/recommendation-cache.js";
+import { backfillArtistNormalizedNames } from "./db/queries/artists.js";
 import { startRefresher, tick } from "./recommendations/refresher.js";
 import { listRegisteredSources } from "./recommendations/source.js";
 import "./recommendations/sources/index.js";
@@ -88,6 +89,7 @@ if (getConfig().STACCATO_ENV !== "development") {
 
 const start = async () => {
   runMigrations();
+  backfillArtistNormalizedNames();
 
   resetInflightOnBoot();
 
