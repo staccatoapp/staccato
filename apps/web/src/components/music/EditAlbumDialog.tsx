@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, X } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import type { AlbumEditResponse } from "@staccato/shared";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
