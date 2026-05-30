@@ -1,6 +1,6 @@
-// TODO - fix zod typing basically everywhere (this file is a particularly bad offender). need to stop being lazy with it
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
+import { PlaybackSessionSchema, TrackLyricsSchema } from "@staccato/shared";
 import type { PlaybackSession, TrackLyrics } from "@staccato/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -41,8 +41,7 @@ function PlayerBar() {
     queryFn: async (): Promise<PlaybackSession> => {
       const res = await fetch("/api/playback/session");
       if (!res.ok) throw new Error("Failed to fetch playback session");
-      const json = await res.json();
-      return json;
+      return PlaybackSessionSchema.parse(await res.json());
     },
     refetchInterval: (query) => (query.state.data?.isPlaying ? 5000 : false),
   });
@@ -66,7 +65,7 @@ function PlayerBar() {
       );
       if (res.status === 204) return null;
       if (!res.ok) return null;
-      return res.json() as Promise<TrackLyrics>;
+      return TrackLyricsSchema.parse(await res.json());
     },
     enabled: !!currentTrack?.id,
     staleTime: Infinity,
@@ -208,7 +207,7 @@ function PlayerBar() {
         body: JSON.stringify(state),
       });
       if (!res.ok) throw new Error("Failed to update playback state");
-      return res.json() as Promise<PlaybackSession>;
+      return PlaybackSessionSchema.parse(await res.json());
     },
     onMutate: async (state) => {
       await queryClient.cancelQueries({ queryKey: ["playback-session"] });

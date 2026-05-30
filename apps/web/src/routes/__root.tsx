@@ -18,7 +18,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { PlaybackSession } from "@staccato/shared";
+import { type PlaybackSession, PlaybackSessionSchema } from "@staccato/shared";
 import { PlayerBar } from "@/components/layout/player-bar";
 import { Toaster } from "@/components/ui/sonner";
 import {
@@ -198,8 +198,7 @@ function LayoutContent() {
     queryFn: async (): Promise<PlaybackSession> => {
       const res = await fetch("/api/playback/session");
       if (!res.ok) throw new Error("Failed to fetch playback session");
-      const json = await res.json();
-      return json;
+      return PlaybackSessionSchema.parse(await res.json());
     },
     select: (d) => (d?.trackQueue?.length ?? 0) > 0,
   });

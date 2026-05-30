@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
+import { DownloadRequestArraySchema } from "@staccato/shared";
 import type { DownloadRequest, DownloadRequestStatus } from "@staccato/shared";
 
 const NON_TERMINAL: ReadonlySet<DownloadRequestStatus> = new Set([
@@ -25,7 +26,7 @@ export function useDownloads() {
     queryFn: async (): Promise<DownloadRequest[]> => {
       const res = await fetch("/api/downloads");
       if (!res.ok) throw new Error("Failed to fetch downloads");
-      return res.json();
+      return DownloadRequestArraySchema.parse(await res.json());
     },
     refetchOnWindowFocus: true,
     refetchInterval: (q) => {

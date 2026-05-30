@@ -51,3 +51,17 @@ export const UnifiedArtistDetailSchema = z.discriminatedUnion("source", [
   UnifiedArtistExternalSchema,
 ]);
 export type UnifiedArtistDetail = z.infer<typeof UnifiedArtistDetailSchema>;
+
+// ─── Library list response ──────────────────────────────────
+export const ArtistSearchItemSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  imageUrl: z.string().nullable(),
+});
+export type ArtistSearchItem = z.infer<typeof ArtistSearchItemSchema>;
+
+export const ArtistSchema = ArtistSearchItemSchema.extend({
+  createdAt: z.string().nullable(),
+  albumCount: z.number(),
+});
+export type Artist = z.infer<typeof ArtistSchema>;

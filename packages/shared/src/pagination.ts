@@ -1,4 +1,9 @@
+import { z } from "zod";
+
 export type Paginated<T> = { items: T[]; total: number };
+
+export const paginatedSchema = <T>(item: z.ZodType<T>) =>
+  z.object({ items: z.array(item), total: z.number() });
 
 export interface PaginationOptions {
   limit: number;

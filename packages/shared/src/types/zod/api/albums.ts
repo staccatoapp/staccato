@@ -187,3 +187,18 @@ export const AlbumEditResponseSchema = z.object({
   attachedTracks: z.number(),
 });
 export type AlbumEditResponse = z.infer<typeof AlbumEditResponseSchema>;
+
+// ─── Library list response ──────────────────────────────────
+export const AlbumListItemSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  artistId: z.string(),
+  artistName: z.string(),
+  artists: z.array(AlbumArtistCreditSchema),
+  releaseYear: z.number().nullable(),
+  coverArtUrl: z.string().nullable(),
+  createdAt: z.string().nullable(),
+  confidenceScore: z.number().nullable(),
+  pendingTrackCount: z.number(),
+});
+export type AlbumListItem = z.infer<typeof AlbumListItemSchema>;

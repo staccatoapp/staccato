@@ -8,7 +8,7 @@ import { useState } from "react";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { UserSettings } from "@staccato/shared";
+import { type UserSettings, UserSettingsSchema } from "@staccato/shared";
 
 export const Route = createFileRoute("/settings/")({
   component: SettingsPage,
@@ -26,7 +26,7 @@ function SettingsPage() {
     queryFn: async (): Promise<UserSettings> => {
       const res = await fetch("/api/settings");
       if (!res.ok) throw new Error("Failed to fetch settings");
-      return res.json();
+      return UserSettingsSchema.parse(await res.json());
     },
   });
 

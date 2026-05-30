@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { LidarrOptionsSchema, LidarrSettingsSchema } from "@staccato/shared";
 import type {
   CreateDownloadRequest,
   LidarrOptions,
@@ -52,7 +53,7 @@ export function useRequestDownloadDialog() {
     queryFn: async (): Promise<LidarrSettings> => {
       const res = await fetch("/api/admin/lidarr");
       if (!res.ok) throw new Error("Failed to fetch Lidarr settings");
-      return res.json();
+      return LidarrSettingsSchema.parse(await res.json());
     },
     staleTime: 5 * 60_000,
   });
@@ -62,7 +63,7 @@ export function useRequestDownloadDialog() {
     queryFn: async (): Promise<LidarrOptions> => {
       const res = await fetch("/api/admin/lidarr/options");
       if (!res.ok) throw new Error("Failed to fetch Lidarr options");
-      return res.json();
+      return LidarrOptionsSchema.parse(await res.json());
     },
     enabled: !!settingsQuery.data?.apiKeySet,
     staleTime: 5 * 60_000,

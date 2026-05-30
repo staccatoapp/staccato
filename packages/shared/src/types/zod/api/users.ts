@@ -13,3 +13,5 @@ export const AdminUserResponseSchema = z.object({
   createdAt: z.coerce.date(),
 });
 export type AdminUserResponse = z.infer<typeof AdminUserResponseSchema>;
+
+export const AdminUserArraySchema = z.array(AdminUserResponseSchema);

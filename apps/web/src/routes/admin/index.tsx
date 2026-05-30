@@ -32,14 +32,20 @@ import {
 import { cn } from "@/lib/utils";
 import { currentUserQueryOptions } from "@/hooks/useCurrentUser";
 import { AddUserDialog } from "@/components/admin/AddUserDialog";
-import type {
-  AdminUserResponse,
-  LidarrOptions,
-  LidarrSettings,
-  LidarrTestResult,
-  ScanProgress,
-  TestLidarrConnection,
-  UpdateLidarrSettings,
+import { z } from "zod";
+import {
+  type AdminUserResponse,
+  AdminUserArraySchema,
+  type LidarrOptions,
+  LidarrOptionsSchema,
+  type LidarrSettings,
+  LidarrSettingsSchema,
+  type LidarrTestResult,
+  LidarrTestResultSchema,
+  type ScanProgress,
+  ScanProgressSchema,
+  type TestLidarrConnection,
+  type UpdateLidarrSettings,
 } from "@staccato/shared";
 
 export const Route = createFileRoute("/admin/")({
@@ -93,7 +99,7 @@ function ScanSection() {
     queryFn: async (): Promise<ScanProgress> => {
       const res = await fetch("/api/admin/scan/status");
       if (!res.ok) throw new Error("Failed to fetch scan status");
-      return res.json();
+      return ScanProgressSchema.parse(await res.json());
     },
     refetchInterval: (query) => (query.state.data?.running ? 2000 : false),
   });
@@ -278,7 +284,7 @@ function LidarrForm() {
     queryFn: async (): Promise<LidarrSettings> => {
       const res = await fetch("/api/admin/lidarr");
       if (!res.ok) throw new Error("Failed to fetch Lidarr settings");
-      return res.json();
+      return LidarrSettingsSchema.parse(await res.json());
     },
   });
 
@@ -297,7 +303,7 @@ function LidarrForm() {
     queryFn: async (): Promise<LidarrOptions> => {
       const res = await fetch("/api/admin/lidarr/options");
       if (!res.ok) throw new Error("Failed to fetch Lidarr options");
-      return res.json();
+      return LidarrOptionsSchema.parse(await res.json());
     },
     enabled: apiKeySet && !!savedUrl,
     staleTime: 5 * 60_000,
@@ -397,7 +403,7 @@ function LidarrForm() {
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error("Test failed");
-      return res.json();
+      return LidarrTestResultSchema.parse(await res.json());
     },
     onSuccess: (result) => {
       setTestResult(result);
@@ -582,7 +588,7 @@ function IntegrationsTab() {
     queryFn: async (): Promise<LidarrSettings> => {
       const res = await fetch("/api/admin/lidarr");
       if (!res.ok) throw new Error("Failed to fetch Lidarr settings");
-      return res.json();
+      return LidarrSettingsSchema.parse(await res.json());
     },
   });
 
@@ -593,7 +599,7 @@ function IntegrationsTab() {
     queryFn: async (): Promise<{ connected: boolean }> => {
       const res = await fetch("/api/admin/lidarr/connectivity");
       if (!res.ok) throw new Error("Connectivity check failed");
-      return res.json();
+      return z.object({ connected: z.boolean() }).parse(await res.json());
     },
     enabled: lidarrConfigured,
     staleTime: Infinity,
@@ -688,7 +694,7 @@ function UsersTab() {
     queryFn: async (): Promise<AdminUserResponse[]> => {
       const res = await fetch("/api/admin/users");
       if (!res.ok) throw new Error("Failed to fetch users");
-      return res.json();
+      return AdminUserArraySchema.parse(await res.json());
     },
   });
 

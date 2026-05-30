@@ -11,7 +11,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import type { PlaylistDetail } from "@staccato/shared";
+import {
+  type PlaybackSession,
+  PlaybackSessionSchema,
+  type PlaylistDetail,
+  PlaylistDetailSchema,
+} from "@staccato/shared";
 
 export const Route = createFileRoute("/playlists/$playlistId")({
   component: PlaylistDetailPage,
@@ -42,7 +47,7 @@ function PlaylistDetailPage() {
     queryFn: async (): Promise<PlaylistDetail> => {
       const res = await fetch(`/api/playlists/${playlistId}`);
       if (!res.ok) throw new Error("Failed to fetch playlist");
-      return res.json();
+      return PlaylistDetailSchema.parse(await res.json());
     },
   });
 
@@ -53,14 +58,14 @@ function PlaylistDetailPage() {
     }: {
       trackIds: string[];
       startIndex: number;
-    }) => {
+    }): Promise<PlaybackSession> => {
       const res = await fetch("/api/playback/session/play", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ trackIds, startIndex }),
       });
       if (!res.ok) throw new Error("Failed to start playback");
-      return res.json();
+      return PlaybackSessionSchema.parse(await res.json());
     },
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ["playback-session"] }),
@@ -73,14 +78,14 @@ function PlaylistDetailPage() {
     }: {
       name: string;
       description: string | null;
-    }) => {
+    }): Promise<PlaylistDetail> => {
       const res = await fetch(`/api/playlists/${playlistId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, description }),
       });
       if (!res.ok) throw new Error("Failed to update playlist");
-      return res.json();
+      return PlaylistDetailSchema.parse(await res.json());
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["playlist", playlistId] });

@@ -23,10 +23,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type {
-  PlaylistListItem,
-  ServerSettings,
-  UnifiedAlbumDetail,
+import {
+  type ConfirmMatchResponse,
+  ConfirmMatchResponseSchema,
+  type PlaybackSession,
+  PlaybackSessionSchema,
+  type PlaylistListItem,
+  PlaylistListResponseSchema,
+  type ServerSettings,
+  ServerSettingsSchema,
+  type UnifiedAlbumDetail,
+  UnifiedAlbumDetailSchema,
 } from "@staccato/shared";
 import { AlbumHeader } from "@/components/music/AlbumHeader";
 import { AlbumDetailSkeleton } from "@/components/music/AlbumDetailSkeleton";
@@ -73,7 +80,7 @@ function AlbumDetailPage() {
     queryFn: async (): Promise<UnifiedAlbumDetail> => {
       const res = await fetch(`/api/albums/${albumKey}`);
       if (!res.ok) throw new Error("Failed to fetch album");
-      return res.json();
+      return UnifiedAlbumDetailSchema.parse(await res.json());
     },
     staleTime: 60_000,
   });
@@ -120,7 +127,7 @@ function LocalAlbumView({
     queryFn: async () => {
       const res = await fetch("/api/settings/server");
       if (!res.ok) throw new Error("Failed to fetch server settings");
-      return res.json();
+      return ServerSettingsSchema.parse(await res.json());
     },
     staleTime: Infinity,
   });
@@ -136,12 +143,12 @@ function LocalAlbumView({
       : null;
 
   const confirmMatchMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (): Promise<ConfirmMatchResponse> => {
       const res = await fetch(`/api/albums/${albumKey}/confirm-match`, {
         method: "POST",
       });
       if (!res.ok) throw new Error("Failed to confirm match");
-      return res.json();
+      return ConfirmMatchResponseSchema.parse(await res.json());
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["album", albumKey] });
@@ -155,7 +162,7 @@ function LocalAlbumView({
     queryFn: async (): Promise<{ items: PlaylistListItem[] }> => {
       const res = await fetch("/api/playlists");
       if (!res.ok) throw new Error("Failed to fetch playlists");
-      return res.json();
+      return PlaylistListResponseSchema.parse(await res.json());
     },
   });
 
@@ -187,14 +194,14 @@ function LocalAlbumView({
     }: {
       trackIds: string[];
       startIndex: number;
-    }) => {
+    }): Promise<PlaybackSession> => {
       const res = await fetch("/api/playback/session/play", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ trackIds, startIndex }),
       });
       if (!res.ok) throw new Error("Failed to start playback");
-      return res.json();
+      return PlaybackSessionSchema.parse(await res.json());
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["playback-session"] });

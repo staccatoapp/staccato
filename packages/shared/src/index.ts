@@ -7,6 +7,13 @@ export * from "./types/zod/api/albums.js";
 export * from "./types/zod/api/artists.js";
 export * from "./types/zod/api/credits.js";
 export * from "./types/zod/api/error.js";
+export * from "./types/zod/api/downloads.js";
+export * from "./types/zod/api/tracks.js";
+export * from "./types/zod/api/playback.js";
+export * from "./types/zod/api/playlists.js";
+export * from "./types/zod/api/scan.js";
+export * from "./types/zod/api/library.js";
+export * from "./types/zod/api/lyrics.js";
 
 export * from "./types/zod/metadata/recording.js";
 export * from "./types/zod/metadata/release.js";
@@ -14,21 +21,6 @@ export * from "./types/zod/metadata/album.js";
 export * from "./types/zod/metadata/artist.js";
 export * from "./types/zod/metadata/search.js";
 export * from "./types/zod/metadata/asset.js";
-
-export * from "./types/typescript/artists.js";
-export * from "./types/typescript/albums.js";
-export * from "./types/typescript/tracks.js";
-export * from "./types/typescript/playback.js";
-export * from "./types/typescript/playlists.js";
-export * from "./types/typescript/settings.js";
-export * from "./types/typescript/scan.js";
-export * from "./types/typescript/library.js";
-
-export * from "./types/typescript/lyrics.js";
-
-export * from "./types/typescript/downloads.js";
-
-export * from "./types/zod/api/downloads.js";
 
 export * from "./pagination.js";
 

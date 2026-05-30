@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ChevronLeft } from "lucide-react";
-import type {
-  ArtistDiscographyItem,
-  UnifiedArtistDetail,
+import {
+  type ArtistDiscographyItem,
+  type UnifiedArtistDetail,
+  UnifiedArtistDetailSchema,
 } from "@staccato/shared";
 import { AlbumCard } from "@/components/music/AlbumCard";
 import { ArtistHeader } from "@/components/music/ArtistHeader";
@@ -74,7 +75,7 @@ function ArtistDetailPage() {
     queryFn: async (): Promise<UnifiedArtistDetail> => {
       const res = await fetch(`/api/artists/${artistKey}`);
       if (!res.ok) throw new Error("Failed to fetch artist");
-      return res.json();
+      return UnifiedArtistDetailSchema.parse(await res.json());
     },
     staleTime: 60_000,
   });

@@ -1,16 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { PlaybackSession } from "@staccato/shared";
+import {
+  type AlbumListItem,
+  AlbumListItemSchema,
+  type Artist,
+  ArtistSchema,
+  type LibrarySearchResults,
+  LibrarySearchResultsSchema,
+  type PlaybackSession,
+  PlaybackSessionSchema,
+  type PlaylistDetail,
+  PlaylistDetailSchema,
+  type PlaylistListItem,
+  PlaylistListItemSchema,
+  type ServerSettings,
+  ServerSettingsSchema,
+  type TrackListItem,
+  TrackListItemSchema,
+} from "@staccato/shared";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Plus, Search, X } from "lucide-react";
-import type {
-  AlbumListItem,
-  Artist,
-  LibrarySearchResults,
-  PlaylistListItem,
-  ServerSettings,
-  TrackListItem,
-} from "@staccato/shared";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -55,7 +64,7 @@ function LibraryPage() {
     queryFn: async () => {
       const res = await fetch("/api/settings/server");
       if (!res.ok) throw new Error("Failed to fetch server settings");
-      return res.json();
+      return ServerSettingsSchema.parse(await res.json());
     },
     staleTime: Infinity,
   });
@@ -64,24 +73,28 @@ function LibraryPage() {
   const albumsQuery = useInfiniteList<AlbumListItem>({
     queryKey: ["albums"],
     endpoint: "/api/library/albums",
+    schema: AlbumListItemSchema,
     enabled: !isSearchMode && activeTab === "albums",
   });
 
   const artistsQuery = useInfiniteList<Artist>({
     queryKey: ["artists"],
     endpoint: "/api/library/artists",
+    schema: ArtistSchema,
     enabled: !isSearchMode && activeTab === "artists",
   });
 
   const tracksQuery = useInfiniteList<TrackListItem>({
     queryKey: ["tracks"],
     endpoint: "/api/library/tracks",
+    schema: TrackListItemSchema,
     enabled: !isSearchMode && activeTab === "tracks",
   });
 
   const playlistsQuery = useInfiniteList<PlaylistListItem>({
     queryKey: ["playlists", "infinite"],
     endpoint: "/api/playlists",
+    schema: PlaylistListItemSchema,
     enabled: isSearchMode || activeTab === "playlists",
   });
 
@@ -92,7 +105,7 @@ function LibraryPage() {
         `/api/library/search?q=${encodeURIComponent(debouncedSearch)}`,
       );
       if (!res.ok) throw new Error("Search failed");
-      return res.json();
+      return LibrarySearchResultsSchema.parse(await res.json());
     },
     enabled: isSearchMode,
     staleTime: 30_000,
@@ -101,7 +114,7 @@ function LibraryPage() {
   const fetchSession = useCallback(async (): Promise<PlaybackSession> => {
     const res = await fetch("/api/playback/session");
     if (!res.ok) throw new Error("Failed to fetch session");
-    return res.json();
+    return PlaybackSessionSchema.parse(await res.json());
   }, []);
 
   const { data: activeTrackId } = useQuery({
@@ -136,14 +149,14 @@ function LibraryPage() {
   });
 
   const createPlaylistMutation = useMutation({
-    mutationFn: async (name: string) => {
+    mutationFn: async (name: string): Promise<PlaylistDetail> => {
       const res = await fetch("/api/playlists", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       });
       if (!res.ok) throw new Error("Failed to create playlist");
-      return res.json();
+      return PlaylistDetailSchema.parse(await res.json());
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["playlists"] });

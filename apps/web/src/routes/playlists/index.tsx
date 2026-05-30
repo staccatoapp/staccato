@@ -11,7 +11,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import type { PlaylistListItem } from "@staccato/shared";
+import {
+  type PlaylistDetail,
+  PlaylistDetailSchema,
+  type PlaylistListItem,
+  PlaylistListResponseSchema,
+} from "@staccato/shared";
 
 export const Route = createFileRoute("/playlists/")({
   component: PlaylistsPage,
@@ -28,7 +33,7 @@ function PlaylistsPage() {
     queryFn: async (): Promise<{ items: PlaylistListItem[] }> => {
       const res = await fetch("/api/playlists");
       if (!res.ok) throw new Error("Failed to fetch playlists");
-      return res.json();
+      return PlaylistListResponseSchema.parse(await res.json());
     },
   });
 
@@ -39,14 +44,14 @@ function PlaylistsPage() {
     }: {
       name: string;
       description?: string;
-    }) => {
+    }): Promise<PlaylistDetail> => {
       const res = await fetch("/api/playlists", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, description }),
       });
       if (!res.ok) throw new Error("Failed to create playlist");
-      return res.json();
+      return PlaylistDetailSchema.parse(await res.json());
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["playlists"] });
