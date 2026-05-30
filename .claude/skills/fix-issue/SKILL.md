@@ -13,8 +13,6 @@ Take one GitHub issue in the Staccato monorepo from specification to a verified 
 
 This skill is whitelisted in `CLAUDE.md` to run git commands; outside it, the no-git-history rule still applies.
 
-Run all `gh` and `git` commands through the **Bash tool**, not PowerShell — multi-line `--body`/commit bodies and `\` continuations don't parse in PS 5.1.
-
 ## When to Use
 
 - The user gives an issue number/URL and wants it implemented end-to-end.
@@ -25,6 +23,7 @@ Run all `gh` and `git` commands through the **Bash tool**, not PowerShell — mu
 ## Prerequisites
 
 - `gh` authenticated; working directory is the `staccatoapp/staccato` repo (the remote infers owner/name — no `--owner` needed for `gh issue`/`gh pr`; `gh project` calls still need `--owner staccatoapp`).
+- Run all `gh` and `git` commands through the **Bash tool**, not PowerShell — multi-line `--body`/commit bodies and `\` continuations don't parse in PS 5.1.
 
 ## Workflow
 
@@ -78,7 +77,14 @@ Cover: files created/modified, the change per file, tests to add/update, and how
 
 ### Phase 4 — Implement on a branch
 
-Create the branch from `main` using `git checkout -b agent/<issue#>-<short-slug>` (e.g. `agent/42-queue-race`). All work stays in the main repo checkout (`C:\Projects\staccato`).
+**REQUIRED SUB-SKILL:** use `superpowers:using-git-worktrees` to create an isolated workspace. Consent is implicit — skip the consent gate and go straight to Step 1. Use branch name `agent/<issue#>-<short-slug>` (e.g. `agent/42-queue-race`). If the native `EnterWorktree` tool is available, prefer it (Step 1a).
+
+**WORKTREE PATH DISCIPLINE** — once `EnterWorktree` runs, the session cwd is the worktree (e.g. `C:\Projects\staccato\.claude\worktrees\agent+10-…`). Every subsequent operation must stay inside that path:
+- **Bash**: do not prefix commands with `cd /c/Projects/staccato &&` or any path to the main repo checkout — run `pnpm`, `git`, and `gh` directly so they resolve from the worktree cwd.
+- **Explore agents**: pass the worktree path as the search root, not the main repo path. The worktree path is printed in `EnterWorktree`'s output — use it explicitly in agent prompts.
+- **Read / Edit / Write**: use absolute paths rooted at the worktree, not at `C:\Projects\staccato\`. Translate any main-repo paths returned by explorers before using them.
+
+Violating this causes all edits to land in the main repo's working tree, defeating the isolation and forcing a manual branch creation at commit time.
 
 1. Make surgical changes that follow existing patterns; no unrelated churn.
 3. Honour Staccato conventions (`CLAUDE.md`):
@@ -124,9 +130,12 @@ If something genuinely can't be verified here (missing service/dep), state exact
 
 ## Common Mistakes
 
+- **Skipping the worktree setup** — Phase 4 always starts with `superpowers:using-git-worktrees`. Don't fall back to a bare `git checkout -b`.
 - **Summarising the issue and diving straight to code** — skips both gates; the most common failure. Confirm requirements, then get plan approval.
+- **Running `gh`/`git` through PowerShell** — multi-line bodies and `\` continuations break. Use the Bash tool.
 - **Inlining the PR body** — em-dashes/curly quotes mangle on the command line. Use `--body-file` with a UTF-8 file. Pass an **absolute path** to `--body-file`; `gh` does not resolve relative paths from the repo root when invoked via Bash.
 - **Claiming "tests pass" without output** — run `pnpm test`/`lint`/`check-types`/`build` and show it.
 - **Re-deriving planning/TDD/clarify logic inline** — defer to the referenced sub-skills instead of duplicating them.
 - **Generic branch names** (`fix/...`, `patch-1`) — this repo uses `agent/<issue#>-<slug>`.
 - **Skipping a `catch`/external-call log** — fails review under the Staccato logging rules; add it during Phase 4, not after.
+- **Editing main-repo files after entering the worktree** — if Read/Edit/Write paths or Bash `cd` commands point at `C:\Projects\staccato\` instead of the worktree path, all changes land in the main checkout. The worktree provides zero isolation and you'll have to create the branch manually at commit time. Use the worktree path printed by `EnterWorktree` for everything.
