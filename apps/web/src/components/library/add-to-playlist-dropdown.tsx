@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Plus } from "lucide-react";
+import {
+  PlaylistDetailSchema,
+  PlaylistListResponseSchema,
+} from "@staccato/shared";
 import type { PlaylistDetail, PlaylistListItem } from "@staccato/shared";
 import { cn } from "@/lib/utils";
 import {
@@ -26,7 +30,7 @@ function PlaylistCheckboxRow({
     queryFn: async (): Promise<PlaylistDetail> => {
       const res = await fetch(`/api/playlists/${playlist.id}`);
       if (!res.ok) throw new Error("Failed to fetch playlist");
-      return res.json();
+      return PlaylistDetailSchema.parse(await res.json());
     },
     enabled: dropdownOpen,
     staleTime: 60_000,
@@ -119,7 +123,7 @@ export function AddToPlaylistDropdown({
     queryFn: async (): Promise<{ items: PlaylistListItem[] }> => {
       const res = await fetch("/api/playlists");
       if (!res.ok) throw new Error("Failed to fetch playlists");
-      return res.json();
+      return PlaylistListResponseSchema.parse(await res.json());
     },
   });
 

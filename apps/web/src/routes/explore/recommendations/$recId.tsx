@@ -2,9 +2,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Check, ChevronLeft, Play, Plus } from "lucide-react";
-import type {
-  PlaylistListItem,
-  RecommendedPlaylistTrack,
+import {
+  type PlaylistListItem,
+  PlaylistListResponseSchema,
+  type RecommendedPlaylistTrack,
 } from "@staccato/shared";
 import { generateAlbumGradient } from "@/lib/music";
 import { useRecommendedPlaylists } from "@/hooks/useRecommendations";
@@ -81,7 +82,7 @@ function RecommendationDetailPage() {
     queryFn: async (): Promise<{ items: PlaylistListItem[] }> => {
       const res = await fetch("/api/playlists");
       if (!res.ok) throw new Error("Failed to fetch playlists");
-      return res.json();
+      return PlaylistListResponseSchema.parse(await res.json());
     },
     enabled: allInLibrary,
   });

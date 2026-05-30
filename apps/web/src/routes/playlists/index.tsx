@@ -11,7 +11,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import type { PlaylistListItem } from "@staccato/shared";
+import {
+  type PlaylistListItem,
+  PlaylistListResponseSchema,
+} from "@staccato/shared";
 
 export const Route = createFileRoute("/playlists/")({
   component: PlaylistsPage,
@@ -28,7 +31,7 @@ function PlaylistsPage() {
     queryFn: async (): Promise<{ items: PlaylistListItem[] }> => {
       const res = await fetch("/api/playlists");
       if (!res.ok) throw new Error("Failed to fetch playlists");
-      return res.json();
+      return PlaylistListResponseSchema.parse(await res.json());
     },
   });
 

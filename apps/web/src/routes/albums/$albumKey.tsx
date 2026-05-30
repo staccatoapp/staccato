@@ -23,10 +23,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type {
-  PlaylistListItem,
-  ServerSettings,
-  UnifiedAlbumDetail,
+import {
+  type PlaylistListItem,
+  PlaylistListResponseSchema,
+  type ServerSettings,
+  ServerSettingsSchema,
+  type UnifiedAlbumDetail,
+  UnifiedAlbumDetailSchema,
 } from "@staccato/shared";
 import { AlbumHeader } from "@/components/music/AlbumHeader";
 import { AlbumDetailSkeleton } from "@/components/music/AlbumDetailSkeleton";
@@ -73,7 +76,7 @@ function AlbumDetailPage() {
     queryFn: async (): Promise<UnifiedAlbumDetail> => {
       const res = await fetch(`/api/albums/${albumKey}`);
       if (!res.ok) throw new Error("Failed to fetch album");
-      return res.json();
+      return UnifiedAlbumDetailSchema.parse(await res.json());
     },
     staleTime: 60_000,
   });
@@ -120,7 +123,7 @@ function LocalAlbumView({
     queryFn: async () => {
       const res = await fetch("/api/settings/server");
       if (!res.ok) throw new Error("Failed to fetch server settings");
-      return res.json();
+      return ServerSettingsSchema.parse(await res.json());
     },
     staleTime: Infinity,
   });
@@ -155,7 +158,7 @@ function LocalAlbumView({
     queryFn: async (): Promise<{ items: PlaylistListItem[] }> => {
       const res = await fetch("/api/playlists");
       if (!res.ok) throw new Error("Failed to fetch playlists");
-      return res.json();
+      return PlaylistListResponseSchema.parse(await res.json());
     },
   });
 

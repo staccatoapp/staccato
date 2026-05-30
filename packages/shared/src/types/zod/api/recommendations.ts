@@ -59,3 +59,18 @@ export type RecommendedTracksResponse = RecommendationsResponse<
 export type RecommendedPlaylistsResponse = RecommendationsResponse<
   RecommendedPlaylist[]
 >;
+
+export const recommendationsResponseSchema = <T>(dataSchema: z.ZodType<T>) =>
+  z.discriminatedUnion("status", [
+    z.object({ status: z.literal("no-token") }),
+    z.object({ status: z.literal("warming") }),
+    z.object({ status: z.literal("ready"), data: dataSchema }),
+    z.object({ status: z.literal("error"), data: dataSchema.nullable() }),
+  ]);
+
+export const RecommendedTracksResponseSchema = recommendationsResponseSchema(
+  z.array(RecommendedTrackSchema),
+);
+export const RecommendedPlaylistsResponseSchema = recommendationsResponseSchema(
+  z.array(RecommendedPlaylistSchema),
+);

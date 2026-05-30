@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { UserSettingsSchema } from "@staccato/shared";
 import type { UserSettings } from "@staccato/shared";
 
 const DEFAULT_VOLUME = 80;
@@ -11,7 +12,7 @@ export function useVolume() {
     queryFn: async (): Promise<UserSettings> => {
       const res = await fetch("/api/settings");
       if (!res.ok) throw new Error("Failed to fetch settings");
-      return res.json();
+      return UserSettingsSchema.parse(await res.json());
     },
     staleTime: Infinity,
   });

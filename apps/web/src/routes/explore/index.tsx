@@ -2,7 +2,11 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
-import type { ExternalSearchResults, RecommendedTrack } from "@staccato/shared";
+import {
+  type ExternalSearchResults,
+  ExternalSearchResultsSchema,
+  type RecommendedTrack,
+} from "@staccato/shared";
 import { AlbumCard } from "@/components/music/AlbumCard";
 import { ArtistCard } from "@/components/library/artist-card";
 import { RecommendationTile } from "@/components/explore/RecommendationTile";
@@ -181,7 +185,7 @@ function ExplorePage() {
         `/api/search/external?q=${encodeURIComponent(debounced.trim())}`,
       );
       if (!res.ok) throw new Error("Search failed");
-      return res.json();
+      return ExternalSearchResultsSchema.parse(await res.json());
     },
     enabled: searched,
     staleTime: 60_000,

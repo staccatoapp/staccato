@@ -11,13 +11,16 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { toast } from "sonner";
-import type {
-  IdentifyApplyResponse,
-  IdentifyOrphansResponse,
-  IdentifyOrphanTrack,
-  IdentifyReleaseCandidate,
-  IdentifyReleaseTracklist,
-  IdentifySearchResponse,
+import {
+  type IdentifyApplyResponse,
+  type IdentifyOrphansResponse,
+  IdentifyOrphansResponseSchema,
+  type IdentifyOrphanTrack,
+  type IdentifyReleaseCandidate,
+  type IdentifyReleaseTracklist,
+  IdentifyReleaseTracklistSchema,
+  type IdentifySearchResponse,
+  IdentifySearchResponseSchema,
 } from "@staccato/shared";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -592,7 +595,7 @@ export function IdentifyAlbumDialog({
       if (query.year.trim()) params.set("year", query.year.trim());
       const res = await fetch(`/api/albums/identify/search?${params}`);
       if (!res.ok) throw new Error("Search failed");
-      return res.json();
+      return IdentifySearchResponseSchema.parse(await res.json());
     },
   });
 
@@ -609,7 +612,7 @@ export function IdentifyAlbumDialog({
         `/api/albums/identify/release/${selected!.releaseMbid}`,
       );
       if (!res.ok) throw new Error("Failed to load tracklist");
-      return res.json();
+      return IdentifyReleaseTracklistSchema.parse(await res.json());
     },
   });
 
@@ -622,7 +625,7 @@ export function IdentifyAlbumDialog({
     queryFn: async (): Promise<IdentifyOrphansResponse> => {
       const res = await fetch(`/api/albums/${album.id}/identify/orphans`);
       if (!res.ok) throw new Error("Failed to load orphans");
-      return res.json();
+      return IdentifyOrphansResponseSchema.parse(await res.json());
     },
   });
 
