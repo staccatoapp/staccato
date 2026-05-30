@@ -8,7 +8,7 @@ export function makeTestConfig(overrides: Partial<Config> = {}): Config {
     STACCATO_SERVER_MUSIC_DIR: "./music",
     STACCATO_LOG_LEVEL: "error",
     STACCATO_LOG_FORMAT: "json",
-    STACCATO_SERVER_SESSION_SECRET: "test-secret",
+    STACCATO_SERVER_SESSION_SECRET: "test-secret-that-is-at-least-32c",
     STACCATO_METADATA_URL: "http://localhost:8290/v1",
     STACCATO_SERVER_LIBRARY_DISCOVERY_CONCURRENCY: 8,
     STACCATO_SERVER_LIBRARY_WORKER_CONCURRENCY: 6,
