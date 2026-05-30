@@ -22,8 +22,18 @@ import { ScanProgressSchema, TrackStatusCountsSchema } from "./scan.js";
 import { ServerSettingsSchema, UserSettingsSchema } from "./settings.js";
 import { TrackListItemSchema, TrackSearchResultSchema } from "./tracks.js";
 
-const TRACK_ARTIST_CREDIT = { artistId: "a1", name: "Band", joinPhrase: null, position: 0 };
-const ALBUM_ARTIST_CREDIT = { artistId: "a1", name: "Band", joinPhrase: null, position: 0 };
+const TRACK_ARTIST_CREDIT = {
+  artistId: "a1",
+  name: "Band",
+  joinPhrase: null,
+  position: 0,
+};
+const ALBUM_ARTIST_CREDIT = {
+  artistId: "a1",
+  name: "Band",
+  joinPhrase: null,
+  position: 0,
+};
 
 describe("paginatedSchema", () => {
   it("parses a valid paginated response", () => {
@@ -64,7 +74,9 @@ describe("TrackListItemSchema", () => {
   });
 
   it("rejects when required id is missing", () => {
-    expect(() => TrackListItemSchema.parse({ ...valid, id: undefined })).toThrow(z.ZodError);
+    expect(() =>
+      TrackListItemSchema.parse({ ...valid, id: undefined }),
+    ).toThrow(z.ZodError);
   });
 });
 
@@ -251,7 +263,9 @@ describe("UserSettingsSchema", () => {
   });
 
   it("rejects when volume is missing", () => {
-    expect(() => UserSettingsSchema.parse({ listenbrainzToken: null })).toThrow(z.ZodError);
+    expect(() => UserSettingsSchema.parse({ listenbrainzToken: null })).toThrow(
+      z.ZodError,
+    );
   });
 });
 
@@ -263,7 +277,7 @@ describe("ServerSettingsSchema", () => {
 });
 
 describe("DownloadRequestSchema", () => {
-  it("parses a valid download request with string dates coerced to Date", () => {
+  it("parses a valid download request with string dates", () => {
     const now = new Date().toISOString();
     const result = DownloadRequestSchema.parse({
       id: "d1",
@@ -277,8 +291,8 @@ describe("DownloadRequestSchema", () => {
       createdAt: now,
       updatedAt: now,
     });
-    expect(result.createdAt).toBeInstanceOf(Date);
-    expect(result.updatedAt).toBeInstanceOf(Date);
+    expect(typeof result.createdAt).toBe("string");
+    expect(typeof result.updatedAt).toBe("string");
   });
 
   it("rejects an invalid download request status", () => {
@@ -362,9 +376,9 @@ describe("ArtistSchema", () => {
   });
 
   it("rejects when albumCount is missing", () => {
-    expect(() => ArtistSchema.parse({ id: "a1", name: "Artist", imageUrl: null })).toThrow(
-      z.ZodError,
-    );
+    expect(() =>
+      ArtistSchema.parse({ id: "a1", name: "Artist", imageUrl: null }),
+    ).toThrow(z.ZodError);
   });
 });
 
@@ -404,9 +418,9 @@ describe("LibrarySearchResultsSchema", () => {
   });
 
   it("rejects when artists array is missing", () => {
-    expect(() => LibrarySearchResultsSchema.parse({ albums: [], tracks: [] })).toThrow(
-      z.ZodError,
-    );
+    expect(() =>
+      LibrarySearchResultsSchema.parse({ albums: [], tracks: [] }),
+    ).toThrow(z.ZodError);
   });
 });
 
@@ -414,7 +428,9 @@ describe("recommendationsResponseSchema", () => {
   const schema = recommendationsResponseSchema(z.array(z.string()));
 
   it("parses no-token status", () => {
-    expect(schema.parse({ status: "no-token" })).toEqual({ status: "no-token" });
+    expect(schema.parse({ status: "no-token" })).toEqual({
+      status: "no-token",
+    });
   });
 
   it("parses warming status", () => {
