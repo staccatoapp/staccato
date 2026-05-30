@@ -1,38 +1,27 @@
+import { z } from "zod";
 import { Logger } from "pino";
 import { logger as appLogger } from "../logger.js";
+import {
+  LidarrAlbum,
+  LidarrAlbumSchema,
+  LidarrArtist,
+  LidarrArtistSchema,
+  LidarrProfile,
+  LidarrProfileSchema,
+  LidarrQueueItem,
+  LidarrQueueResponseSchema,
+  LidarrRootFolder,
+  LidarrRootFolderSchema,
+} from "./schemas.js";
 
-export type LidarrArtist = {
-  id: number;
-  artistName: string;
-  foreignArtistId: string;
-  monitored: boolean;
-};
-
-export type LidarrAlbumStatistics = {
-  trackCount: number;
-  trackFileCount: number;
-  percentOfTracks: number;
-  sizeOnDisk: number;
-};
-
-export type LidarrAlbum = {
-  id: number;
-  title: string;
-  foreignAlbumId: string;
-  artistId: number;
-  monitored: boolean;
-  statistics?: LidarrAlbumStatistics;
-};
-
-export type LidarrQueueItem = {
-  id: number;
-  albumId: number;
-  title: string;
-  status: string;
-};
-
-export type LidarrProfile = { id: number; name: string };
-export type LidarrRootFolder = { id: number; path: string };
+export type {
+  LidarrAlbum,
+  LidarrAlbumStatistics,
+  LidarrArtist,
+  LidarrProfile,
+  LidarrQueueItem,
+  LidarrRootFolder,
+} from "./schemas.js";
 
 export class LidarrClient {
   private baseUrl: string;
@@ -78,22 +67,58 @@ export class LidarrClient {
 
   async getQualityProfiles(): Promise<LidarrProfile[]> {
     this.logger.debug("Fetching Lidarr quality profiles");
-    return this.request<LidarrProfile[]>("GET", "/qualityprofile");
+    const raw = await this.request<unknown>("GET", "/qualityprofile");
+    try {
+      return z.array(LidarrProfileSchema).parse(raw);
+    } catch (err) {
+      this.logger.error(
+        { err, operation: "getQualityProfiles" },
+        "lidarr response validation failed",
+      );
+      throw err;
+    }
   }
 
   async getMetadataProfiles(): Promise<LidarrProfile[]> {
     this.logger.debug("Fetching Lidarr metadata profiles");
-    return this.request<LidarrProfile[]>("GET", "/metadataprofile");
+    const raw = await this.request<unknown>("GET", "/metadataprofile");
+    try {
+      return z.array(LidarrProfileSchema).parse(raw);
+    } catch (err) {
+      this.logger.error(
+        { err, operation: "getMetadataProfiles" },
+        "lidarr response validation failed",
+      );
+      throw err;
+    }
   }
 
   async getRootFolders(): Promise<LidarrRootFolder[]> {
     this.logger.debug("Fetching Lidarr root folders");
-    return this.request<LidarrRootFolder[]>("GET", "/rootfolder");
+    const raw = await this.request<unknown>("GET", "/rootfolder");
+    try {
+      return z.array(LidarrRootFolderSchema).parse(raw);
+    } catch (err) {
+      this.logger.error(
+        { err, operation: "getRootFolders" },
+        "lidarr response validation failed",
+      );
+      throw err;
+    }
   }
 
   async getArtists(): Promise<LidarrArtist[]> {
     this.logger.debug("Fetching all Lidarr artists");
-    return this.request("GET", "/artist");
+    const raw = await this.request<unknown>("GET", "/artist");
+    try {
+      return z.array(LidarrArtistSchema).parse(raw);
+    } catch (err) {
+      this.logger.error(
+        { err, operation: "getArtists" },
+        "lidarr response validation failed",
+      );
+      throw err;
+    }
   }
 
   async addArtist(params: {
@@ -106,7 +131,7 @@ export class LidarrClient {
     this.logger.debug(
       `Adding artist ${params.artistName} (${params.artistMbid})`,
     );
-    return this.request("POST", "/artist", {
+    const raw = await this.request<unknown>("POST", "/artist", {
       foreignArtistId: params.artistMbid,
       artistName: params.artistName,
       qualityProfileId: params.qualityProfileId,
@@ -118,18 +143,48 @@ export class LidarrClient {
         searchForMissingAlbums: false,
       },
     });
+    try {
+      return LidarrArtistSchema.parse(raw);
+    } catch (err) {
+      this.logger.error(
+        { err, operation: "addArtist", artistMbid: params.artistMbid },
+        "lidarr response validation failed",
+      );
+      throw err;
+    }
   }
 
   async getAlbumsForArtist(lidarrArtistId: number): Promise<LidarrAlbum[]> {
     this.logger.debug(`Fetching albums for Lidarr artist ${lidarrArtistId}`);
-    return this.request("GET", `/album?artistId=${lidarrArtistId}`);
+    const raw = await this.request<unknown>(
+      "GET",
+      `/album?artistId=${lidarrArtistId}`,
+    );
+    try {
+      return z.array(LidarrAlbumSchema).parse(raw);
+    } catch (err) {
+      this.logger.error(
+        { err, operation: "getAlbumsForArtist", lidarrArtistId },
+        "lidarr response validation failed",
+      );
+      throw err;
+    }
   }
 
   async getAlbumsByIds(ids: number[]): Promise<LidarrAlbum[]> {
     this.logger.debug(`Fetching albums by ids: ${ids.join(",")}`);
     if (ids.length === 0) return [];
     const query = ids.map((id) => `albumIds=${id}`).join("&");
-    return this.request("GET", `/album?${query}`);
+    const raw = await this.request<unknown>("GET", `/album?${query}`);
+    try {
+      return z.array(LidarrAlbumSchema).parse(raw);
+    } catch (err) {
+      this.logger.error(
+        { err, operation: "getAlbumsByIds", ids },
+        "lidarr response validation failed",
+      );
+      throw err;
+    }
   }
 
   async setAlbumMonitored(albumId: number, monitored: boolean): Promise<void> {
@@ -151,10 +206,16 @@ export class LidarrClient {
 
   async getQueue(): Promise<LidarrQueueItem[]> {
     this.logger.debug("Fetching Lidarr queue");
-    const res = await this.request<{ records: LidarrQueueItem[] }>(
-      "GET",
-      "/queue?pageSize=1000",
-    );
-    return res.records ?? [];
+    const raw = await this.request<unknown>("GET", "/queue?pageSize=1000");
+    try {
+      const res = LidarrQueueResponseSchema.parse(raw);
+      return res.records ?? [];
+    } catch (err) {
+      this.logger.error(
+        { err, operation: "getQueue" },
+        "lidarr response validation failed",
+      );
+      throw err;
+    }
   }
 }
