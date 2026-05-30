@@ -11,8 +11,12 @@ vi.mock("fastify-plugin", () => ({ default: (fn: unknown) => fn }));
 vi.mock("@fastify/secure-session", () => ({ default: vi.fn() }));
 vi.mock("../db/queries/users.js");
 vi.mock("../db/queries/albums.js", () => ({
+  getAlbumById: vi.fn(),
   getAlbumByMbid: vi.fn(),
   getAlbumWithArtistDetails: vi.fn(),
+}));
+vi.mock("../db/queries/album-edit.js", () => ({
+  applyAlbumEdit: vi.fn(),
 }));
 vi.mock("../db/queries/tracks.js", () => ({
   getOrphanTracksInDirectories: vi.fn(() => []),
@@ -29,6 +33,9 @@ vi.mock("../db/queries/album-artists.js", () => ({
 vi.mock("../coverart/store.js", () => ({
   ensureCoverOnDisk: vi.fn(),
   resolveAlbumCoverNow: vi.fn(() => null),
+  cacheCoverFromUrl: vi.fn(),
+  isLocalCoverUrl: (v: unknown) =>
+    typeof v === "string" && v.startsWith("/metadata/covers/"),
 }));
 vi.mock("../musicbrainz/client.js", () => ({
   lookupExternalAlbum: vi.fn(),
@@ -41,7 +48,12 @@ vi.mock("../library/identify.js", () => ({
   confirmAlbumMatch: vi.fn(),
 }));
 
-import { getAlbumWithArtistDetails } from "../db/queries/albums.js";
+import {
+  getAlbumById,
+  getAlbumWithArtistDetails,
+} from "../db/queries/albums.js";
+import { applyAlbumEdit } from "../db/queries/album-edit.js";
+import { cacheCoverFromUrl } from "../coverart/store.js";
 
 // A syntactically valid cuid2 album id (matches the route's CUID2_RE).
 const ALBUM_ID = "abcdefghijklmnopqrstuvwx";
@@ -93,6 +105,148 @@ describe("album routes admin gating", () => {
     expect(res.statusCode).not.toBe(403);
     expect(res.statusCode).toBe(400);
   });
+});
+
+describe("PATCH /:albumId edit persistence", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const validBody = {
+    title: "New Title",
+    artistName: "New Artist",
+    releaseYear: 2021,
+    coverArtUrl: null,
+    tracks: [],
+  };
+
+  it("returns 404 when the album does not exist", async () => {
+    asAdmin(true);
+    vi.mocked(getAlbumById).mockReturnValue(undefined);
+    const app = buildApp();
+    const res = await app.inject({
+      method: "PATCH",
+      url: `/${ALBUM_ID}`,
+      payload: validBody,
+    });
+    expect(res.statusCode).toBe(404);
+    expect(applyAlbumEdit).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 on a malformed body", async () => {
+    asAdmin(true);
+    vi.mocked(getAlbumById).mockReturnValue({ id: ALBUM_ID } as never);
+    const app = buildApp();
+    const res = await app.inject({
+      method: "PATCH",
+      url: `/${ALBUM_ID}`,
+      payload: { title: "missing the rest" },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(applyAlbumEdit).not.toHaveBeenCalled();
+  });
+
+  it("persists a valid edit and returns the AlbumEditResponse shape", async () => {
+    asAdmin(true);
+    vi.mocked(getAlbumById).mockReturnValue({
+      id: ALBUM_ID,
+      coverArtUrl: null,
+    } as never);
+    vi.mocked(applyAlbumEdit).mockReturnValue({
+      updatedTracks: 3,
+      removedTracks: 1,
+      attachedTracks: 2,
+    });
+    const app = buildApp();
+    const res = await app.inject({
+      method: "PATCH",
+      url: `/${ALBUM_ID}`,
+      payload: validBody,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      ok: true,
+      albumId: ALBUM_ID,
+      updatedTracks: 3,
+      removedTracks: 1,
+      attachedTracks: 2,
+    });
+    expect(cacheCoverFromUrl).not.toHaveBeenCalled();
+  });
+
+  it("downloads + caches an external cover and persists the local path", async () => {
+    asAdmin(true);
+    vi.mocked(getAlbumById).mockReturnValue({
+      id: ALBUM_ID,
+      coverArtUrl: null,
+    } as never);
+    vi.mocked(cacheCoverFromUrl).mockResolvedValue(
+      "/metadata/covers/album-x.jpg",
+    );
+    vi.mocked(applyAlbumEdit).mockReturnValue({
+      updatedTracks: 0,
+      removedTracks: 0,
+      attachedTracks: 0,
+    });
+    const app = buildApp();
+    const res = await app.inject({
+      method: "PATCH",
+      url: `/${ALBUM_ID}`,
+      payload: { ...validBody, coverArtUrl: "https://img.example/cover.jpg" },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(cacheCoverFromUrl).toHaveBeenCalledWith(
+      ALBUM_ID,
+      "https://img.example/cover.jpg",
+    );
+    expect(vi.mocked(applyAlbumEdit).mock.calls[0]?.[1].coverArtUrl).toBe(
+      "/metadata/covers/album-x.jpg",
+    );
+  });
+
+  it("keeps the existing cover when caching fails", async () => {
+    asAdmin(true);
+    vi.mocked(getAlbumById).mockReturnValue({
+      id: ALBUM_ID,
+      coverArtUrl: "/metadata/covers/album-x.jpg",
+    } as never);
+    vi.mocked(cacheCoverFromUrl).mockResolvedValue(null);
+    vi.mocked(applyAlbumEdit).mockReturnValue({
+      updatedTracks: 0,
+      removedTracks: 0,
+      attachedTracks: 0,
+    });
+    const app = buildApp();
+    const res = await app.inject({
+      method: "PATCH",
+      url: `/${ALBUM_ID}`,
+      payload: { ...validBody, coverArtUrl: "https://img.example/bad.jpg" },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(vi.mocked(applyAlbumEdit).mock.calls[0]?.[1].coverArtUrl).toBe(
+      "/metadata/covers/album-x.jpg",
+    );
+  });
+
+  it("returns 500 when persistence throws", async () => {
+    asAdmin(true);
+    vi.mocked(getAlbumById).mockReturnValue({
+      id: ALBUM_ID,
+      coverArtUrl: null,
+    } as never);
+    vi.mocked(applyAlbumEdit).mockImplementation(() => {
+      throw new Error("boom");
+    });
+    const app = buildApp();
+    const res = await app.inject({
+      method: "PATCH",
+      url: `/${ALBUM_ID}`,
+      payload: validBody,
+    });
+    expect(res.statusCode).toBe(500);
+  });
+});
+
+describe("GET /:albumKey stays public", () => {
+  beforeEach(() => vi.clearAllMocks());
 
   it("keeps GET /:albumKey public for a non-admin", async () => {
     asAdmin(false);
