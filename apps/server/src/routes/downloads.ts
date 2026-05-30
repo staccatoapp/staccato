@@ -20,8 +20,8 @@ function toDto(row: DownloadRequestRow): DownloadRequest {
     status: row.status,
     errorMessage: row.errorMessage,
     lidarrAlbumId: row.lidarrAlbumId,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
+    createdAt: row.createdAt?.toISOString() ?? null,
+    updatedAt: row.updatedAt?.toISOString() ?? null,
   };
 }
 
