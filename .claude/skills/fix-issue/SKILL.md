@@ -94,12 +94,11 @@ if [ -n "$(git status --porcelain)" ]; then
   exit 1
 fi
 
-# 3. Reset to latest main so the new branch starts clean
+# 3. Create the issue branch directly from origin/main.
+# Do NOT `git checkout main` first — git worktree prevents checking out a branch
+# that is already checked out in another worktree (the primary repo holds main).
 git fetch origin
-git checkout main && git reset --hard origin/main
-
-# 4. Create the issue branch
-git checkout -b agent/<issue#>-<short-slug>
+git checkout -b agent/<issue#>-<short-slug> origin/main
 ```
 
 **PATH DISCIPLINE** — every subsequent operation must use `C:\Projects\staccato-fix-issue-agent` as the root, not `C:\Projects\staccato`:
@@ -154,6 +153,7 @@ If something genuinely can't be verified here (missing service/dep), state exact
 ## Common Mistakes
 
 - **Skipping the worktree setup** — Phase 4 always sets up `C:\Projects\staccato-fix-issue-agent` via the Bash snippet. Don't skip the dirty-check or reset steps.
+- **`git checkout main` in the worktree** — git prevents checking out a branch that is already checked out in another worktree. The primary repo holds `main`, so running `git checkout main` inside the fix-issue worktree always fails. Always create the issue branch directly from `origin/main` with `git checkout -b agent/... origin/main`.
 - **Summarising the issue and diving straight to code** — skips both gates; the most common failure. Confirm requirements, then get plan approval.
 - **Running `gh`/`git` through PowerShell** — multi-line bodies and `\` continuations break. Use the Bash tool.
 - **Inlining the PR body** — em-dashes/curly quotes mangle on the command line. Use `--body-file` with a UTF-8 file. Pass an **absolute path** to `--body-file`; `gh` does not resolve relative paths from the repo root when invoked via Bash.
