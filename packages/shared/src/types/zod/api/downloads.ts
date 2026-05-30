@@ -46,8 +46,8 @@ export const DownloadRequestSchema = z.object({
   status: DownloadRequestStatusSchema,
   errorMessage: z.string().nullable(),
   lidarrAlbumId: z.number().nullable(),
-  createdAt: z.coerce.date().nullable(),
-  updatedAt: z.coerce.date().nullable(),
+  createdAt: z.string().nullable(),
+  updatedAt: z.string().nullable(),
 });
 export type DownloadRequest = z.infer<typeof DownloadRequestSchema>;
 
