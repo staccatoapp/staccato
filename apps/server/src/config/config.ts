@@ -14,14 +14,25 @@ const intFromEnv = (fallback: number, min = 0) =>
     return Number.isInteger(n) && n >= min ? n : fallback;
   }, z.number().int().min(min));
 
-const ConfigSchema = z.object({
+export const ConfigSchema = z.object({
   STACCATO_ENV: z.string().optional(),
   PORT: intFromEnv(8280),
   STACCATO_DATA_DIR: z.string().default("./data"),
   STACCATO_SERVER_MUSIC_DIR: z.string().default("./music"),
   STACCATO_LOG_LEVEL: z.string().default("info"),
   STACCATO_LOG_FORMAT: z.string().default("pretty"),
-  STACCATO_SERVER_SESSION_SECRET: z.string().min(1),
+  STACCATO_SERVER_SESSION_SECRET: z
+    .string()
+    .min(32)
+    .refine(
+      (val) =>
+        process.env.STACCATO_ENV === "test" ||
+        val !== "change-this-to-a-random-32-plus-character-secret",
+      {
+        message:
+          "Session secret must not be the default placeholder. Generate one with: openssl rand -base64 32",
+      },
+    ),
   STACCATO_METADATA_URL: z.string().url().default("http://localhost:8290/v1"),
   STACCATO_SERVER_LIBRARY_DISCOVERY_CONCURRENCY: intFromEnv(8, 1),
   STACCATO_SERVER_LIBRARY_WORKER_CONCURRENCY: intFromEnv(6, 1),

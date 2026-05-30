@@ -77,14 +77,36 @@ Cover: files created/modified, the change per file, tests to add/update, and how
 
 ### Phase 4 — Implement on a branch
 
-**REQUIRED SUB-SKILL:** use `superpowers:using-git-worktrees` to create an isolated workspace. Consent is implicit — skip the consent gate and go straight to Step 1. Use branch name `agent/<issue#>-<short-slug>` (e.g. `agent/42-queue-race`). If the native `EnterWorktree` tool is available, prefer it (Step 1a).
+Use the fixed worktree at `C:\Projects\staccato-fix-issue-agent` — a sibling of the main repo, so main-repo agents never traverse it. This path is reused across issues; each issue gets its own branch inside it.
 
-**WORKTREE PATH DISCIPLINE** — once `EnterWorktree` runs, the session cwd is the worktree (e.g. `C:\Projects\staccato\.claude\worktrees\agent+10-…`). Every subsequent operation must stay inside that path:
-- **Bash**: do not prefix commands with `cd /c/Projects/staccato &&` or any path to the main repo checkout — run `pnpm`, `git`, and `gh` directly so they resolve from the worktree cwd.
-- **Explore agents**: pass the worktree path as the search root, not the main repo path. The worktree path is printed in `EnterWorktree`'s output — use it explicitly in agent prompts.
-- **Read / Edit / Write**: use absolute paths rooted at the worktree, not at `C:\Projects\staccato\`. Translate any main-repo paths returned by explorers before using them.
+**Setup (run via Bash tool):**
 
-Violating this causes all edits to land in the main repo's working tree, defeating the isolation and forcing a manual branch creation at commit time.
+```bash
+# 1. Create the fixed worktree if it doesn't exist
+if [ ! -d "/c/Projects/staccato-fix-issue-agent" ]; then
+  git -C /c/Projects/staccato worktree add /c/Projects/staccato-fix-issue-agent main
+fi
+
+# 2. Halt if dirty — uncommitted work from a previous issue must be resolved first
+cd /c/Projects/staccato-fix-issue-agent
+if [ -n "$(git status --porcelain)" ]; then
+  echo "DIRTY — uncommitted changes present. Resolve before starting a new issue."
+  exit 1
+fi
+
+# 3. Create the issue branch directly from origin/main.
+# Do NOT `git checkout main` first — git worktree prevents checking out a branch
+# that is already checked out in another worktree (the primary repo holds main).
+git fetch origin
+git checkout -b agent/<issue#>-<short-slug> origin/main
+```
+
+**PATH DISCIPLINE** — every subsequent operation must use `C:\Projects\staccato-fix-issue-agent` as the root, not `C:\Projects\staccato`:
+- **Bash**: run `pnpm`, `git`, and `gh` from inside the worktree; never `cd` back to the main repo.
+- **Explore agents**: pass `C:\Projects\staccato-fix-issue-agent` as the search root explicitly in the agent prompt.
+- **Read / Edit / Write**: use absolute paths rooted at `C:\Projects\staccato-fix-issue-agent`.
+
+Violating this causes edits to land in the main repo's working tree.
 
 1. Make surgical changes that follow existing patterns; no unrelated churn.
 3. Honour Staccato conventions (`CLAUDE.md`):
@@ -130,7 +152,8 @@ If something genuinely can't be verified here (missing service/dep), state exact
 
 ## Common Mistakes
 
-- **Skipping the worktree setup** — Phase 4 always starts with `superpowers:using-git-worktrees`. Don't fall back to a bare `git checkout -b`.
+- **Skipping the worktree setup** — Phase 4 always sets up `C:\Projects\staccato-fix-issue-agent` via the Bash snippet. Don't skip the dirty-check or reset steps.
+- **`git checkout main` in the worktree** — git prevents checking out a branch that is already checked out in another worktree. The primary repo holds `main`, so running `git checkout main` inside the fix-issue worktree always fails. Always create the issue branch directly from `origin/main` with `git checkout -b agent/... origin/main`.
 - **Summarising the issue and diving straight to code** — skips both gates; the most common failure. Confirm requirements, then get plan approval.
 - **Running `gh`/`git` through PowerShell** — multi-line bodies and `\` continuations break. Use the Bash tool.
 - **Inlining the PR body** — em-dashes/curly quotes mangle on the command line. Use `--body-file` with a UTF-8 file. Pass an **absolute path** to `--body-file`; `gh` does not resolve relative paths from the repo root when invoked via Bash.
@@ -138,4 +161,5 @@ If something genuinely can't be verified here (missing service/dep), state exact
 - **Re-deriving planning/TDD/clarify logic inline** — defer to the referenced sub-skills instead of duplicating them.
 - **Generic branch names** (`fix/...`, `patch-1`) — this repo uses `agent/<issue#>-<slug>`.
 - **Skipping a `catch`/external-call log** — fails review under the Staccato logging rules; add it during Phase 4, not after.
-- **Editing main-repo files after entering the worktree** — if Read/Edit/Write paths or Bash `cd` commands point at `C:\Projects\staccato\` instead of the worktree path, all changes land in the main checkout. The worktree provides zero isolation and you'll have to create the branch manually at commit time. Use the worktree path printed by `EnterWorktree` for everything.
+- **Editing main-repo files from inside the worktree** — if Read/Edit/Write paths or Bash commands point at `C:\Projects\staccato\` instead of `C:\Projects\staccato-fix-issue-agent\`, changes land in the main checkout. Always use the fixed sibling path.
+- **Passing the wrong root to Explore agents** — explorers default to the session cwd. Explicitly pass `C:\Projects\staccato-fix-issue-agent` as the search root or they may search the main repo and return paths that don't translate.

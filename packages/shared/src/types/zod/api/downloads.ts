@@ -1,5 +1,28 @@
 import { z } from "zod";
 
+export const DownloadRequestStatusSchema = z.enum([
+  "requested",
+  "sent_to_lidarr",
+  "downloading",
+  "completed",
+  "failed",
+]);
+export type DownloadRequestStatus = z.infer<typeof DownloadRequestStatusSchema>;
+
+export const DownloadRequestSchema = z.object({
+  id: z.string(),
+  releaseGroupMbid: z.string(),
+  artistMbid: z.string(),
+  artistName: z.string(),
+  albumTitle: z.string().nullable(),
+  status: DownloadRequestStatusSchema,
+  errorMessage: z.string().nullable(),
+  lidarrAlbumId: z.number().int().nullable(),
+  createdAt: z.string().nullable(),
+  updatedAt: z.string().nullable(),
+});
+export type DownloadRequest = z.infer<typeof DownloadRequestSchema>;
+
 export const CreateDownloadRequestSchema = z.object({
   releaseGroupMbid: z.string().min(1),
   artistMbid: z.string().min(1),
