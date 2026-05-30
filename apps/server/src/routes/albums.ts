@@ -6,9 +6,11 @@ import {
   IdentifyApplyRequestSchema,
 } from "@staccato/shared";
 import {
+  getAlbumById,
   getAlbumByMbid,
   getAlbumWithArtistDetails,
 } from "../db/queries/albums.js";
+import { applyAlbumEdit } from "../db/queries/album-edit.js";
 import {
   getOrphanTracksInDirectories,
   getTrackFilePathsInAlbum,
@@ -19,7 +21,12 @@ import {
   listTrackArtistsForTracks,
 } from "../db/queries/track-artists.js";
 import { listAlbumArtists } from "../db/queries/album-artists.js";
-import { ensureCoverOnDisk, resolveAlbumCoverNow } from "../coverart/store.js";
+import {
+  cacheCoverFromUrl,
+  ensureCoverOnDisk,
+  isLocalCoverUrl,
+  resolveAlbumCoverNow,
+} from "../coverart/store.js";
 import {
   lookupExternalAlbum,
   lookupReleaseDetails,
@@ -163,10 +170,11 @@ const albumRoutes: FastifyPluginAsync = async (fastify) => {
     });
 
     // ─── Edit Album: persist manual metadata/tracklist edits ───────────────
-    // Contract is live (validated here); persistence is a deliberate
-    // follow-up, so a valid request currently returns 501. The dialog wires
-    // Save to this endpoint now so the request/response shape can't drift
-    // before Phase 2.
+    // Overwrite model — edits write straight to the canonical rows with no
+    // per-field lock. A later file re-tag / retry-resolution / sibling
+    // re-resolve (library/commit.ts) or a re-identify (library/identify.ts) can
+    // silently clobber these manual edits; protecting against that is a
+    // deliberate follow-up (see edit-album Phase 2+ notes).
     admin.patch("/:albumId", async (request, reply) => {
       const { albumId } = request.params as { albumId: string };
       if (!CUID2_RE.test(albumId)) {
@@ -176,13 +184,40 @@ const albumRoutes: FastifyPluginAsync = async (fastify) => {
       if (!parsed.success) {
         return reply.status(400).send({ error: "Invalid request body" });
       }
-      request.log.info(
-        { albumId, trackCount: parsed.data.tracks.length },
-        "album edit received (persistence not yet implemented)",
-      );
-      return reply
-        .status(501)
-        .send({ error: "Album editing not yet implemented" });
+      const body = parsed.data;
+
+      const album = getAlbumById(albumId);
+      if (!album) {
+        return reply.status(404).send({ error: "Album not found" });
+      }
+
+      // Resolve the cover before the (sync) transaction. An external https URL
+      // is downloaded + cached so we persist a local /metadata/covers path, not
+      // a raw third-party link. null clears the cover; an already-local path
+      // passes through. On a failed download we keep the existing cover rather
+      // than failing the whole edit.
+      let coverArtUrl = body.coverArtUrl;
+      if (coverArtUrl && !isLocalCoverUrl(coverArtUrl)) {
+        const cached = await cacheCoverFromUrl(albumId, coverArtUrl);
+        if (cached) {
+          coverArtUrl = cached;
+        } else {
+          request.log.warn(
+            { albumId, coverArtUrl },
+            "cover art caching failed; keeping existing cover",
+          );
+          coverArtUrl = album.coverArtUrl;
+        }
+      }
+
+      try {
+        const counts = applyAlbumEdit(albumId, { ...body, coverArtUrl });
+        request.log.info({ albumId, ...counts }, "album edit persisted");
+        return { ok: true as const, albumId, ...counts };
+      } catch (err) {
+        request.log.error({ err, albumId }, "album edit failed");
+        return reply.status(500).send({ error: "Album edit failed" });
+      }
     });
   });
 

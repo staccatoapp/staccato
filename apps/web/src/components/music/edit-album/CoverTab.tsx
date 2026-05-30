@@ -15,6 +15,27 @@ export function CoverTab({
   setAlbumKey: <K extends keyof DraftAlbum>(k: K, v: DraftAlbum[K]) => void;
 }) {
   const [url, setUrl] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const handleUse = () => {
+    const trimmed = url.trim();
+    if (!trimmed) return;
+    let parsed: URL;
+    try {
+      parsed = new URL(trimmed);
+    } catch {
+      setError("Enter a valid image URL.");
+      return;
+    }
+    // The server downloads + caches the cover and only fetches over https.
+    if (parsed.protocol !== "https:") {
+      setError("Cover URL must start with https://");
+      return;
+    }
+    setError(null);
+    setAlbumKey("coverArtUrl", trimmed);
+  };
+
   return (
     <div className="px-6 pt-6 pb-7">
       <p className={cn(microLabel, "mb-3")}>Cover art</p>
@@ -48,18 +69,17 @@ export function CoverTab({
           <div className="flex gap-2">
             <Input
               value={url}
-              onChange={(e) => setUrl(e.target.value)}
+              onChange={(e) => {
+                setUrl(e.target.value);
+                if (error) setError(null);
+              }}
               placeholder="https://example.com/cover.jpg"
             />
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (url.trim()) setAlbumKey("coverArtUrl", url.trim());
-              }}
-            >
+            <Button variant="outline" onClick={handleUse}>
               Use
             </Button>
           </div>
+          {error && <p className="text-[0.74rem] text-destructive">{error}</p>}
           {album.coverArtUrl && (
             <button
               type="button"
