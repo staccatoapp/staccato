@@ -3,6 +3,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Check, ChevronLeft, Play, Plus } from "lucide-react";
 import {
+  type PlaybackSession,
+  PlaybackSessionSchema,
   type PlaylistListItem,
   PlaylistListResponseSchema,
   type RecommendedPlaylistTrack,
@@ -94,14 +96,14 @@ function RecommendationDetailPage() {
     }: {
       trackIds: string[];
       startIndex: number;
-    }) => {
+    }): Promise<PlaybackSession> => {
       const res = await fetch("/api/playback/session/play", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ trackIds, startIndex }),
       });
       if (!res.ok) throw new Error("Failed to start playback");
-      return res.json();
+      return PlaybackSessionSchema.parse(await res.json());
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["playback-session"] });

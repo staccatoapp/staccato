@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
+  type PlaylistDetail,
+  PlaylistDetailSchema,
   type PlaylistListItem,
   PlaylistListResponseSchema,
 } from "@staccato/shared";
@@ -42,14 +44,14 @@ function PlaylistsPage() {
     }: {
       name: string;
       description?: string;
-    }) => {
+    }): Promise<PlaylistDetail> => {
       const res = await fetch("/api/playlists", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, description }),
       });
       if (!res.ok) throw new Error("Failed to create playlist");
-      return res.json();
+      return PlaylistDetailSchema.parse(await res.json());
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["playlists"] });

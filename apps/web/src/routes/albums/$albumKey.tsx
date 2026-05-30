@@ -24,6 +24,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  type ConfirmMatchResponse,
+  ConfirmMatchResponseSchema,
+  type PlaybackSession,
+  PlaybackSessionSchema,
   type PlaylistListItem,
   PlaylistListResponseSchema,
   type ServerSettings,
@@ -139,12 +143,12 @@ function LocalAlbumView({
       : null;
 
   const confirmMatchMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (): Promise<ConfirmMatchResponse> => {
       const res = await fetch(`/api/albums/${albumKey}/confirm-match`, {
         method: "POST",
       });
       if (!res.ok) throw new Error("Failed to confirm match");
-      return res.json();
+      return ConfirmMatchResponseSchema.parse(await res.json());
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["album", albumKey] });
@@ -190,14 +194,14 @@ function LocalAlbumView({
     }: {
       trackIds: string[];
       startIndex: number;
-    }) => {
+    }): Promise<PlaybackSession> => {
       const res = await fetch("/api/playback/session/play", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ trackIds, startIndex }),
       });
       if (!res.ok) throw new Error("Failed to start playback");
-      return res.json();
+      return PlaybackSessionSchema.parse(await res.json());
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["playback-session"] });

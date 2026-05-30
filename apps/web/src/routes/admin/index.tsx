@@ -41,6 +41,7 @@ import {
   type LidarrSettings,
   LidarrSettingsSchema,
   type LidarrTestResult,
+  LidarrTestResultSchema,
   type ScanProgress,
   ScanProgressSchema,
   type TestLidarrConnection,
@@ -402,7 +403,7 @@ function LidarrForm() {
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error("Test failed");
-      return res.json();
+      return LidarrTestResultSchema.parse(await res.json());
     },
     onSuccess: (result) => {
       setTestResult(result);

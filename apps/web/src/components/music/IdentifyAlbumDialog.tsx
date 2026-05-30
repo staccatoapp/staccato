@@ -13,6 +13,7 @@ import {
 import { toast } from "sonner";
 import {
   type IdentifyApplyResponse,
+  IdentifyApplyResponseSchema,
   type IdentifyOrphansResponse,
   IdentifyOrphansResponseSchema,
   type IdentifyOrphanTrack,
@@ -654,7 +655,7 @@ export function IdentifyAlbumDialog({
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? `Identify failed (${res.status})`);
       }
-      return res.json();
+      return IdentifyApplyResponseSchema.parse(await res.json());
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["album", albumKey] });

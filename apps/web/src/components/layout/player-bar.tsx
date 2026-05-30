@@ -207,7 +207,7 @@ function PlayerBar() {
         body: JSON.stringify(state),
       });
       if (!res.ok) throw new Error("Failed to update playback state");
-      return res.json() as Promise<PlaybackSession>;
+      return PlaybackSessionSchema.parse(await res.json());
     },
     onMutate: async (state) => {
       await queryClient.cancelQueries({ queryKey: ["playback-session"] });
