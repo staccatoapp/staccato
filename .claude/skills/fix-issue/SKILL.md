@@ -172,3 +172,4 @@ If something genuinely can't be verified here (missing service/dep), state exact
 - **Skipping a `catch`/external-call log** — fails review under the Staccato logging rules; add it during Phase 5, not after.
 - **Editing main-repo files from inside the worktree** — if Read/Edit/Write paths or Bash commands point at `C:\Projects\staccato\` instead of `C:\Projects\staccato-fix-issue-agent\`, changes land in the main checkout. Always use the fixed sibling path.
 - **Passing the wrong root to Explore agents** — explorers default to the session cwd. Explicitly pass `C:\Projects\staccato-fix-issue-agent` as the search root or they may search the main repo and return paths that don't translate.
+- **`gh pr create` missing `--head` in a worktree** — when `gh` is run from inside the worktree via Bash, the shell cwd may be reset between commands, causing `gh` to lose track of the current branch. Always pass `--head agent/<issue#>-<slug>` explicitly to `gh pr create`.
