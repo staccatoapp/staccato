@@ -1,9 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { MIRROR_USER_AGENT } from "../constants.js";
-
-const MBID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { MBID_RE } from "../lib/id-patterns.js";
 
 const CAA_BASE = "https://coverartarchive.org";
 

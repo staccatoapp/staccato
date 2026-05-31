@@ -22,10 +22,7 @@ import {
   type ArtistReleaseGroup,
 } from "../musicbrainz/client.js";
 import { logger } from "../logger.js";
-
-const CUID2_RE = /^[a-z0-9]{24}$/;
-const MBID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { CUID2_RE, MBID_RE } from "../lib/id-patterns.js";
 
 const DISCOGRAPHY_PRIMARY_TYPES = new Set(["Album", "EP"]);
 

@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { MetadataArtistImageSchema } from "@staccato/shared";
 import { mirrorFetch } from "../mirror/client.js";
+import { MBID_RE } from "../lib/id-patterns.js";
 
 export const ArtistUrlRelsSchema = z.object({
   relations: z
@@ -33,9 +34,6 @@ export const WikidataEntitySchema = z.object({
     }),
   ),
 });
-
-const MBID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 type CacheValue = { url: string; filename: string } | null;

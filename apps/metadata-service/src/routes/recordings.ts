@@ -13,9 +13,7 @@ import {
   toMetadataRecording,
   toMetadataRecordingSearchResult,
 } from "../mirror/map.js";
-
-const MBID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { MBID_RE } from "../lib/id-patterns.js";
 
 const SEARCH_INC = "artist-credits+releases+release-groups+media";
 

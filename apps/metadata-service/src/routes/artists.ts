@@ -13,9 +13,7 @@ import {
   toMetadataArtist,
   toMetadataArtistReleaseGroups,
 } from "../mirror/map.js";
-
-const MBID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { MBID_RE } from "../lib/id-patterns.js";
 
 const RG_PAGE_LIMIT = 100;
 const RG_MAX_PAGES = 5;

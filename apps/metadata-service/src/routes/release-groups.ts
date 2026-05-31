@@ -8,9 +8,7 @@ import {
 } from "../mirror/schemas.js";
 import { toArtistCredits, toMetadataReleaseDetail } from "../mirror/map.js";
 import { parseReleaseYear, pickBestRelease } from "../mirror/pickRelease.js";
-
-const MBID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { MBID_RE } from "../lib/id-patterns.js";
 
 // R6 · album detail + tracklist in one round-trip. Internally: release-group
 // lookup → pickBestRelease → release lookup. Serves the server's
