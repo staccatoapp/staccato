@@ -161,9 +161,22 @@ export type AlbumIdByTitleAndArtistId = ReturnType<
   typeof getAlbumIdByTitleAndArtistId
 >;
 
+function pendingTrackCountsSubquery() {
+  return db
+    .select({
+      albumId: tracks.albumId,
+      pendingCount: count().as("pending_count"),
+    })
+    .from(tracks)
+    .where(sql`${tracks.resolutionStatus} IN ('pending','resolving')`)
+    .groupBy(tracks.albumId)
+    .as("pending_counts");
+}
+
 export function getAlbumsWithArtistDetails(
   paginationOptions: PaginationOptions,
 ): AlbumWithArtistDetailsRow[] {
+  const sq = pendingTrackCountsSubquery();
   return db
     .select({
       id: albums.id,
@@ -176,10 +189,11 @@ export function getAlbumsWithArtistDetails(
       coverArtUrl: albums.coverArtUrl,
       createdAt: albums.createdAt,
       confidenceScore: albums.confidenceScore,
-      pendingTrackCount: sql<number>`(SELECT COUNT(*) FROM tracks WHERE tracks.album_id = ${albums.id} AND tracks.resolution_status IN ('pending','resolving'))`,
+      pendingTrackCount: sql<number>`COALESCE(${sq.pendingCount}, 0)`,
     })
     .from(albums)
     .innerJoin(artists, eq(albums.artistId, artists.id))
+    .leftJoin(sq, eq(albums.id, sq.albumId))
     .orderBy(
       asc(sql`COALESCE(${artists.canonicalName}, ${artists.name})`),
       asc(sql`COALESCE(${albums.canonicalTitle}, ${albums.title})`),
@@ -239,6 +253,7 @@ export function searchAlbums(
   pattern: string,
   limit: number,
 ): AlbumWithArtistDetailsRow[] {
+  const sq = pendingTrackCountsSubquery();
   return db
     .select({
       id: albums.id,
@@ -251,10 +266,11 @@ export function searchAlbums(
       coverArtUrl: albums.coverArtUrl,
       createdAt: albums.createdAt,
       confidenceScore: albums.confidenceScore,
-      pendingTrackCount: sql<number>`(SELECT COUNT(*) FROM tracks WHERE tracks.album_id = ${albums.id} AND tracks.resolution_status IN ('pending','resolving'))`,
+      pendingTrackCount: sql<number>`COALESCE(${sq.pendingCount}, 0)`,
     })
     .from(albums)
     .innerJoin(artists, eq(albums.artistId, artists.id))
+    .leftJoin(sq, eq(albums.id, sq.albumId))
     .where(
       or(
         like(albums.title, pattern),
