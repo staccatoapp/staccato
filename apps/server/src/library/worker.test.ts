@@ -10,7 +10,11 @@ import {
 import { tracks } from "../db/schema/index.js";
 import { discoverFile, resolveTrack } from "./worker.js";
 import { libraryProgress, resetProgress } from "./state.js";
-import { makeTags, makeCandidate, makeResolvedRelease } from "./__fixtures__/builders.js";
+import {
+  makeTags,
+  makeCandidate,
+  makeResolvedRelease,
+} from "./__fixtures__/builders.js";
 import { enqueueResolution, enqueueEnrichment } from "./queue.js";
 import { extractTags } from "./evidence/tags.js";
 import { fingerprintFile } from "./evidence/fingerprint.js";
@@ -21,6 +25,7 @@ import { candidatesFromSearch } from "./candidates/fromSearch.js";
 import { scoreCandidates, pickWinner } from "./scoring.js";
 import { pickRelease } from "./graphWalk.js";
 import { setAudioFingerprint } from "../db/queries/tracks.js";
+import type { Stats } from "node:fs";
 import fs from "node:fs/promises";
 
 let testDb: TestDb;
@@ -54,8 +59,12 @@ vi.mock("./queue.js", () => ({
 }));
 vi.mock("./commit.js", () => ({ commitResolution: vi.fn() }));
 vi.mock("./candidates/fromTags.js", () => ({ candidatesFromTags: vi.fn() }));
-vi.mock("./candidates/fromAcoustid.js", () => ({ candidatesFromAcoustid: vi.fn() }));
-vi.mock("./candidates/fromSearch.js", () => ({ candidatesFromSearch: vi.fn() }));
+vi.mock("./candidates/fromAcoustid.js", () => ({
+  candidatesFromAcoustid: vi.fn(),
+}));
+vi.mock("./candidates/fromSearch.js", () => ({
+  candidatesFromSearch: vi.fn(),
+}));
 vi.mock("./scoring.js", () => ({
   scoreCandidates: vi.fn(),
   pickWinner: vi.fn(),
@@ -87,15 +96,24 @@ describe("discoverFile", () => {
   it("returns early without re-extracting tags when track is resolved and file is unchanged", async () => {
     const artistId = seedArtist();
     const albumId = seedAlbum(artistId);
-    const trackId = seedTrack(artistId, albumId, { filePath: "/music/track.flac" });
+    const trackId = seedTrack(artistId, albumId, {
+      filePath: "/music/track.flac",
+    });
     // Promote to resolved with the same mtime/size the stat mock will return.
     testDb
       .update(tracks)
-      .set({ resolutionStatus: "resolved", fileMtime: 1000, fileSizeBytes: 1_000_000 })
+      .set({
+        resolutionStatus: "resolved",
+        fileMtime: 1000,
+        fileSizeBytes: 1_000_000,
+      })
       .where(eq(tracks.id, trackId))
       .run();
 
-    vi.mocked(fs.stat).mockResolvedValue({ size: 1_000_000, mtimeMs: 1000 } as any);
+    vi.mocked(fs.stat).mockResolvedValue({
+      size: 1_000_000,
+      mtimeMs: 1000,
+    } as unknown as Stats);
 
     await discoverFile("/music/track.flac");
 
@@ -107,14 +125,19 @@ describe("discoverFile", () => {
   it("clears the pending-removal flag when a previously-missing file reappears", async () => {
     const artistId = seedArtist();
     const albumId = seedAlbum(artistId);
-    const trackId = seedTrack(artistId, albumId, { filePath: "/music/track.flac" });
+    const trackId = seedTrack(artistId, albumId, {
+      filePath: "/music/track.flac",
+    });
     testDb
       .update(tracks)
       .set({ pendingRemovalAt: Date.now() })
       .where(eq(tracks.id, trackId))
       .run();
 
-    vi.mocked(fs.stat).mockResolvedValue({ size: 1_000_000, mtimeMs: 0 } as any);
+    vi.mocked(fs.stat).mockResolvedValue({
+      size: 1_000_000,
+      mtimeMs: 0,
+    } as unknown as Stats);
     vi.mocked(extractTags).mockResolvedValue(makeTags());
 
     await discoverFile("/music/track.flac");
@@ -128,7 +151,10 @@ describe("discoverFile", () => {
   });
 
   it("logs a warning and increments the failed counter when tag extraction throws", async () => {
-    vi.mocked(fs.stat).mockResolvedValue({ size: 1_000_000, mtimeMs: 0 } as any);
+    vi.mocked(fs.stat).mockResolvedValue({
+      size: 1_000_000,
+      mtimeMs: 0,
+    } as unknown as Stats);
     vi.mocked(extractTags).mockRejectedValue(new Error("corrupt file"));
 
     await discoverFile("/music/corrupt.flac");
@@ -139,7 +165,10 @@ describe("discoverFile", () => {
   });
 
   it("upserts the track, enqueues resolution, and increments the scanned counter for a new file", async () => {
-    vi.mocked(fs.stat).mockResolvedValue({ size: 1_000_000, mtimeMs: 0 } as any);
+    vi.mocked(fs.stat).mockResolvedValue({
+      size: 1_000_000,
+      mtimeMs: 0,
+    } as unknown as Stats);
     vi.mocked(extractTags).mockResolvedValue(makeTags());
 
     await discoverFile("/music/new.flac");
@@ -182,14 +211,23 @@ describe("resolveTrack", () => {
   it("returns early without re-resolving when track is resolved and file is unchanged", async () => {
     const artistId = seedArtist();
     const albumId = seedAlbum(artistId);
-    const trackId = seedTrack(artistId, albumId, { filePath: "/music/track.flac" });
+    const trackId = seedTrack(artistId, albumId, {
+      filePath: "/music/track.flac",
+    });
     testDb
       .update(tracks)
-      .set({ resolutionStatus: "resolved", fileMtime: 1000, fileSizeBytes: 1_000_000 })
+      .set({
+        resolutionStatus: "resolved",
+        fileMtime: 1000,
+        fileSizeBytes: 1_000_000,
+      })
       .where(eq(tracks.id, trackId))
       .run();
 
-    vi.mocked(fs.stat).mockResolvedValue({ size: 1_000_000, mtimeMs: 1000 } as any);
+    vi.mocked(fs.stat).mockResolvedValue({
+      size: 1_000_000,
+      mtimeMs: 1000,
+    } as unknown as Stats);
 
     await resolveTrack("/music/track.flac");
 
@@ -201,9 +239,14 @@ describe("resolveTrack", () => {
   it("marks the track failed when tag extraction throws during resolution", async () => {
     const artistId = seedArtist();
     const albumId = seedAlbum(artistId);
-    const trackId = seedTrack(artistId, albumId, { filePath: "/music/track.flac" });
+    const trackId = seedTrack(artistId, albumId, {
+      filePath: "/music/track.flac",
+    });
 
-    vi.mocked(fs.stat).mockResolvedValue({ size: 1_000_000, mtimeMs: 0 } as any);
+    vi.mocked(fs.stat).mockResolvedValue({
+      size: 1_000_000,
+      mtimeMs: 0,
+    } as unknown as Stats);
     vi.mocked(extractTags).mockRejectedValue(new Error("corrupt"));
 
     await resolveTrack("/music/track.flac");
@@ -220,9 +263,14 @@ describe("resolveTrack", () => {
   it("takes the Picard fast-path, commits from tags, and enqueues enrichment when all MB IDs are present", async () => {
     const artistId = seedArtist();
     const albumId = seedAlbum(artistId);
-    const trackId = seedTrack(artistId, albumId, { filePath: "/music/picard.flac" });
+    const trackId = seedTrack(artistId, albumId, {
+      filePath: "/music/picard.flac",
+    });
 
-    vi.mocked(fs.stat).mockResolvedValue({ size: 1_000_000, mtimeMs: 0 } as any);
+    vi.mocked(fs.stat).mockResolvedValue({
+      size: 1_000_000,
+      mtimeMs: 0,
+    } as unknown as Stats);
     vi.mocked(extractTags).mockResolvedValue(
       makeTags({
         mbRecordingId: "rec-mbid",
@@ -236,7 +284,11 @@ describe("resolveTrack", () => {
 
     expect(commitResolution).toHaveBeenCalledOnce();
     expect(enqueueEnrichment).toHaveBeenCalledOnce();
-    expect(enqueueEnrichment).toHaveBeenCalledWith(trackId, "/music/picard.flac", "rec-mbid");
+    expect(enqueueEnrichment).toHaveBeenCalledWith(
+      trackId,
+      "/music/picard.flac",
+      "rec-mbid",
+    );
     expect(libraryProgress.resolved).toBe(1);
     expect(libraryProgress.inFlight).toBe(0);
     // Picard fast-path must not fan out to fingerprint or candidate lookups.
@@ -249,25 +301,41 @@ describe("resolveTrack", () => {
     const albumId = seedAlbum(artistId);
 
     // Seed the original track (old path) and give it a chromaprint.
-    const oldTrackId = seedTrack(artistId, albumId, { filePath: "/music/old.flac" });
+    const oldTrackId = seedTrack(artistId, albumId, {
+      filePath: "/music/old.flac",
+    });
     setAudioFingerprint(oldTrackId, "fp-abc123");
 
     // Seed the newly-discovered stub for the renamed file.
-    const newTrackId = seedTrack(artistId, albumId, { filePath: "/music/new.flac" });
+    const newTrackId = seedTrack(artistId, albumId, {
+      filePath: "/music/new.flac",
+    });
 
-    vi.mocked(fs.stat).mockResolvedValue({ size: 1_000_000, mtimeMs: 0 } as any);
+    vi.mocked(fs.stat).mockResolvedValue({
+      size: 1_000_000,
+      mtimeMs: 0,
+    } as unknown as Stats);
     vi.mocked(extractTags).mockResolvedValue(makeTags()); // no MB IDs → not Picard fast-path
-    vi.mocked(fingerprintFile).mockResolvedValue({ fingerprint: "fp-abc123", duration: 200 });
+    vi.mocked(fingerprintFile).mockResolvedValue({
+      fingerprint: "fp-abc123",
+      duration: 200,
+    });
     // Wire the resolution tail so finishResolution completes without crashing.
     vi.mocked(candidatesFromTags).mockResolvedValue([makeCandidate()]);
-    vi.mocked(scoreCandidates).mockReturnValue([{ ...makeCandidate(), score: 0.9 }]);
+    vi.mocked(scoreCandidates).mockReturnValue([
+      { ...makeCandidate(), score: 0.9 },
+    ]);
     vi.mocked(pickWinner).mockReturnValue({ ...makeCandidate(), score: 0.9 });
     vi.mocked(pickRelease).mockReturnValue(makeResolvedRelease());
 
     await resolveTrack("/music/new.flac");
 
     // The new-path stub should be deleted.
-    const newRows = testDb.select().from(tracks).where(eq(tracks.id, newTrackId)).all();
+    const newRows = testDb
+      .select()
+      .from(tracks)
+      .where(eq(tracks.id, newTrackId))
+      .all();
     expect(newRows).toHaveLength(0);
 
     // The old row should now carry the new file path.
@@ -284,9 +352,14 @@ describe("resolveTrack", () => {
   it("marks the track failed when no candidates are found across all sources", async () => {
     const artistId = seedArtist();
     const albumId = seedAlbum(artistId);
-    const trackId = seedTrack(artistId, albumId, { filePath: "/music/unmatched.flac" });
+    const trackId = seedTrack(artistId, albumId, {
+      filePath: "/music/unmatched.flac",
+    });
 
-    vi.mocked(fs.stat).mockResolvedValue({ size: 1_000_000, mtimeMs: 0 } as any);
+    vi.mocked(fs.stat).mockResolvedValue({
+      size: 1_000_000,
+      mtimeMs: 0,
+    } as unknown as Stats);
     vi.mocked(extractTags).mockResolvedValue(makeTags()); // no MB IDs → normal path
     vi.mocked(fingerprintFile).mockResolvedValue(null);
     vi.mocked(candidatesFromTags).mockResolvedValue([]);
@@ -310,11 +383,16 @@ describe("resolveTrack", () => {
     const albumId = seedAlbum(artistId);
     seedTrack(artistId, albumId, { filePath: "/music/crash.flac" });
 
-    vi.mocked(fs.stat).mockResolvedValue({ size: 1_000_000, mtimeMs: 0 } as any);
+    vi.mocked(fs.stat).mockResolvedValue({
+      size: 1_000_000,
+      mtimeMs: 0,
+    } as unknown as Stats);
     vi.mocked(extractTags).mockResolvedValue(makeTags()); // no MB IDs → normal path
     vi.mocked(fingerprintFile).mockResolvedValue(null);
     // candidatesFromTags throws outside any try/catch in doResolve → propagates to resolveTrack's catch
-    vi.mocked(candidatesFromTags).mockRejectedValue(new Error("unexpected network crash"));
+    vi.mocked(candidatesFromTags).mockRejectedValue(
+      new Error("unexpected network crash"),
+    );
 
     await resolveTrack("/music/crash.flac");
 
