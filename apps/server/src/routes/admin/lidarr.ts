@@ -1,12 +1,11 @@
 import {
-  LidarrOptions,
   LidarrSettings,
   LidarrTestResult,
   TestLidarrConnectionSchema,
   UpdateLidarrSettingsSchema,
 } from "@staccato/shared";
 import { FastifyPluginAsync } from "fastify";
-import { LidarrClient } from "../../lidarr/client.js";
+import { fetchLidarrOptions, LidarrClient } from "../../lidarr/client.js";
 import {
   getOrCreateServerSettings,
   ServerSettingsUpdate,
@@ -50,23 +49,7 @@ const lidarrRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.send(result);
     }
     try {
-      const [qualityProfiles, metadataProfiles, rootFolders] =
-        await Promise.all([
-          client.getQualityProfiles(),
-          client.getMetadataProfiles(),
-          client.getRootFolders(),
-        ]);
-      const options: LidarrOptions = {
-        qualityProfiles: qualityProfiles.map((p) => ({
-          id: p.id,
-          name: p.name,
-        })),
-        metadataProfiles: metadataProfiles.map((p) => ({
-          id: p.id,
-          name: p.name,
-        })),
-        rootFolders: rootFolders.map((r) => ({ id: r.id, path: r.path })),
-      };
+      const options = await fetchLidarrOptions(client);
       const result: LidarrTestResult = { connected: true, options };
       return reply.send(result);
     } catch (err) {
@@ -93,23 +76,7 @@ const lidarrRoutes: FastifyPluginAsync = async (fastify) => {
     }
     const client = new LidarrClient(settings.lidarrUrl, settings.lidarrApiKey);
     try {
-      const [qualityProfiles, metadataProfiles, rootFolders] =
-        await Promise.all([
-          client.getQualityProfiles(),
-          client.getMetadataProfiles(),
-          client.getRootFolders(),
-        ]);
-      const options: LidarrOptions = {
-        qualityProfiles: qualityProfiles.map((p) => ({
-          id: p.id,
-          name: p.name,
-        })),
-        metadataProfiles: metadataProfiles.map((p) => ({
-          id: p.id,
-          name: p.name,
-        })),
-        rootFolders: rootFolders.map((r) => ({ id: r.id, path: r.path })),
-      };
+      const options = await fetchLidarrOptions(client);
       return reply.send(options);
     } catch (err) {
       req.log.warn({ err }, "lidarr options fetch failed");
