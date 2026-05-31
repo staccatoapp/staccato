@@ -38,10 +38,7 @@ import {
   confirmAlbumMatch,
 } from "../library/identify.js";
 import { requireAdmin } from "../plugins/session.js";
-
-const CUID2_RE = /^[a-z0-9]{24}$/;
-const MBID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { CUID2_RE, MBID_RE } from "../lib/id-patterns.js";
 
 const IdentifySearchQuerySchema = z.object({
   release: z.string().optional().default(""),
