@@ -37,6 +37,10 @@ export const WikidataEntitySchema = z.object({
 const MBID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+type CacheValue = { url: string; filename: string } | null;
+const cache = new Map<string, { value: CacheValue; expires: number }>();
+
 // R8 · artist image. Owns the full 3-hop chain (moved from the server):
 // MB url-rels (from the mirror) → Wikidata QID → Wikimedia Commons P18 filename.
 // Returns the *base* Commons URL (Special:FilePath/<filename>, no `?width=`) +
@@ -47,6 +51,12 @@ const artistImageRoutes: FastifyPluginAsync = async (fastify) => {
     const { mbid } = z.object({ mbid: z.string() }).parse(request.params);
     if (!MBID_RE.test(mbid)) {
       return reply.status(400).send({ error: "Invalid artist mbid" });
+    }
+
+    const cached = cache.get(mbid);
+    if (cached && cached.expires > Date.now()) {
+      if (cached.value) return MetadataArtistImageSchema.parse(cached.value);
+      return reply.status(404).send({ error: "No image for artist" });
     }
 
     // Hop 1 — MB url-rels from the mirror (Postgres-backed; no Solr).
@@ -64,6 +74,9 @@ const artistImageRoutes: FastifyPluginAsync = async (fastify) => {
         { status: mbRes.status, mbid },
         "mirror artist url-rels non-ok response",
       );
+      if (mbRes.status < 500) {
+        cache.set(mbid, { value: null, expires: Date.now() + CACHE_TTL_MS });
+      }
       return reply
         .status(mbRes.status < 500 ? 404 : 502)
         .send({ error: "No image for artist" });
@@ -81,6 +94,7 @@ const artistImageRoutes: FastifyPluginAsync = async (fastify) => {
     );
     const qid = wikidataRel?.url.resource.split("/wiki/")[1];
     if (!qid) {
+      cache.set(mbid, { value: null, expires: Date.now() + CACHE_TTL_MS });
       return reply.status(404).send({ error: "No Wikidata relation" });
     }
 
@@ -100,6 +114,9 @@ const artistImageRoutes: FastifyPluginAsync = async (fastify) => {
         { status: wdRes.status, mbid, qid },
         "wikidata entity non-ok response",
       );
+      if (wdRes.status < 500) {
+        cache.set(mbid, { value: null, expires: Date.now() + CACHE_TTL_MS });
+      }
       return reply
         .status(wdRes.status < 500 ? 404 : 502)
         .send({ error: "No image for artist" });
@@ -115,6 +132,7 @@ const artistImageRoutes: FastifyPluginAsync = async (fastify) => {
     const filename =
       wdParsed.data.entities[qid]?.claims?.P18?.[0]?.mainsnak?.datavalue?.value;
     if (!filename) {
+      cache.set(mbid, { value: null, expires: Date.now() + CACHE_TTL_MS });
       return reply.status(404).send({ error: "No image for artist" });
     }
 
@@ -122,6 +140,10 @@ const artistImageRoutes: FastifyPluginAsync = async (fastify) => {
     const url = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(
       filename,
     )}`;
+    cache.set(mbid, {
+      value: { url, filename },
+      expires: Date.now() + CACHE_TTL_MS,
+    });
     return MetadataArtistImageSchema.parse({ url, filename });
   });
 };
