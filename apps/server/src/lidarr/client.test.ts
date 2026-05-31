@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
-import { LidarrClient } from "./client.js";
+import { fetchLidarrOptions, LidarrClient } from "./client.js";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -172,6 +172,32 @@ describe("LidarrClient", () => {
     it("throws ZodError when response is not the expected envelope shape", async () => {
       mockFetch.mockReturnValue(okResponse([{ id: 1 }]));
       await expect(client.getQueue()).rejects.toBeInstanceOf(ZodError);
+    });
+  });
+
+  describe("fetchLidarrOptions", () => {
+    it("maps quality profiles, metadata profiles, and root folders into LidarrOptions shape", async () => {
+      mockFetch
+        .mockReturnValueOnce(okResponse([{ id: 1, name: "Lossless" }]))
+        .mockReturnValueOnce(okResponse([{ id: 2, name: "Standard" }]))
+        .mockReturnValueOnce(okResponse([{ id: 3, path: "/music" }]));
+
+      const options = await fetchLidarrOptions(client);
+
+      expect(options).toEqual({
+        qualityProfiles: [{ id: 1, name: "Lossless" }],
+        metadataProfiles: [{ id: 2, name: "Standard" }],
+        rootFolders: [{ id: 3, path: "/music" }],
+      });
+    });
+
+    it("propagates errors when any profile fetch fails", async () => {
+      mockFetch
+        .mockReturnValueOnce(okResponse([{ id: 1, name: "Lossless" }]))
+        .mockReturnValueOnce(Promise.resolve({ ok: false, status: 500, json: vi.fn() }))
+        .mockReturnValueOnce(okResponse([{ id: 3, path: "/music" }]));
+
+      await expect(fetchLidarrOptions(client)).rejects.toThrow();
     });
   });
 });
