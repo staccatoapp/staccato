@@ -4,9 +4,7 @@ import { MetadataReleaseDetailSchema } from "@staccato/shared";
 import { mirrorFetch } from "../mirror/client.js";
 import { ReleaseLookupSchema } from "../mirror/schemas.js";
 import { toMetadataReleaseDetail } from "../mirror/map.js";
-
-const MBID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { MBID_RE } from "../lib/id-patterns.js";
 
 // R4 · release + flattened tracklist. Postgres-backed; serves the server's
 // lookupReleaseDetails (Identify dialog tracklist + apply remap).
