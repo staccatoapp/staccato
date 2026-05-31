@@ -13,6 +13,7 @@ import {
   LidarrRootFolder,
   LidarrRootFolderSchema,
 } from "./schemas.js";
+import { LidarrOptions } from "@staccato/shared";
 
 export type {
   LidarrAlbum,
@@ -218,4 +219,19 @@ export class LidarrClient {
       throw err;
     }
   }
+}
+
+export async function fetchLidarrOptions(
+  client: LidarrClient,
+): Promise<LidarrOptions> {
+  const [qualityProfiles, metadataProfiles, rootFolders] = await Promise.all([
+    client.getQualityProfiles(),
+    client.getMetadataProfiles(),
+    client.getRootFolders(),
+  ]);
+  return {
+    qualityProfiles: qualityProfiles.map((p) => ({ id: p.id, name: p.name })),
+    metadataProfiles: metadataProfiles.map((p) => ({ id: p.id, name: p.name })),
+    rootFolders: rootFolders.map((r) => ({ id: r.id, path: r.path })),
+  };
 }
