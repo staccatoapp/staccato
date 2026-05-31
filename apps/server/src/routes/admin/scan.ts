@@ -40,9 +40,7 @@ const scanRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post("/resolve/retry", async (req, reply) => {
     const parsed = retryBodySchema.safeParse(req.body);
     if (!parsed.success) {
-      return reply
-        .status(400)
-        .send({ error: "Invalid retry options", details: parsed.error });
+      return reply.status(400).send({ error: "Invalid retry options" });
     }
     const result = await retryResolution(parsed.data);
     return reply.status(202).send(result);
