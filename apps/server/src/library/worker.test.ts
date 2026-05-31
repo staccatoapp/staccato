@@ -156,3 +156,169 @@ describe("discoverFile", () => {
     expect(rows).toHaveLength(1);
   });
 });
+
+describe("resolveTrack", () => {
+  it("returns without touching the file system when the track row is missing", async () => {
+    await resolveTrack("/music/ghost.flac");
+
+    expect(fs.stat).not.toHaveBeenCalled();
+    expect(extractTags).not.toHaveBeenCalled();
+    expect(libraryProgress.inFlight).toBe(0);
+  });
+
+  it("skips resolution and keeps inFlight balanced when fs.stat fails", async () => {
+    const artistId = seedArtist();
+    const albumId = seedAlbum(artistId);
+    seedTrack(artistId, albumId, { filePath: "/music/track.flac" });
+    vi.mocked(fs.stat).mockRejectedValue(new Error("ENOENT"));
+
+    await resolveTrack("/music/track.flac");
+
+    expect(extractTags).not.toHaveBeenCalled();
+    expect(libraryProgress.failed).toBe(0);
+    expect(libraryProgress.inFlight).toBe(0);
+  });
+
+  it("returns early without re-resolving when track is resolved and file is unchanged", async () => {
+    const artistId = seedArtist();
+    const albumId = seedAlbum(artistId);
+    const trackId = seedTrack(artistId, albumId, { filePath: "/music/track.flac" });
+    testDb
+      .update(tracks)
+      .set({ resolutionStatus: "resolved", fileMtime: 1000, fileSizeBytes: 1_000_000 })
+      .where(eq(tracks.id, trackId))
+      .run();
+
+    vi.mocked(fs.stat).mockResolvedValue({ size: 1_000_000, mtimeMs: 1000 } as any);
+
+    await resolveTrack("/music/track.flac");
+
+    expect(extractTags).not.toHaveBeenCalled();
+    expect(commitResolution).not.toHaveBeenCalled();
+    expect(libraryProgress.inFlight).toBe(0);
+  });
+
+  it("marks the track failed when tag extraction throws during resolution", async () => {
+    const artistId = seedArtist();
+    const albumId = seedAlbum(artistId);
+    const trackId = seedTrack(artistId, albumId, { filePath: "/music/track.flac" });
+
+    vi.mocked(fs.stat).mockResolvedValue({ size: 1_000_000, mtimeMs: 0 } as any);
+    vi.mocked(extractTags).mockRejectedValue(new Error("corrupt"));
+
+    await resolveTrack("/music/track.flac");
+
+    expect(libraryProgress.failed).toBe(1);
+    const [row] = testDb
+      .select({ resolutionStatus: tracks.resolutionStatus })
+      .from(tracks)
+      .where(eq(tracks.id, trackId))
+      .all();
+    expect(row?.resolutionStatus).toBe("failed");
+  });
+
+  it("takes the Picard fast-path, commits from tags, and enqueues enrichment when all MB IDs are present", async () => {
+    const artistId = seedArtist();
+    const albumId = seedAlbum(artistId);
+    const trackId = seedTrack(artistId, albumId, { filePath: "/music/picard.flac" });
+
+    vi.mocked(fs.stat).mockResolvedValue({ size: 1_000_000, mtimeMs: 0 } as any);
+    vi.mocked(extractTags).mockResolvedValue(
+      makeTags({
+        mbRecordingId: "rec-mbid",
+        mbAlbumId: "album-mbid",
+        mbReleaseGroupId: "rg-mbid",
+        mbAlbumArtistId: "artist-mbid",
+      }),
+    );
+
+    await resolveTrack("/music/picard.flac");
+
+    expect(commitResolution).toHaveBeenCalledOnce();
+    expect(enqueueEnrichment).toHaveBeenCalledOnce();
+    expect(enqueueEnrichment).toHaveBeenCalledWith(trackId, "/music/picard.flac", "rec-mbid");
+    expect(libraryProgress.resolved).toBe(1);
+    expect(libraryProgress.inFlight).toBe(0);
+    // Picard fast-path must not fan out to fingerprint or candidate lookups.
+    expect(fingerprintFile).not.toHaveBeenCalled();
+    expect(candidatesFromTags).not.toHaveBeenCalled();
+  });
+
+  it("repoints the existing row to the new path when rename is detected via fingerprint match", async () => {
+    const artistId = seedArtist();
+    const albumId = seedAlbum(artistId);
+
+    // Seed the original track (old path) and give it a chromaprint.
+    const oldTrackId = seedTrack(artistId, albumId, { filePath: "/music/old.flac" });
+    setAudioFingerprint(oldTrackId, "fp-abc123");
+
+    // Seed the newly-discovered stub for the renamed file.
+    const newTrackId = seedTrack(artistId, albumId, { filePath: "/music/new.flac" });
+
+    vi.mocked(fs.stat).mockResolvedValue({ size: 1_000_000, mtimeMs: 0 } as any);
+    vi.mocked(extractTags).mockResolvedValue(makeTags()); // no MB IDs → not Picard fast-path
+    vi.mocked(fingerprintFile).mockResolvedValue({ fingerprint: "fp-abc123", duration: 200 });
+    // Wire the resolution tail so finishResolution completes without crashing.
+    vi.mocked(candidatesFromTags).mockResolvedValue([makeCandidate()]);
+    vi.mocked(scoreCandidates).mockReturnValue([{ ...makeCandidate(), score: 0.9 }]);
+    vi.mocked(pickWinner).mockReturnValue({ ...makeCandidate(), score: 0.9 });
+    vi.mocked(pickRelease).mockReturnValue(makeResolvedRelease());
+
+    await resolveTrack("/music/new.flac");
+
+    // The new-path stub should be deleted.
+    const newRows = testDb.select().from(tracks).where(eq(tracks.id, newTrackId)).all();
+    expect(newRows).toHaveLength(0);
+
+    // The old row should now carry the new file path.
+    const [oldRow] = testDb
+      .select({ filePath: tracks.filePath })
+      .from(tracks)
+      .where(eq(tracks.id, oldTrackId))
+      .all();
+    expect(oldRow?.filePath).toBe("/music/new.flac");
+    expect(libraryProgress.resolved).toBe(1);
+    expect(libraryProgress.inFlight).toBe(0);
+  });
+
+  it("marks the track failed when no candidates are found across all sources", async () => {
+    const artistId = seedArtist();
+    const albumId = seedAlbum(artistId);
+    const trackId = seedTrack(artistId, albumId, { filePath: "/music/unmatched.flac" });
+
+    vi.mocked(fs.stat).mockResolvedValue({ size: 1_000_000, mtimeMs: 0 } as any);
+    vi.mocked(extractTags).mockResolvedValue(makeTags()); // no MB IDs → normal path
+    vi.mocked(fingerprintFile).mockResolvedValue(null);
+    vi.mocked(candidatesFromTags).mockResolvedValue([]);
+    vi.mocked(candidatesFromAcoustid).mockResolvedValue([]);
+    vi.mocked(candidatesFromSearch).mockResolvedValue([]);
+
+    await resolveTrack("/music/unmatched.flac");
+
+    expect(libraryProgress.failed).toBe(1);
+    expect(libraryProgress.inFlight).toBe(0);
+    const [row] = testDb
+      .select({ resolutionStatus: tracks.resolutionStatus })
+      .from(tracks)
+      .where(eq(tracks.id, trackId))
+      .all();
+    expect(row?.resolutionStatus).toBe("failed");
+  });
+
+  it("increments the failed counter and keeps inFlight balanced on an unexpected crash", async () => {
+    const artistId = seedArtist();
+    const albumId = seedAlbum(artistId);
+    seedTrack(artistId, albumId, { filePath: "/music/crash.flac" });
+
+    vi.mocked(fs.stat).mockResolvedValue({ size: 1_000_000, mtimeMs: 0 } as any);
+    vi.mocked(extractTags).mockResolvedValue(makeTags()); // no MB IDs → normal path
+    vi.mocked(fingerprintFile).mockResolvedValue(null);
+    // candidatesFromTags throws outside any try/catch in doResolve → propagates to resolveTrack's catch
+    vi.mocked(candidatesFromTags).mockRejectedValue(new Error("unexpected network crash"));
+
+    await resolveTrack("/music/crash.flac");
+
+    expect(libraryProgress.failed).toBe(1);
+    expect(libraryProgress.inFlight).toBe(0); // finally block always decrements
+  });
+});
