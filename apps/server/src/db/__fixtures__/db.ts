@@ -9,6 +9,8 @@ import {
   upsertDiscoveredTrack,
   markTrackResolving,
 } from "../queries/tracks.js";
+import { createUser } from "../queries/users.js";
+import { createPlaylist } from "../queries/playlists.js";
 
 export type TestDb = ReturnType<typeof createTestDb>;
 
@@ -61,4 +63,12 @@ export function seedTrack(
   );
   markTrackResolving(trackId);
   return trackId;
+}
+
+export function seedUser(username = `user-${Date.now()}`): string {
+  return createUser({ username, passwordHash: null, isAdmin: false }).id;
+}
+
+export function seedPlaylist(userId: string, name = "Test Playlist"): string {
+  return createPlaylist({ userId, name }).id;
 }

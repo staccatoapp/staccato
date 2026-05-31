@@ -1,0 +1,131 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import Fastify from "fastify";
+import { createTestDb, seedPlaylist, seedUser } from "../db/__fixtures__/db.js";
+
+let testDb: ReturnType<typeof createTestDb>;
+
+vi.mock("../db/client.js", () => ({
+  get db() {
+    return testDb;
+  },
+}));
+
+vi.mock("../coverart/store.js", () => ({
+  resolveAlbumCoverNow: vi.fn(() => null),
+}));
+
+import playlistRoutes from "./playlists.js";
+
+const buildApp = (userId: string) => {
+  const app = Fastify({ logger: false });
+  app.addHook("preHandler", async (req) => {
+    (req as { userId?: string }).userId = userId;
+  });
+  app.register(playlistRoutes);
+  return app;
+};
+
+let userAId: string;
+let userBId: string;
+let playlistId: string;
+
+beforeEach(() => {
+  testDb = createTestDb();
+  userAId = seedUser("alice");
+  userBId = seedUser("bob");
+  playlistId = seedPlaylist(userAId, "Alice's Playlist");
+});
+
+describe("GET /:id — cross-user isolation", () => {
+  it("returns 403 when requester is not the playlist owner", async () => {
+    const app = buildApp(userBId);
+    const res = await app.inject({ method: "GET", url: `/${playlistId}` });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("returns 200 when requester is the playlist owner", async () => {
+    const app = buildApp(userAId);
+    const res = await app.inject({ method: "GET", url: `/${playlistId}` });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("returns 404 for an unknown playlist id", async () => {
+    const app = buildApp(userAId);
+    const res = await app.inject({ method: "GET", url: "/nonexistent-id" });
+    expect(res.statusCode).toBe(404);
+  });
+});
+
+describe("PUT /:id — cross-user isolation", () => {
+  it("returns 403 when requester is not the playlist owner", async () => {
+    const app = buildApp(userBId);
+    const res = await app.inject({
+      method: "PUT",
+      url: `/${playlistId}`,
+      payload: { name: "Hijacked" },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("returns 200 when requester is the playlist owner", async () => {
+    const app = buildApp(userAId);
+    const res = await app.inject({
+      method: "PUT",
+      url: `/${playlistId}`,
+      payload: { name: "Renamed" },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().name).toBe("Renamed");
+  });
+});
+
+describe("DELETE /:id — cross-user isolation", () => {
+  it("returns 403 when requester is not the playlist owner", async () => {
+    const app = buildApp(userBId);
+    const res = await app.inject({ method: "DELETE", url: `/${playlistId}` });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("returns 204 when requester is the playlist owner", async () => {
+    const app = buildApp(userAId);
+    const res = await app.inject({ method: "DELETE", url: `/${playlistId}` });
+    expect(res.statusCode).toBe(204);
+  });
+});
+
+describe("POST /:id/tracks — cross-user isolation", () => {
+  it("returns 403 when requester is not the playlist owner", async () => {
+    const app = buildApp(userBId);
+    const res = await app.inject({
+      method: "POST",
+      url: `/${playlistId}/tracks`,
+      payload: { trackIds: ["some-track-id"] },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+});
+
+describe("DELETE /:id/tracks/:entryId — cross-user isolation", () => {
+  it("returns 403 when requester is not the playlist owner", async () => {
+    const app = buildApp(userBId);
+    const res = await app.inject({
+      method: "DELETE",
+      url: `/${playlistId}/tracks/some-entry-id`,
+    });
+    expect(res.statusCode).toBe(403);
+  });
+});
+
+describe("GET / — list scoping", () => {
+  it("returns only the requesting user's playlists", async () => {
+    seedPlaylist(userBId, "Bob's Playlist");
+
+    const app = buildApp(userAId);
+    const res = await app.inject({ method: "GET", url: "/" });
+
+    expect(res.statusCode).toBe(200);
+    const { items } = res.json();
+    expect(items).toHaveLength(1);
+    expect(items[0].name).toBe("Alice's Playlist");
+  });
+});
