@@ -133,9 +133,13 @@ function PlayerBar() {
           currentTrackAccumulatedPlayTimeInSeconds: 0,
           currentTrackListenEventCreated: false,
         }),
-      }).then(() => {
-        queryClient.invalidateQueries({ queryKey: ["playback-session"] });
-      });
+      })
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ["playback-session"] });
+        })
+        .catch((err) => {
+          console.error("session sync failed (track ended)", err);
+        });
     };
 
     const handlePause = () => {
@@ -156,6 +160,8 @@ function PlayerBar() {
             accumulatedPlayTimeRef.current,
           ),
         }),
+      }).catch((err) => {
+        console.error("session sync failed (pause)", err);
       });
     };
 
@@ -175,6 +181,8 @@ function PlayerBar() {
             accumulatedPlayTimeRef.current,
           ),
         }),
+      }).catch((err) => {
+        console.error("session sync failed (interval)", err);
       });
     }, 5000);
 
