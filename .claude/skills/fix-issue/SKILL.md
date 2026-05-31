@@ -141,6 +141,15 @@ pnpm test              # vitest
 pnpm build         # production build
 ```
 
+> **drizzle-kit generate note:** `drizzle.config.ts` imports `src/paths.ts` → `src/config/config.ts`, which validates all required env vars at import time. Running `drizzle-kit generate` without them fails with "Invalid server config". Prefix the command with the minimum required vars:
+> ```bash
+> cd /c/Projects/staccato-fix-issue-agent/apps/server && \
+>   STACCATO_ENV=test \
+>   STACCATO_SERVER_SESSION_SECRET=change-this-to-a-random-32-plus-character-secret \
+>   pnpm exec drizzle-kit generate
+> ```
+> `STACCATO_ENV=test` bypasses the placeholder-secret refine check; all other config fields have defaults.
+
 If something genuinely can't be verified here (missing service/dep), state exactly what and why — don't fabricate results.
 
 ### Phase 8 — Commit and open the PR
@@ -173,3 +182,4 @@ If something genuinely can't be verified here (missing service/dep), state exact
 - **Editing main-repo files from inside the worktree** — if Read/Edit/Write paths or Bash commands point at `C:\Projects\staccato\` instead of `C:\Projects\staccato-fix-issue-agent\`, changes land in the main checkout. Always use the fixed sibling path.
 - **Passing the wrong root to Explore agents** — explorers default to the session cwd. Explicitly pass `C:\Projects\staccato-fix-issue-agent` as the search root or they may search the main repo and return paths that don't translate.
 - **`gh pr create` missing `--head` in a worktree** — when `gh` is run from inside the worktree via Bash, the shell cwd may be reset between commands, causing `gh` to lose track of the current branch. Always pass `--head agent/<issue#>-<slug>` explicitly to `gh pr create`.
+- **`drizzle-kit generate` failing with "Invalid server config"** — `drizzle.config.ts` transitively imports `src/config/config.ts`, which validates all env vars at import time. Prefix the command with `STACCATO_ENV=test STACCATO_SERVER_SESSION_SECRET=change-this-to-a-random-32-plus-character-secret` so validation passes. See the note in Phase 7 for the full command.
