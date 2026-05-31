@@ -194,7 +194,9 @@ describe("LidarrClient", () => {
     it("propagates errors when any profile fetch fails", async () => {
       mockFetch
         .mockReturnValueOnce(okResponse([{ id: 1, name: "Lossless" }]))
-        .mockReturnValueOnce(Promise.resolve({ ok: false, status: 500, json: vi.fn() }))
+        .mockReturnValueOnce(
+          Promise.resolve({ ok: false, status: 500, json: vi.fn() }),
+        )
         .mockReturnValueOnce(okResponse([{ id: 3, path: "/music" }]));
 
       await expect(fetchLidarrOptions(client)).rejects.toThrow();
