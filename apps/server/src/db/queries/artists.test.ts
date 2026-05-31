@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
-import { createTestDb } from "../__fixtures__/db.js";
+import { createId } from "@paralleldrive/cuid2";
+import { createTestDb, seedArtist, seedAlbum } from "../__fixtures__/db.js";
 import { artists } from "../schema/artists.js";
+import { albumArtists } from "../schema/album-artists.js";
 import {
   backfillArtistNormalizedNames,
+  getArtists,
   updateArtist,
   upsertArtist,
 } from "./artists.js";
@@ -22,6 +25,108 @@ vi.mock("../../logger.js", () => ({
 
 beforeEach(() => {
   testDb = createTestDb();
+});
+
+describe("getArtists", () => {
+  it("returns albumCount 0 for an artist with no albums", () => {
+    seedArtist("Burial");
+    const rows = getArtists({ limit: 10, offset: 0 });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.albumCount).toBe(0);
+  });
+
+  it("counts albums owned via the legacy albums.artist_id FK", () => {
+    const artistId = seedArtist("Portishead");
+    seedAlbum(artistId, "Dummy");
+    seedAlbum(artistId, "Portishead");
+    const rows = getArtists({ limit: 10, offset: 0 });
+    expect(rows[0]!.albumCount).toBe(2);
+  });
+
+  it("counts albums credited via albumArtists.isPrimary = true", () => {
+    const mainArtistId = seedArtist("MF DOOM");
+    const collabArtistId = seedArtist("Madlib");
+    const albumId = seedAlbum(collabArtistId, "Madvillainy");
+    testDb
+      .insert(albumArtists)
+      .values({
+        id: createId(),
+        albumId,
+        artistId: mainArtistId,
+        position: 1,
+        isPrimary: true,
+      })
+      .run();
+    const rows = getArtists({ limit: 10, offset: 0 });
+    const doom = rows.find((r) => r.id === mainArtistId)!;
+    expect(doom.albumCount).toBe(1);
+  });
+
+  it("counts an album only once when it appears via both ownership paths", () => {
+    const artistId = seedArtist("Actress");
+    const albumId = seedAlbum(artistId, "Hazyville");
+    testDb
+      .insert(albumArtists)
+      .values({
+        id: createId(),
+        albumId,
+        artistId,
+        position: 1,
+        isPrimary: true,
+      })
+      .run();
+    const rows = getArtists({ limit: 10, offset: 0 });
+    expect(rows[0]!.albumCount).toBe(1);
+  });
+
+  it("does not count albums where the artist has only a non-primary (feat) credit", () => {
+    const featArtistId = seedArtist("Ghostface Killah");
+    const ownerArtistId = seedArtist("Danger Mouse");
+    const albumId = seedAlbum(ownerArtistId, "The Mouse and the Mask");
+    testDb
+      .insert(albumArtists)
+      .values({
+        id: createId(),
+        albumId,
+        artistId: featArtistId,
+        position: 1,
+        isPrimary: false,
+      })
+      .run();
+    const rows = getArtists({ limit: 10, offset: 0 });
+    const feat = rows.find((r) => r.id === featArtistId)!;
+    expect(feat.albumCount).toBe(0);
+  });
+
+  it("returns correct album counts for multiple artists simultaneously", () => {
+    const artistA = seedArtist("Aphex Twin");
+    const artistB = seedArtist("Boards of Canada");
+    const artistC = seedArtist("Autechre");
+    seedAlbum(artistA, "Selected Ambient Works");
+    seedAlbum(artistA, "Come to Daddy");
+    seedAlbum(artistB, "Music Has the Right to Children");
+    // artistC has no albums
+    const rows = getArtists({ limit: 10, offset: 0 });
+    const a = rows.find((r) => r.id === artistA)!;
+    const b = rows.find((r) => r.id === artistB)!;
+    const c = rows.find((r) => r.id === artistC)!;
+    expect(a.albumCount).toBe(2);
+    expect(b.albumCount).toBe(1);
+    expect(c.albumCount).toBe(0);
+  });
+
+  it("paginates results ordered alphabetically by name", () => {
+    seedArtist("Zomby");
+    seedArtist("Air");
+    seedArtist("Massive Attack");
+    const page1 = getArtists({ limit: 2, offset: 0 });
+    const page2 = getArtists({ limit: 2, offset: 2 });
+    expect(page1).toHaveLength(2);
+    expect(page1[0]!.name).toBe("Air");
+    expect(page1[1]!.name).toBe("Massive Attack");
+    expect(page2).toHaveLength(1);
+    expect(page2[0]!.name).toBe("Zomby");
+  });
 });
 
 describe("upsertArtist", () => {
