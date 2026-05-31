@@ -129,6 +129,13 @@ export async function resolveTrack(filePath: string): Promise<void> {
   } catch (err) {
     log.error({ err, filePath }, "worker crashed resolving track");
     libraryProgress.failed++;
+    const stuck = getTrackByFilePath(filePath);
+    if (stuck?.resolutionStatus === "resolving") {
+      markTrackFailed(stuck.id, {
+        confidenceScore: 0,
+        audioFingerprint: stuck.audioFingerprint ?? null,
+      });
+    }
   } finally {
     libraryProgress.inFlight--;
   }
