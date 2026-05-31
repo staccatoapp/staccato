@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import Fastify from "fastify";
 import { createTestDb, seedPlaylist, seedUser } from "../db/__fixtures__/db.js";
 
 let testDb: ReturnType<typeof createTestDb>;
@@ -15,15 +14,7 @@ vi.mock("../coverart/store.js", () => ({
 }));
 
 import playlistRoutes from "./playlists.js";
-
-const buildApp = (userId: string) => {
-  const app = Fastify({ logger: false });
-  app.addHook("preHandler", async (req) => {
-    (req as { userId?: string }).userId = userId;
-  });
-  app.register(playlistRoutes);
-  return app;
-};
+import { buildApp } from "./__fixtures__/app.js";
 
 let userAId: string;
 let userBId: string;
@@ -38,19 +29,19 @@ beforeEach(() => {
 
 describe("GET /:id — cross-user isolation", () => {
   it("returns 403 when requester is not the playlist owner", async () => {
-    const app = buildApp(userBId);
+    const app = buildApp(playlistRoutes, userBId);
     const res = await app.inject({ method: "GET", url: `/${playlistId}` });
     expect(res.statusCode).toBe(403);
   });
 
   it("returns 200 when requester is the playlist owner", async () => {
-    const app = buildApp(userAId);
+    const app = buildApp(playlistRoutes, userAId);
     const res = await app.inject({ method: "GET", url: `/${playlistId}` });
     expect(res.statusCode).toBe(200);
   });
 
   it("returns 404 for an unknown playlist id", async () => {
-    const app = buildApp(userAId);
+    const app = buildApp(playlistRoutes, userAId);
     const res = await app.inject({ method: "GET", url: "/nonexistent-id" });
     expect(res.statusCode).toBe(404);
   });
@@ -58,7 +49,7 @@ describe("GET /:id — cross-user isolation", () => {
 
 describe("PUT /:id — cross-user isolation", () => {
   it("returns 403 when requester is not the playlist owner", async () => {
-    const app = buildApp(userBId);
+    const app = buildApp(playlistRoutes, userBId);
     const res = await app.inject({
       method: "PUT",
       url: `/${playlistId}`,
@@ -68,7 +59,7 @@ describe("PUT /:id — cross-user isolation", () => {
   });
 
   it("returns 200 when requester is the playlist owner", async () => {
-    const app = buildApp(userAId);
+    const app = buildApp(playlistRoutes, userAId);
     const res = await app.inject({
       method: "PUT",
       url: `/${playlistId}`,
@@ -81,13 +72,13 @@ describe("PUT /:id — cross-user isolation", () => {
 
 describe("DELETE /:id — cross-user isolation", () => {
   it("returns 403 when requester is not the playlist owner", async () => {
-    const app = buildApp(userBId);
+    const app = buildApp(playlistRoutes, userBId);
     const res = await app.inject({ method: "DELETE", url: `/${playlistId}` });
     expect(res.statusCode).toBe(403);
   });
 
   it("returns 204 when requester is the playlist owner", async () => {
-    const app = buildApp(userAId);
+    const app = buildApp(playlistRoutes, userAId);
     const res = await app.inject({ method: "DELETE", url: `/${playlistId}` });
     expect(res.statusCode).toBe(204);
   });
@@ -95,7 +86,7 @@ describe("DELETE /:id — cross-user isolation", () => {
 
 describe("POST /:id/tracks — cross-user isolation", () => {
   it("returns 403 when requester is not the playlist owner", async () => {
-    const app = buildApp(userBId);
+    const app = buildApp(playlistRoutes, userBId);
     const res = await app.inject({
       method: "POST",
       url: `/${playlistId}/tracks`,
@@ -107,7 +98,7 @@ describe("POST /:id/tracks — cross-user isolation", () => {
 
 describe("DELETE /:id/tracks/:entryId — cross-user isolation", () => {
   it("returns 403 when requester is not the playlist owner", async () => {
-    const app = buildApp(userBId);
+    const app = buildApp(playlistRoutes, userBId);
     const res = await app.inject({
       method: "DELETE",
       url: `/${playlistId}/tracks/some-entry-id`,
@@ -120,7 +111,7 @@ describe("GET / — list scoping", () => {
   it("returns only the requesting user's playlists", async () => {
     seedPlaylist(userBId, "Bob's Playlist");
 
-    const app = buildApp(userAId);
+    const app = buildApp(playlistRoutes, userAId);
     const res = await app.inject({ method: "GET", url: "/" });
 
     expect(res.statusCode).toBe(200);

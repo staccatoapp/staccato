@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import Fastify from "fastify";
 import {
   isSetupComplete,
   createUser,
@@ -8,6 +7,7 @@ import {
   markOnboardingComplete,
 } from "../db/queries/users.js";
 import authRoutes from "./auth.js";
+import { buildSessionApp } from "./__fixtures__/app.js";
 
 // auth.ts imports session.ts which imports these at module level — neutralize them
 // so the routes can be registered in isolation, matching the albums.test.ts pattern.
@@ -33,24 +33,10 @@ const mockUser = {
   onboardingComplete: false,
 };
 
-const makeSession = (userId?: string) => ({
-  get: vi.fn((key: string) => (key === "userId" ? userId : undefined)),
-  set: vi.fn(),
-  delete: vi.fn(),
-});
-
-// buildApp injects a fake session via onRequest (runs before every preHandler,
-// including requireAuth) so the real @fastify/secure-session is never needed.
-// Pass a userId to simulate an authenticated session; omit for unauthenticated.
-const buildApp = (userId?: string) => {
-  const session = makeSession(userId);
-  const app = Fastify();
-  app.addHook("onRequest", async (req) => {
-    (req as unknown as { session: typeof session }).session = session;
-  });
-  app.register(authRoutes);
-  return { app, session };
-};
+// buildSessionApp injects a fake session via onRequest (runs before every
+// preHandler, including requireAuth) so the real @fastify/secure-session is
+// never needed. Pass a userId to simulate an authenticated session; omit for
+// unauthenticated.
 
 const SETUP_BODY = { username: "admin", password: "password123" };
 const LOGIN_BODY = { username: "admin", password: "password123" };
@@ -60,7 +46,7 @@ describe("GET /status", () => {
 
   it("returns setupComplete: false when setup has not run", async () => {
     vi.mocked(isSetupComplete).mockReturnValue(false);
-    const { app } = buildApp();
+    const { app } = buildSessionApp(authRoutes);
     const res = await app.inject({ method: "GET", url: "/status" });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ setupComplete: false });
@@ -68,7 +54,7 @@ describe("GET /status", () => {
 
   it("returns setupComplete: true after setup has run", async () => {
     vi.mocked(isSetupComplete).mockReturnValue(true);
-    const { app } = buildApp();
+    const { app } = buildSessionApp(authRoutes);
     const res = await app.inject({ method: "GET", url: "/status" });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ setupComplete: true });
@@ -80,7 +66,7 @@ describe("POST /setup", () => {
 
   it("returns 409 when setup is already complete", async () => {
     vi.mocked(isSetupComplete).mockReturnValue(true);
-    const { app } = buildApp();
+    const { app } = buildSessionApp(authRoutes);
     const res = await app.inject({
       method: "POST",
       url: "/setup",
@@ -93,7 +79,7 @@ describe("POST /setup", () => {
   it("returns 201 with user shape and sets session on success", async () => {
     vi.mocked(isSetupComplete).mockReturnValue(false);
     vi.mocked(createUser).mockReturnValue(mockUser as never);
-    const { app, session } = buildApp();
+    const { app, session } = buildSessionApp(authRoutes);
     const res = await app.inject({
       method: "POST",
       url: "/setup",
@@ -116,7 +102,7 @@ describe("POST /login", () => {
   it("returns 401 when user is not found", async () => {
     vi.mocked(findUserByUsername).mockReturnValue(undefined as never);
     vi.mocked(argon2.verify).mockResolvedValue(false);
-    const { app } = buildApp();
+    const { app } = buildSessionApp(authRoutes);
     const res = await app.inject({
       method: "POST",
       url: "/login",
@@ -128,7 +114,7 @@ describe("POST /login", () => {
   it("returns 401 when password is invalid", async () => {
     vi.mocked(findUserByUsername).mockReturnValue(mockUser as never);
     vi.mocked(argon2.verify).mockResolvedValue(false);
-    const { app } = buildApp();
+    const { app } = buildSessionApp(authRoutes);
     const res = await app.inject({
       method: "POST",
       url: "/login",
@@ -140,7 +126,7 @@ describe("POST /login", () => {
   it("returns 200 with user shape and sets session on valid credentials", async () => {
     vi.mocked(findUserByUsername).mockReturnValue(mockUser as never);
     vi.mocked(argon2.verify).mockResolvedValue(true);
-    const { app, session } = buildApp();
+    const { app, session } = buildSessionApp(authRoutes);
     const res = await app.inject({
       method: "POST",
       url: "/login",
@@ -161,13 +147,13 @@ describe("POST /logout", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("returns 401 when unauthenticated", async () => {
-    const { app } = buildApp();
+    const { app } = buildSessionApp(authRoutes);
     const res = await app.inject({ method: "POST", url: "/logout" });
     expect(res.statusCode).toBe(401);
   });
 
   it("returns 204 and deletes the session when authenticated", async () => {
-    const { app, session } = buildApp("user-1");
+    const { app, session } = buildSessionApp(authRoutes, "user-1");
     const res = await app.inject({ method: "POST", url: "/logout" });
     expect(res.statusCode).toBe(204);
     expect(session.delete).toHaveBeenCalled();
@@ -178,21 +164,21 @@ describe("GET /me", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("returns 401 when unauthenticated", async () => {
-    const { app } = buildApp();
+    const { app } = buildSessionApp(authRoutes);
     const res = await app.inject({ method: "GET", url: "/me" });
     expect(res.statusCode).toBe(401);
   });
 
   it("returns 404 when session userId has no matching user in the DB", async () => {
     vi.mocked(findUserById).mockReturnValue(undefined as never);
-    const { app } = buildApp("user-1");
+    const { app } = buildSessionApp(authRoutes, "user-1");
     const res = await app.inject({ method: "GET", url: "/me" });
     expect(res.statusCode).toBe(404);
   });
 
   it("returns 200 with user shape when session is valid", async () => {
     vi.mocked(findUserById).mockReturnValue(mockUser as never);
-    const { app } = buildApp("user-1");
+    const { app } = buildSessionApp(authRoutes, "user-1");
     const res = await app.inject({ method: "GET", url: "/me" });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({
@@ -208,7 +194,7 @@ describe("POST /complete-onboarding", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("returns 401 when unauthenticated", async () => {
-    const { app } = buildApp();
+    const { app } = buildSessionApp(authRoutes);
     const res = await app.inject({
       method: "POST",
       url: "/complete-onboarding",
@@ -218,7 +204,7 @@ describe("POST /complete-onboarding", () => {
 
   it("returns 200 with ok: true when authenticated", async () => {
     vi.mocked(markOnboardingComplete).mockReturnValue(undefined as never);
-    const { app } = buildApp("user-1");
+    const { app } = buildSessionApp(authRoutes, "user-1");
     const res = await app.inject({
       method: "POST",
       url: "/complete-onboarding",

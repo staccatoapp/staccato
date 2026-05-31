@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import Fastify from "fastify";
 import * as usersQueries from "../db/queries/users.js";
 import albumRoutes from "./albums.js";
+import { buildApp } from "./__fixtures__/app.js";
 
 // albums.ts pulls in the DB client, cover-art store, MusicBrainz client and the
 // session plugin at import time. Stub them so the routes can be registered in
@@ -60,14 +60,6 @@ const ALBUM_ID = "abcdefghijklmnopqrstuvwx";
 
 // Build an app that simulates requireAuth (sets request.userId) then mounts the
 // album routes, whose admin scope adds requireAdmin on top.
-const buildApp = () => {
-  const app = Fastify();
-  app.addHook("preHandler", async (req) => {
-    (req as { userId?: string }).userId = "user-1";
-  });
-  app.register(albumRoutes);
-  return app;
-};
 
 const asAdmin = (isAdmin: boolean) =>
   vi
@@ -83,7 +75,7 @@ describe("album routes admin gating", () => {
     ["POST", `/${ALBUM_ID}/confirm-match`],
   ])("returns 403 for a non-admin on %s %s", async (method, url) => {
     asAdmin(false);
-    const app = buildApp();
+    const app = buildApp(albumRoutes);
     const res = await app.inject({
       method: method as "PATCH" | "POST",
       url,
@@ -94,7 +86,7 @@ describe("album routes admin gating", () => {
 
   it("lets an admin through the edit route (past requireAdmin)", async () => {
     asAdmin(true);
-    const app = buildApp();
+    const app = buildApp(albumRoutes);
     // Empty body fails AlbumEditRequestSchema → 400. The point is it is NOT
     // 403, proving requireAdmin passed and the handler ran.
     const res = await app.inject({
@@ -121,7 +113,7 @@ describe("PATCH /:albumId edit persistence", () => {
   it("returns 404 when the album does not exist", async () => {
     asAdmin(true);
     vi.mocked(getAlbumById).mockReturnValue(undefined);
-    const app = buildApp();
+    const app = buildApp(albumRoutes);
     const res = await app.inject({
       method: "PATCH",
       url: `/${ALBUM_ID}`,
@@ -134,7 +126,7 @@ describe("PATCH /:albumId edit persistence", () => {
   it("returns 400 on a malformed body", async () => {
     asAdmin(true);
     vi.mocked(getAlbumById).mockReturnValue({ id: ALBUM_ID } as never);
-    const app = buildApp();
+    const app = buildApp(albumRoutes);
     const res = await app.inject({
       method: "PATCH",
       url: `/${ALBUM_ID}`,
@@ -155,7 +147,7 @@ describe("PATCH /:albumId edit persistence", () => {
       removedTracks: 1,
       attachedTracks: 2,
     });
-    const app = buildApp();
+    const app = buildApp(albumRoutes);
     const res = await app.inject({
       method: "PATCH",
       url: `/${ALBUM_ID}`,
@@ -186,7 +178,7 @@ describe("PATCH /:albumId edit persistence", () => {
       removedTracks: 0,
       attachedTracks: 0,
     });
-    const app = buildApp();
+    const app = buildApp(albumRoutes);
     const res = await app.inject({
       method: "PATCH",
       url: `/${ALBUM_ID}`,
@@ -214,7 +206,7 @@ describe("PATCH /:albumId edit persistence", () => {
       removedTracks: 0,
       attachedTracks: 0,
     });
-    const app = buildApp();
+    const app = buildApp(albumRoutes);
     const res = await app.inject({
       method: "PATCH",
       url: `/${ALBUM_ID}`,
@@ -235,7 +227,7 @@ describe("PATCH /:albumId edit persistence", () => {
     vi.mocked(applyAlbumEdit).mockImplementation(() => {
       throw new Error("boom");
     });
-    const app = buildApp();
+    const app = buildApp(albumRoutes);
     const res = await app.inject({
       method: "PATCH",
       url: `/${ALBUM_ID}`,
@@ -262,7 +254,7 @@ describe("GET /:albumKey stays public", () => {
       confidenceScore: null,
       pendingTrackCount: 0,
     } as never);
-    const app = buildApp();
+    const app = buildApp(albumRoutes);
     const res = await app.inject({ method: "GET", url: `/${ALBUM_ID}` });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ source: "local" });
