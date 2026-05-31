@@ -6,6 +6,10 @@ import { userSettings } from "../schema/user-settings.js";
 export type UserSettingsRow = typeof userSettings.$inferSelect;
 export type UserSettingsUpdate = SQLiteUpdateSetSource<typeof userSettings>;
 
+export function getAllUserSettings(): UserSettingsRow[] {
+  return db.select().from(userSettings).all();
+}
+
 export function getOrCreateUserSettings(userId: string): UserSettingsRow {
   return db
     .insert(userSettings)

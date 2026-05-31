@@ -7,14 +7,8 @@ import {
   updateUserSettings,
 } from "../db/queries/settings.js";
 import { getOrCreateServerSettings } from "../db/queries/server-settings.js";
-import {
-  deleteForUser as deleteRecommendationCacheForUser,
-  resetWarmingForUser,
-  upsertWarmingRow,
-} from "../db/queries/recommendation-cache.js";
-import { listRegisteredSources } from "../recommendations/source.js";
+import { reconcileUserRows } from "../recommendations/eligibility.js";
 import { tick as recommendationTick } from "../recommendations/refresher.js";
-import "../recommendations/sources/index.js";
 
 const settingsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/", async (req) => {
@@ -75,18 +69,20 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
         listenbrainzToken: null,
         musicbrainzUsername: null,
       });
-      deleteRecommendationCacheForUser(req.userId);
+      // Reconcile removes rows for sources the user is no longer eligible for
+      // (e.g. the ListenBrainz sources), leaving any other providers' rows intact.
+      reconcileUserRows(getOrCreateUserSettings(req.userId));
       return reply.status(204).send();
     }
 
     updateUserSettings(req.userId, cleanedUpdates);
 
     if (tokenSetOrChanged) {
-      const sources = listRegisteredSources();
-      for (const source of sources) {
-        upsertWarmingRow(req.userId, source.id, source.kind);
-      }
-      resetWarmingForUser(req.userId);
+      // forceRefresh: credentials changed, so reset eligible rows to warming
+      // and kick a tick to refetch with the new token.
+      reconcileUserRows(getOrCreateUserSettings(req.userId), {
+        forceRefresh: true,
+      });
       void recommendationTick().catch((err) =>
         req.log.error(
           { err, userId: req.userId },

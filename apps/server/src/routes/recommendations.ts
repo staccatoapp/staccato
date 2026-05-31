@@ -54,13 +54,6 @@ function mergePlaylists(
   return out;
 }
 
-function ensureWarmingRowsForKind(userId: string, kind: string): void {
-  for (const source of listRegisteredSources()) {
-    if (source.kind !== kind) continue;
-    upsertWarmingRow(userId, source.id, source.kind);
-  }
-}
-
 const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/tracks", async (req) => {
     const response = buildResponse<RecommendedTrack[]>(
@@ -90,13 +83,18 @@ function buildResponse<T extends unknown[]>(
   applyLiveLibrary: (merged: T) => T,
 ): RecommendationsResponse<T> {
   const settings = getOrCreateUserSettings(userId);
-  if (!settings.listenbrainzToken) {
+  const eligibleSources = listRegisteredSources().filter(
+    (s) => s.kind === kind && s.isEligible(settings),
+  );
+  if (eligibleSources.length === 0) {
     return { status: "no-token" };
   }
 
   const rows = findRowsForUserKind(userId, kind);
   if (rows.length === 0) {
-    ensureWarmingRowsForKind(userId, kind);
+    for (const source of eligibleSources) {
+      upsertWarmingRow(userId, source.id, source.kind);
+    }
     return { status: "warming" };
   }
 
