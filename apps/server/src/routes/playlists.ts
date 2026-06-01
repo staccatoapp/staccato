@@ -32,12 +32,14 @@ function requireOwnPlaylist(
 }
 
 const playlistRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.get("/", async (req) => {
+  fastify.get("/", async (req, reply) => {
     const userId = req.userId;
-    const query = z
+    const parsedQuery = z
       .object({ limit: z.string().optional(), offset: z.string().optional() })
-      .parse(req.query);
-    const paginationOptions = parsePagination(query);
+      .safeParse(req.query);
+    if (!parsedQuery.success)
+      return reply.status(400).send({ error: "Invalid request" });
+    const paginationOptions = parsePagination(parsedQuery.data);
 
     const userPlaylists = getUserPlaylists(userId, paginationOptions);
     const total = countUserPlaylists(userId);
@@ -81,9 +83,14 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.post("/", async (req, reply) => {
     const userId = req.userId;
-    const { name, description } = z
+    const parsedBody = z
       .object({ name: z.string().min(1), description: z.string().optional() })
-      .parse(req.body);
+      .safeParse(req.body);
+    if (!parsedBody.success) {
+      req.log.warn({ err: parsedBody.error }, "ROUTE: invalid request body");
+      return reply.status(400).send({ error: "Invalid request" });
+    }
+    const { name, description } = parsedBody.data;
 
     const now = new Date();
     const playlist = createPlaylist({
@@ -105,7 +112,10 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   fastify.get("/:id", async (req, reply) => {
-    const { id } = z.object({ id: z.string() }).parse(req.params);
+    const parsedParams = z.object({ id: z.string() }).safeParse(req.params);
+    if (!parsedParams.success)
+      return reply.status(400).send({ error: "Invalid request" });
+    const { id } = parsedParams.data;
     const result = requireOwnPlaylist(id, req.userId);
     if (result === 404) {
       req.log.warn({ playlistId: id }, "playlist not found");
@@ -138,7 +148,10 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   fastify.put("/:id", async (req, reply) => {
-    const { id } = z.object({ id: z.string() }).parse(req.params);
+    const parsedParams = z.object({ id: z.string() }).safeParse(req.params);
+    if (!parsedParams.success)
+      return reply.status(400).send({ error: "Invalid request" });
+    const { id } = parsedParams.data;
     const result = requireOwnPlaylist(id, req.userId);
     if (result === 404) {
       req.log.warn({ playlistId: id }, "playlist not found");
@@ -152,12 +165,17 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(403).send({ error: "Forbidden" });
     }
 
-    const { name, description } = z
+    const parsedBody = z
       .object({
         name: z.string().min(1).optional(),
         description: z.string().nullable().optional(),
       })
-      .parse(req.body);
+      .safeParse(req.body);
+    if (!parsedBody.success) {
+      req.log.warn({ err: parsedBody.error }, "ROUTE: invalid request body");
+      return reply.status(400).send({ error: "Invalid request" });
+    }
+    const { name, description } = parsedBody.data;
 
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     if (name !== undefined) updates.name = name;
@@ -174,7 +192,10 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   fastify.delete("/:id", async (req, reply) => {
-    const { id } = z.object({ id: z.string() }).parse(req.params);
+    const parsedParams = z.object({ id: z.string() }).safeParse(req.params);
+    if (!parsedParams.success)
+      return reply.status(400).send({ error: "Invalid request" });
+    const { id } = parsedParams.data;
     const result = requireOwnPlaylist(id, req.userId);
     if (result === 404) {
       req.log.warn({ playlistId: id }, "playlist not found");
@@ -195,7 +216,10 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   fastify.post("/:id/tracks", async (req, reply) => {
-    const { id } = z.object({ id: z.string() }).parse(req.params);
+    const parsedParams = z.object({ id: z.string() }).safeParse(req.params);
+    if (!parsedParams.success)
+      return reply.status(400).send({ error: "Invalid request" });
+    const { id } = parsedParams.data;
     const result = requireOwnPlaylist(id, req.userId);
     if (result === 404) {
       req.log.warn({ playlistId: id }, "playlist not found");
@@ -209,9 +233,14 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(403).send({ error: "Forbidden" });
     }
 
-    const { trackIds } = z
+    const parsedBody = z
       .object({ trackIds: z.array(z.string()).min(1) })
-      .parse(req.body);
+      .safeParse(req.body);
+    if (!parsedBody.success) {
+      req.log.warn({ err: parsedBody.error }, "ROUTE: invalid request body");
+      return reply.status(400).send({ error: "Invalid request" });
+    }
+    const { trackIds } = parsedBody.data;
 
     const startPosition = (getMaxPlaylistTrackPosition(id) ?? -1) + 1;
 
@@ -224,9 +253,12 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   fastify.delete("/:id/tracks/:entryId", async (req, reply) => {
-    const { id, entryId } = z
+    const parsedParams = z
       .object({ id: z.string(), entryId: z.string() })
-      .parse(req.params);
+      .safeParse(req.params);
+    if (!parsedParams.success)
+      return reply.status(400).send({ error: "Invalid request" });
+    const { id, entryId } = parsedParams.data;
     const result = requireOwnPlaylist(id, req.userId);
     if (result === 404) {
       req.log.warn({ playlistId: id }, "playlist not found");

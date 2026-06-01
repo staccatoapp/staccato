@@ -120,3 +120,39 @@ describe("GET / — list scoping", () => {
     expect(items[0].name).toBe("Alice's Playlist");
   });
 });
+
+describe("POST / — validation", () => {
+  it("returns 400 when name is missing", async () => {
+    const app = buildApp(playlistRoutes, userAId);
+    const res = await app.inject({
+      method: "POST",
+      url: "/",
+      payload: { description: "no name provided" },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+});
+
+describe("PUT /:id — validation", () => {
+  it("returns 400 on invalid body", async () => {
+    const app = buildApp(playlistRoutes, userAId);
+    const res = await app.inject({
+      method: "PUT",
+      url: `/${playlistId}`,
+      payload: { name: 123 }, // name must be a string
+    });
+    expect(res.statusCode).toBe(400);
+  });
+});
+
+describe("POST /:id/tracks — validation", () => {
+  it("returns 400 on invalid body", async () => {
+    const app = buildApp(playlistRoutes, userAId);
+    const res = await app.inject({
+      method: "POST",
+      url: `/${playlistId}/tracks`,
+      payload: { notTrackIds: true },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+});

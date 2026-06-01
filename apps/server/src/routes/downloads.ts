@@ -27,7 +27,15 @@ function toDto(row: DownloadRequestRow): DownloadRequest {
 
 const downloadRoutes: FastifyPluginAsync = async (app) => {
   app.post("/", async (req, reply) => {
-    const body = CreateDownloadRequestSchema.parse(req.body);
+    const parsed = CreateDownloadRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      req.log.warn(
+        { err: parsed.error },
+        "POST /downloads: invalid request body",
+      );
+      return reply.status(400).send({ error: "Invalid request" });
+    }
+    const body = parsed.data;
 
     const existing = findExistingActiveRequest(
       req.userId,
@@ -68,7 +76,10 @@ const downloadRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.delete("/:id", async (req, reply) => {
-    const { id } = z.object({ id: z.string() }).parse(req.params);
+    const parsedParams = z.object({ id: z.string() }).safeParse(req.params);
+    if (!parsedParams.success)
+      return reply.status(400).send({ error: "Invalid request" });
+    const { id } = parsedParams.data;
     const deleted = deleteDownloadRequest(id, req.userId);
     if (!deleted) return reply.status(404).send({ error: "Not found" });
     return reply.status(204).send();

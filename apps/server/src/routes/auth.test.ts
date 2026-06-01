@@ -76,6 +76,18 @@ describe("POST /setup", () => {
     expect(createUser).not.toHaveBeenCalled();
   });
 
+  it("returns 400 on invalid body", async () => {
+    vi.mocked(isSetupComplete).mockReturnValue(false);
+    const { app } = buildSessionApp(authRoutes);
+    const res = await app.inject({
+      method: "POST",
+      url: "/setup",
+      payload: { notAUsername: true },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(createUser).not.toHaveBeenCalled();
+  });
+
   it("returns 201 with user shape and sets session on success", async () => {
     vi.mocked(isSetupComplete).mockReturnValue(false);
     vi.mocked(createUser).mockReturnValue(mockUser as never);
@@ -98,6 +110,16 @@ describe("POST /setup", () => {
 
 describe("POST /login", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("returns 400 on invalid body", async () => {
+    const { app } = buildSessionApp(authRoutes);
+    const res = await app.inject({
+      method: "POST",
+      url: "/login",
+      payload: { notAUsername: true },
+    });
+    expect(res.statusCode).toBe(400);
+  });
 
   it("returns 401 when user is not found", async () => {
     vi.mocked(findUserByUsername).mockReturnValue(undefined as never);

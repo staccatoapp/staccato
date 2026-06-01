@@ -26,7 +26,15 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       req.log.warn("setup attempted but already complete");
       return reply.code(409).send({ error: "Setup already complete" });
     }
-    const { username, password } = CreateUserSchema.parse(req.body);
+    const parsedBody = CreateUserSchema.safeParse(req.body);
+    if (!parsedBody.success) {
+      req.log.warn(
+        { err: parsedBody.error },
+        "POST /setup: invalid request body",
+      );
+      return reply.status(400).send({ error: "Invalid request" });
+    }
+    const { username, password } = parsedBody.data;
     const passwordHash = await argon2.hash(password, { type: argon2.argon2id });
     const user = createUser({ username, passwordHash, isAdmin: true });
     req.session.set("userId", user.id);
@@ -45,7 +53,15 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   fastify.post("/login", async (req, reply) => {
-    const { username, password } = LoginSchema.parse(req.body);
+    const parsedBody = LoginSchema.safeParse(req.body);
+    if (!parsedBody.success) {
+      req.log.warn(
+        { err: parsedBody.error },
+        "POST /login: invalid request body",
+      );
+      return reply.status(400).send({ error: "Invalid request" });
+    }
+    const { username, password } = parsedBody.data;
     const user = findUserByUsername(username);
 
     // Always run a hash verification to prevent timing attacks
