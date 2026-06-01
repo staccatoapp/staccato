@@ -1,8 +1,13 @@
 import { FastifyPluginAsync } from "fastify";
+import { z } from "zod";
 import type {
   RecommendationsResponse,
   RecommendedPlaylist,
   RecommendedTrack,
+} from "@staccato/shared";
+import {
+  RecommendedTrackSchema,
+  RecommendedPlaylistSchema,
 } from "@staccato/shared";
 import { getOrCreateUserSettings } from "../db/queries/settings.js";
 import {
@@ -16,12 +21,29 @@ import {
 } from "../recommendations/in-library.js";
 import { listRegisteredSources } from "../recommendations/source.js";
 import "../recommendations/sources/index.js";
+import { logger } from "../logger.js";
 
-function parsePayload<T>(row: RecommendationCacheRow): T | null {
+function parsePayload<T>(
+  row: RecommendationCacheRow,
+  schema: z.ZodType<T>,
+): T | null {
   if (!row.payload) return null;
   try {
-    return JSON.parse(row.payload) as T;
-  } catch {
+    const parsed = JSON.parse(row.payload);
+    const result = schema.safeParse(parsed);
+    if (!result.success) {
+      logger.warn(
+        { source: row.source, kind: row.kind, errors: result.error.issues },
+        "recommendation cache payload failed validation",
+      );
+      return null;
+    }
+    return result.data;
+  } catch (err) {
+    logger.warn(
+      { err, source: row.source, kind: row.kind },
+      "recommendation cache payload failed to parse",
+    );
     return null;
   }
 }
@@ -59,6 +81,7 @@ const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
     const response = buildResponse<RecommendedTrack[]>(
       req.userId,
       "cf-tracks",
+      z.array(RecommendedTrackSchema),
       mergeTracks,
       refreshTracksInLibrary,
     );
@@ -69,6 +92,7 @@ const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
     const response = buildResponse<RecommendedPlaylist[]>(
       req.userId,
       "playlists",
+      z.array(RecommendedPlaylistSchema),
       mergePlaylists,
       refreshPlaylistsInLibrary,
     );
@@ -79,6 +103,7 @@ const recommendationRoutes: FastifyPluginAsync = async (fastify) => {
 function buildResponse<T extends unknown[]>(
   userId: string,
   kind: string,
+  schema: z.ZodType<T>,
   merge: (payloads: T[]) => T,
   applyLiveLibrary: (merged: T) => T,
 ): RecommendationsResponse<T> {
@@ -107,7 +132,7 @@ function buildResponse<T extends unknown[]>(
 
   const withPayload = rows.filter((r) => r.payload !== null);
   const payloads = withPayload
-    .map((r) => parsePayload<T>(r))
+    .map((r) => parsePayload(r, schema))
     .filter((p): p is T => p !== null);
 
   const merged = applyLiveLibrary(merge(payloads));

@@ -111,9 +111,12 @@ prefix and exposes `GET /tracks` and `GET /playlists`. `buildResponse` returns t
 sources for the kind the user is **eligible** for; if none, it returns `no-token` (the wire value
 is unchanged — it now means "no eligible source"). On the first request for a kind with no cache
 rows yet, it lazily seeds warming rows for those eligible sources and returns `warming`. Otherwise
-it parses the payloads of all sources for that kind, merges and
-dedupes them (by `recordingMbid` for tracks, by playlist `id`), and runs the result through the
-live in-library pass before responding. The wire contract is the zod source of truth in
+it parses and validates the payloads of all sources for that kind. Each payload is validated with
+`safeParse` against `z.array(RecommendedTrackSchema)` or `z.array(RecommendedPlaylistSchema)` at
+read time — a payload that fails validation (stale schema or corrupt row) is discarded with a `warn`
+log and treated as if absent, never served as a mistyped object. Valid payloads are merged and
+deduped (by `recordingMbid` for tracks, by playlist `id`), then run through the live in-library
+pass before responding. The wire contract is the zod source of truth in
 `packages/shared/src/types/zod/api/recommendations.ts`.
 
 ## Web Consumer
