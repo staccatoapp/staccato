@@ -15,8 +15,7 @@ ListenBrainz) and serves them to the Explore UI. It is owned by `apps/server/src
 and is best understood as a **per-user, per-source pull-through cache**: a background refresher
 fetches from external sources on a schedule and writes JSON payloads to the `recommendation_cache`
 table, while the HTTP route serves whatever is cached and re-resolves in-library status live on
-every request. A detailed companion walkthrough lives in
-`apps/internal-docs/src/pipelines/recommendations.md`.
+every request.
 
 ## Data Model
 

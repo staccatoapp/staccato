@@ -57,7 +57,7 @@ load; everything else is TanStack Query wrapping `fetch`.
 There is no separate web server. `apps/server` serves the built SPA itself: when
 `STACCATO_ENV !== "development"` it registers `@fastify/static` over `apps/web/dist` and adds a
 catch-all not-found handler that returns `index.html` for non-`/api` routes (client-side
-routing). See `apps/server/src/index.ts` and `.claude/rules/server-architecture.md`.
+routing). See `apps/server/src/index.ts`.
 
 ### API surface
 

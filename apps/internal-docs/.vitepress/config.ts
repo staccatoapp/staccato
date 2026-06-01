@@ -30,6 +30,7 @@ export default defineConfig({
           { text: "Overview", link: "/architecture/overview" },
           { text: "Data Model", link: "/architecture/data-model" },
           { text: "Metadata Service", link: "/architecture/metadata-service" },
+          { text: "Listen Events", link: "/architecture/listen-events" },
         ],
       },
       {

@@ -3,8 +3,7 @@
 The recommendations pipeline produces per-user **track** and **playlist** recommendations from
 ListenBrainz and surfaces them in the Explore UI, where each item is either playable from the
 local library or available to preview and request for download. It lives in
-`apps/server/src/recommendations/` and is summarised canonically in
-`.claude/rules/recommendations-pipeline.md` — this page is the detailed companion to that rule.
+`apps/server/src/recommendations/`.
 
 ## Design principles
 

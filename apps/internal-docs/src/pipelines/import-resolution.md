@@ -2,8 +2,7 @@
 
 The library pipeline turns audio files on disk into resolved tracks linked to canonical
 MusicBrainz artists, albums, and recordings. It is the most complex subsystem in Staccato.
-It lives entirely in `apps/server/src/library/` and is summarised canonically in
-`.claude/rules/import-pipeline.md` — this page is the detailed companion to that rule.
+It lives entirely in `apps/server/src/library/`.
 
 ## Design principles
 

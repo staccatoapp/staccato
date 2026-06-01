@@ -3,8 +3,7 @@
 > **Stub.** Headings and source pointers only — to be written out in a later pass.
 >
 > Source of truth: the Drizzle schema in `apps/server/src/db/schema/` (one file per table,
-> plus `index.ts`), migrations in `apps/server/drizzle/`, and the shared/per-user split rule in
-> `.claude/rules/server-architecture.md`. Browse live data with `pnpm studio`.
+> plus `index.ts`) and migrations in `apps/server/drizzle/`. Browse live data with `pnpm studio`.
 
 ## Shared vs. per-user data
 
