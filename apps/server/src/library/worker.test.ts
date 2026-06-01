@@ -378,10 +378,12 @@ describe("resolveTrack", () => {
     expect(row?.resolutionStatus).toBe("failed");
   });
 
-  it("increments the failed counter and keeps inFlight balanced on an unexpected crash", async () => {
+  it("marks the track failed in the DB and keeps inFlight balanced on an unexpected crash", async () => {
     const artistId = seedArtist();
     const albumId = seedAlbum(artistId);
-    seedTrack(artistId, albumId, { filePath: "/music/crash.flac" });
+    const trackId = seedTrack(artistId, albumId, {
+      filePath: "/music/crash.flac",
+    });
 
     vi.mocked(fs.stat).mockResolvedValue({
       size: 1_000_000,
@@ -389,7 +391,8 @@ describe("resolveTrack", () => {
     } as unknown as Stats);
     vi.mocked(extractTags).mockResolvedValue(makeTags()); // no MB IDs → normal path
     vi.mocked(fingerprintFile).mockResolvedValue(null);
-    // candidatesFromTags throws outside any try/catch in doResolve → propagates to resolveTrack's catch
+    // candidatesFromTags throws outside any try/catch in doResolve → propagates to resolveTrack's catch.
+    // At that point markTrackResolving has already been called, so the track is in 'resolving' status.
     vi.mocked(candidatesFromTags).mockRejectedValue(
       new Error("unexpected network crash"),
     );
@@ -397,6 +400,12 @@ describe("resolveTrack", () => {
     await resolveTrack("/music/crash.flac");
 
     expect(libraryProgress.failed).toBe(1);
-    expect(libraryProgress.inFlight).toBe(0); // finally block always decrements
+    expect(libraryProgress.inFlight).toBe(0);
+    const [row] = testDb
+      .select({ resolutionStatus: tracks.resolutionStatus })
+      .from(tracks)
+      .where(eq(tracks.id, trackId))
+      .all();
+    expect(row?.resolutionStatus).toBe("failed");
   });
 });
