@@ -1,4 +1,3 @@
-import { eq } from "drizzle-orm";
 import { db } from "../client.js";
 import { listeningHistory } from "../schema/listening-history.js";
 
@@ -10,14 +9,7 @@ export function insertListenEvent(
 ): ListenHistoryRow {
   return db
     .insert(listeningHistory)
-    .values({ userId, trackId, scrobbledToListenbrainz: false })
+    .values({ userId, trackId })
     .returning()
     .get()!;
-}
-
-export function markScrobbled(listenId: string): void {
-  db.update(listeningHistory)
-    .set({ scrobbledToListenbrainz: true })
-    .where(eq(listeningHistory.id, listenId))
-    .run();
 }

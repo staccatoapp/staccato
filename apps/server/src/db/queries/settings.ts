@@ -40,12 +40,3 @@ export function getMusicbrainzUsername(userId: string): string | null {
     .get();
   return result?.musicbrainzUsername ?? null;
 }
-
-export function getUserListenbrainzToken(userId: string): string | null {
-  const result = db
-    .select({ listenbrainzToken: userSettings.listenbrainzToken })
-    .from(userSettings)
-    .where(eq(userSettings.userId, userId))
-    .get();
-  return result?.listenbrainzToken ?? null;
-}

@@ -1,5 +1,3 @@
-// TODO - abstract clients so that different scrobbling services are plug and play/not called directly
-
 import { z } from "zod";
 import { logger } from "../logger.js";
 

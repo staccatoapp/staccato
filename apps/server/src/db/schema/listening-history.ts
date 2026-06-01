@@ -17,9 +17,4 @@ export const listeningHistory = sqliteTable("listening_history", {
   listenedAt: integer("listened_at")
     .notNull()
     .default(sql`(unixepoch())`),
-  scrobbledToListenbrainz: integer("scrobbled_to_listenbrainz", {
-    mode: "boolean",
-  })
-    .notNull()
-    .default(false),
 });

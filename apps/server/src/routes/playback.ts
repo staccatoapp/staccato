@@ -1,4 +1,4 @@
-import { FastifyBaseLogger, FastifyPluginAsync } from "fastify";
+import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import {
   appendToQueue,
@@ -9,19 +9,13 @@ import {
 import {
   getExistingTrackIds,
   getPlaybackTracksByIds,
-  getTrackForScrobble,
   type PlaybackTrackRow,
 } from "../db/queries/tracks.js";
 import {
   groupCreditsByTrack,
   listTrackArtistsForTracks,
 } from "../db/queries/track-artists.js";
-import {
-  insertListenEvent,
-  markScrobbled,
-} from "../db/queries/listening-history.js";
-import { getUserListenbrainzToken } from "../db/queries/settings.js";
-import { submitListen } from "../listenbrainz/client.js";
+import { recordListen } from "../scrobbling/dispatch.js";
 import {
   getLyricsByTrackId,
   getTrackMetaForLyrics,
@@ -102,7 +96,7 @@ const playbackRoutes: FastifyPluginAsync = async (fastify) => {
         Math.min(240, (currentTrackDurationSeconds ?? 480) / 2)
     ) {
       if (currentTrackId) {
-        addListenEvent(userId, currentTrackId, req.log).catch(() => {
+        recordListen(userId, currentTrackId, req.log).catch(() => {
           /* logged inside */
         });
       } else {
@@ -250,48 +244,6 @@ function buildSessionResponse(session: PlaybackSessionRow) {
     currentTrackListenEventCreated: session.currentTrackListenEventCreated,
     isPlaying: session.isPlaying,
   };
-}
-
-// TODO: a periodic retry job should pick up listening_history rows with
-// scrobbled_to_listenbrainz = false and replay them. Out of scope for now.
-async function addListenEvent(
-  userId: string,
-  trackId: string,
-  log: FastifyBaseLogger,
-): Promise<void> {
-  const insertedListen = insertListenEvent(userId, trackId);
-
-  const listenbrainzToken = getUserListenbrainzToken(userId);
-  if (!listenbrainzToken) {
-    log.warn(
-      { userId },
-      "could not submit listen to listenbrainz - no token found for user",
-    );
-    return;
-  }
-
-  const track = getTrackForScrobble(trackId);
-  if (!track?.artistName || !track?.title) {
-    log.warn(
-      { trackId },
-      "could not submit listen to listenbrainz - missing track or artist name",
-    );
-    return;
-  }
-
-  try {
-    await submitListen({
-      token: listenbrainzToken,
-      listenType: "single",
-      artistName: track.artistName,
-      trackName: track.title,
-      listenedAt: insertedListen.listenedAt,
-      trackMbid: track.musicbrainzId,
-    });
-    markScrobbled(insertedListen.id);
-  } catch (err) {
-    log.error({ err, userId, trackId }, "scrobble to listenbrainz failed");
-  }
 }
 
 export default playbackRoutes;
