@@ -16,6 +16,7 @@ import {
 } from "../db/__fixtures__/db.js";
 import { getAlbumById } from "../db/queries/albums.js";
 import { getArtistIdByMbid, getArtistRowById } from "../db/queries/artists.js";
+import { listTrackArtists } from "../db/queries/track-artists.js";
 import { db } from "../db/client.js";
 import { tracks } from "../db/schema/tracks.js";
 import { albums } from "../db/schema/albums.js";
@@ -342,5 +343,118 @@ describe("commitResolution — dominant artist recompute", () => {
     // Artist A adopted the local placeholder and holds 2 resolved tracks.
     const album = getAlbumById(albumId);
     expect(album?.artistId).toBe(localArtist);
+  });
+});
+
+describe("commitResolution — track artist credits", () => {
+  it("writes a single credit to track_artists at position 0", () => {
+    const artistId = seedArtist("Solo Artist", "mbid-solo");
+    const albumId = seedAlbum(artistId);
+    const trackId = seedTrack(artistId, albumId);
+
+    commitResolution({
+      trackId,
+      currentArtistId: artistId,
+      currentAlbumId: albumId,
+      winner: makeWinner({
+        artistCredits: [makeCredit({ mbid: "mbid-solo", name: "Solo Artist" })],
+      }),
+      release: null,
+      tags: makeTags(),
+      audioFingerprint: null,
+    });
+
+    const credits = listTrackArtists(trackId);
+    expect(credits).toHaveLength(1);
+    const track = getTrackRow(trackId);
+    expect(credits[0]).toMatchObject({
+      position: 0,
+      joinPhrase: null,
+      artistId: track?.artistId,
+    });
+  });
+
+  it("writes all credits for a multi-artist track at correct positions", () => {
+    const artistId = seedArtist("Lead Artist", "mbid-lead");
+    const albumId = seedAlbum(artistId);
+    const trackId = seedTrack(artistId, albumId);
+
+    commitResolution({
+      trackId,
+      currentArtistId: artistId,
+      currentAlbumId: albumId,
+      winner: makeWinner({
+        artistCredits: [
+          makeCredit({
+            mbid: "mbid-lead",
+            name: "Lead Artist",
+            joinPhrase: " feat. ",
+          }),
+          makeCredit({
+            mbid: "mbid-feat",
+            name: "Featured Artist",
+            joinPhrase: null,
+          }),
+        ],
+      }),
+      release: null,
+      tags: makeTags(),
+      audioFingerprint: null,
+    });
+
+    const credits = listTrackArtists(trackId);
+    expect(credits).toHaveLength(2);
+
+    const track = getTrackRow(trackId);
+    // Position 0 uses the identity-stable leadArtistId (same row as track.artistId).
+    expect(credits[0]).toMatchObject({
+      position: 0,
+      joinPhrase: " feat. ",
+      artistId: track?.artistId,
+    });
+    // Position 1 is a distinct row for the featured artist.
+    expect(credits[1]).toMatchObject({ position: 1, joinPhrase: null });
+    expect(credits[1]!.artistId).not.toBe(track?.artistId);
+  });
+
+  it("replaces credits on a second commit rather than appending", () => {
+    const artistId = seedArtist("Lead Artist", "mbid-lead2");
+    const albumId = seedAlbum(artistId);
+    const trackId = seedTrack(artistId, albumId);
+
+    const baseInput = {
+      trackId,
+      currentArtistId: artistId,
+      currentAlbumId: albumId,
+      release: null,
+      tags: makeTags(),
+      audioFingerprint: null,
+    };
+
+    // First commit: two credits.
+    commitResolution({
+      ...baseInput,
+      winner: makeWinner({
+        artistCredits: [
+          makeCredit({ mbid: "mbid-lead2", name: "Lead Artist" }),
+          makeCredit({ mbid: "mbid-guest", name: "Guest Artist" }),
+        ],
+      }),
+    });
+
+    // Second commit: one credit — must replace, not append.
+    commitResolution({
+      ...baseInput,
+      currentArtistId: getTrackRow(trackId)!.artistId,
+      winner: makeWinner({
+        artistCredits: [
+          makeCredit({ mbid: "mbid-lead2", name: "Lead Artist" }),
+        ],
+      }),
+    });
+
+    const credits = listTrackArtists(trackId);
+    expect(credits).toHaveLength(1);
+    expect(credits[0]!.position).toBe(0);
   });
 });
