@@ -19,6 +19,7 @@ import {
   touchPlaylist,
   updatePlaylist,
 } from "../db/queries/playlists.js";
+import { getExistingTrackIds } from "../db/queries/tracks.js";
 import { resolveAlbumCoverNow } from "../coverart/store.js";
 
 function requireOwnPlaylist(
@@ -242,9 +243,17 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
     }
     const { trackIds } = parsedBody.data;
 
+    const existingSet = getExistingTrackIds(trackIds);
+    const validTrackIds = trackIds.filter((trackId) =>
+      existingSet.has(trackId),
+    );
+    if (validTrackIds.length === 0) {
+      return reply.status(400).send({ error: "no-valid-tracks" });
+    }
+
     const startPosition = (getMaxPlaylistTrackPosition(id) ?? -1) + 1;
 
-    trackIds.forEach((trackId, i) => {
+    validTrackIds.forEach((trackId, i) => {
       addTrackToPlaylist(id, trackId, startPosition + i);
     });
     touchPlaylist(id);
