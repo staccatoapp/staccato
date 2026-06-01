@@ -1,5 +1,6 @@
 import { createId } from "@paralleldrive/cuid2";
 import {
+  index,
   integer,
   real,
   sqliteTable,
@@ -35,5 +36,7 @@ export const albums = sqliteTable(
       table.artistId,
       table.releaseMbid,
     ),
+    index("albums_artist_id_idx").on(table.artistId),
+    index("albums_normalized_title_idx").on(table.normalizedTitle),
   ],
 );
