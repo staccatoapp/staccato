@@ -41,9 +41,14 @@ const playbackRoutes: FastifyPluginAsync = async (fastify) => {
   // ahead of the current track. Switch to fractional indexing + a queue_items
   // table in a future plan.
   fastify.post("/session/queue", async (req, reply) => {
-    const parsedQueue = z.object({ trackIds: z.array(z.string()) }).safeParse(req.body);
+    const parsedQueue = z
+      .object({ trackIds: z.array(z.string()) })
+      .safeParse(req.body);
     if (!parsedQueue.success) {
-      req.log.warn({ err: parsedQueue.error }, "POST /session/queue: invalid request body");
+      req.log.warn(
+        { err: parsedQueue.error },
+        "POST /session/queue: invalid request body",
+      );
       return reply.status(400).send({ error: "Invalid request" });
     }
     const { trackIds } = parsedQueue.data;
@@ -58,9 +63,14 @@ const playbackRoutes: FastifyPluginAsync = async (fastify) => {
 
   // TODO(queue-items): see comment on POST /session/queue.
   fastify.put("/session/queue", async (req, reply) => {
-    const parsedQueue = z.object({ trackIds: z.array(z.string()) }).safeParse(req.body);
+    const parsedQueue = z
+      .object({ trackIds: z.array(z.string()) })
+      .safeParse(req.body);
     if (!parsedQueue.success) {
-      req.log.warn({ err: parsedQueue.error }, "PUT /session/queue: invalid request body");
+      req.log.warn(
+        { err: parsedQueue.error },
+        "PUT /session/queue: invalid request body",
+      );
       return reply.status(400).send({ error: "Invalid request" });
     }
     const { trackIds } = parsedQueue.data;
@@ -85,7 +95,10 @@ const playbackRoutes: FastifyPluginAsync = async (fastify) => {
       })
       .safeParse(req.body);
     if (!parsedState.success) {
-      req.log.warn({ err: parsedState.error }, "PUT /session/state: invalid request body");
+      req.log.warn(
+        { err: parsedState.error },
+        "PUT /session/state: invalid request body",
+      );
       return reply.status(400).send({ error: "Invalid request" });
     }
     const {
@@ -145,7 +158,10 @@ const playbackRoutes: FastifyPluginAsync = async (fastify) => {
       })
       .safeParse(req.body);
     if (!parsedPlay.success) {
-      req.log.warn({ err: parsedPlay.error }, "PUT /session/play: invalid request body");
+      req.log.warn(
+        { err: parsedPlay.error },
+        "PUT /session/play: invalid request body",
+      );
       return reply.status(400).send({ error: "Invalid request" });
     }
     const { trackIds, startIndex } = parsedPlay.data;
@@ -179,7 +195,10 @@ const playbackRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/lyrics", async (req, reply) => {
     const parsedQuery = z.object({ trackId: z.string() }).safeParse(req.query);
     if (!parsedQuery.success) {
-      req.log.warn({ err: parsedQuery.error }, "GET /lyrics: missing or invalid trackId query param");
+      req.log.warn(
+        { err: parsedQuery.error },
+        "GET /lyrics: missing or invalid trackId query param",
+      );
       return reply.status(400).send({ error: "Invalid request" });
     }
     const { trackId } = parsedQuery.data;

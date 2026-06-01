@@ -28,7 +28,10 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     }
     const parsedBody = CreateUserSchema.safeParse(req.body);
     if (!parsedBody.success) {
-      req.log.warn({ err: parsedBody.error }, "POST /setup: invalid request body");
+      req.log.warn(
+        { err: parsedBody.error },
+        "POST /setup: invalid request body",
+      );
       return reply.status(400).send({ error: "Invalid request" });
     }
     const { username, password } = parsedBody.data;
@@ -52,7 +55,10 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post("/login", async (req, reply) => {
     const parsedBody = LoginSchema.safeParse(req.body);
     if (!parsedBody.success) {
-      req.log.warn({ err: parsedBody.error }, "POST /login: invalid request body");
+      req.log.warn(
+        { err: parsedBody.error },
+        "POST /login: invalid request body",
+      );
       return reply.status(400).send({ error: "Invalid request" });
     }
     const { username, password } = parsedBody.data;

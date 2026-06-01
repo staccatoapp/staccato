@@ -29,7 +29,10 @@ const downloadRoutes: FastifyPluginAsync = async (app) => {
   app.post("/", async (req, reply) => {
     const parsed = CreateDownloadRequestSchema.safeParse(req.body);
     if (!parsed.success) {
-      req.log.warn({ err: parsed.error }, "POST /downloads: invalid request body");
+      req.log.warn(
+        { err: parsed.error },
+        "POST /downloads: invalid request body",
+      );
       return reply.status(400).send({ error: "Invalid request" });
     }
     const body = parsed.data;
@@ -74,7 +77,8 @@ const downloadRoutes: FastifyPluginAsync = async (app) => {
 
   app.delete("/:id", async (req, reply) => {
     const parsedParams = z.object({ id: z.string() }).safeParse(req.params);
-    if (!parsedParams.success) return reply.status(400).send({ error: "Invalid request" });
+    if (!parsedParams.success)
+      return reply.status(400).send({ error: "Invalid request" });
     const { id } = parsedParams.data;
     const deleted = deleteDownloadRequest(id, req.userId);
     if (!deleted) return reply.status(404).send({ error: "Not found" });

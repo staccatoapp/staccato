@@ -22,7 +22,10 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.patch("/", async (req, reply) => {
     const parsedBody = UpdateUserSettingsSchema.safeParse(req.body);
     if (!parsedBody.success) {
-      req.log.warn({ err: parsedBody.error }, "PATCH /settings: invalid request body");
+      req.log.warn(
+        { err: parsedBody.error },
+        "PATCH /settings: invalid request body",
+      );
       return reply.status(400).send({ error: "Invalid request" });
     }
     const parsedUpdates = parsedBody.data;
@@ -102,7 +105,10 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post("/validate-listenbrainz-token", async (req, reply) => {
     const parsedToken = z.object({ token: z.string() }).safeParse(req.body);
     if (!parsedToken.success) {
-      req.log.warn({ err: parsedToken.error }, "POST /settings/validate-listenbrainz-token: invalid request body");
+      req.log.warn(
+        { err: parsedToken.error },
+        "POST /settings/validate-listenbrainz-token: invalid request body",
+      );
       return reply.status(400).send({ error: "Invalid request" });
     }
     const { token } = parsedToken.data;

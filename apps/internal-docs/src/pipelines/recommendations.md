@@ -31,14 +31,14 @@ local library or available to preview and request for download. It lives in
 The `recommendation_cache` table (`db/schema/recommendation-cache.ts`) holds one row per
 `(userId, source, kind)`, enforced by the `recommendation_cache_user_source_kind` unique index.
 
-| Column          | Role                                                                       |
-| --------------- | -------------------------------------------------------------------------- |
-| `status`        | Lifecycle: `warming` → `ready` → `error` (see below).                      |
-| `inflight`      | Claim flag (`0`/`1`); set while a refresh is in progress.                  |
-| `payload`       | The cached recommendations as a JSON string (nullable until first fetch).  |
-| `lastError`     | Last failure message (set on `error`).                                     |
-| `fetchedAt`     | When the payload was last written.                                         |
-| `nextRefreshAt` | When the row next becomes due; drives the refresher's scan.                |
+| Column          | Role                                                                      |
+| --------------- | ------------------------------------------------------------------------- |
+| `status`        | Lifecycle: `warming` → `ready` → `error` (see below).                     |
+| `inflight`      | Claim flag (`0`/`1`); set while a refresh is in progress.                 |
+| `payload`       | The cached recommendations as a JSON string (nullable until first fetch). |
+| `lastError`     | Last failure message (set on `error`).                                    |
+| `fetchedAt`     | When the payload was last written.                                        |
+| `nextRefreshAt` | When the row next becomes due; drives the refresher's scan.               |
 
 The partial index `idx_recommendation_cache_due` on `nextRefreshAt WHERE inflight = 0` makes the
 "what's due?" query cheap. Rows are per-user and cascade-delete with the user.
@@ -52,13 +52,17 @@ keeps its stale payload — the route can still serve it while flagging the erro
 A source implements `RecommendationSource<Kind, Payload, Ctx>` (`source.ts`):
 
 ```ts
-interface RecommendationSource<Kind extends string, Payload extends unknown[], Ctx = unknown> {
+interface RecommendationSource<
+  Kind extends string,
+  Payload extends unknown[],
+  Ctx = unknown,
+> {
   readonly id: string;
   readonly kind: Kind;
   readonly refreshIntervalMs: number;
   readonly emptyRetryIntervalMs?: number;
-  isEligible(settings: UserSettingsRow): boolean;      // has the right credentials?
-  buildContext(settings: UserSettingsRow): Ctx;        // source-specific creds → fetch ctx
+  isEligible(settings: UserSettingsRow): boolean; // has the right credentials?
+  buildContext(settings: UserSettingsRow): Ctx; // source-specific creds → fetch ctx
   fetch(ctx: Ctx, log: FastifyBaseLogger): Promise<Payload>;
 }
 ```
@@ -78,10 +82,10 @@ Last.fm source would read its own columns and define its own `Ctx`, touching no 
 
 Two sources exist today, both with `id` `"listenbrainz"`:
 
-| Kind        | File                            | Refresh | Empty-retry | Upstream                                   |
-| ----------- | ------------------------------- | ------- | ----------- | ------------------------------------------ |
-| `cf-tracks` | `listenbrainz-cf-tracks.ts`     | 6h      | 1h          | `getCFRecommendations`                     |
-| `playlists` | `listenbrainz-playlists.ts`     | 24h     | —           | `getRecommendedPlaylists` + `getPlaylistDetail` |
+| Kind        | File                        | Refresh | Empty-retry | Upstream                                        |
+| ----------- | --------------------------- | ------- | ----------- | ----------------------------------------------- |
+| `cf-tracks` | `listenbrainz-cf-tracks.ts` | 6h      | 1h          | `getCFRecommendations`                          |
+| `playlists` | `listenbrainz-playlists.ts` | 24h     | —           | `getRecommendedPlaylists` + `getPlaylistDetail` |
 
 Both follow the same shape: pull MBIDs from ListenBrainz, call `getTracksByMusicbrainzIds` to
 short-circuit any recording already in the local library (those need no MusicBrainz lookup or
@@ -163,12 +167,12 @@ The route (`routes/recommendations.ts`) is mounted under the protected `/api/rec
 prefix and exposes `GET /tracks` and `GET /playlists`. Both delegate to a shared `buildResponse`,
 which returns the discriminated `RecommendationsResponse` union:
 
-| Status    | When                                                                                   |
-| --------- | -------------------------------------------------------------------------------------- |
-| `no-token` | The user is eligible for **no** source of this kind (lacks the required credentials).  |
-| `warming` | No cache rows yet (rows are lazily seeded here too), or all rows are warming/empty.     |
-| `ready`   | At least one row has a payload; merged data is returned.                                |
-| `error`   | All rows are in `error`; stale merged data is returned if any exists, else `null`.      |
+| Status     | When                                                                                  |
+| ---------- | ------------------------------------------------------------------------------------- |
+| `no-token` | The user is eligible for **no** source of this kind (lacks the required credentials). |
+| `warming`  | No cache rows yet (rows are lazily seeded here too), or all rows are warming/empty.   |
+| `ready`    | At least one row has a payload; merged data is returned.                              |
+| `error`    | All rows are in `error`; stale merged data is returned if any exists, else `null`.    |
 
 `buildResponse` first filters the registry to the sources for this kind the user `isEligible` for;
 if none, it returns `no-token` (the wire value is unchanged — it now means "no eligible source").
