@@ -29,6 +29,7 @@ import { startRefresher, tick } from "./recommendations/refresher.js";
 import { reconcileUserRows } from "./recommendations/eligibility.js";
 import "./recommendations/sources/index.js";
 import adminRoutes from "./routes/admin/index.js";
+import { ZodError } from "zod";
 
 const app = Fastify({ loggerInstance: logger });
 
@@ -83,6 +84,14 @@ if (getConfig().STACCATO_ENV !== "development") {
     }
   });
 }
+
+app.setErrorHandler((err, req, reply) => {
+  if (err instanceof ZodError) {
+    req.log.warn({ err, url: req.url }, "unhandled zod validation error");
+    return reply.status(400).send({ error: "Invalid request" });
+  }
+  reply.send(err);
+});
 
 const start = async () => {
   runMigrations();
