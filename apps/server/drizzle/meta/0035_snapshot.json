@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "55677eed-cb38-497a-a9ee-07a8e9b5927a",
+  "id": "d3c36562-5eda-493d-94a6-a03b170c4cdd",
   "prevId": "6557c3b7-100a-4368-a4d1-d856c823694f",
   "tables": {
     "album_artists": {
@@ -66,13 +66,6 @@
             "position"
           ],
           "isUnique": true
-        },
-        "album_artists_artist_id_idx": {
-          "name": "album_artists_artist_id_idx",
-          "columns": [
-            "artist_id"
-          ],
-          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -197,20 +190,6 @@
             "release_mbid"
           ],
           "isUnique": true
-        },
-        "albums_artist_id_idx": {
-          "name": "albums_artist_id_idx",
-          "columns": [
-            "artist_id"
-          ],
-          "isUnique": false
-        },
-        "albums_normalized_title_idx": {
-          "name": "albums_normalized_title_idx",
-          "columns": [
-            "normalized_title"
-          ],
-          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -459,32 +438,9 @@
           "notNull": true,
           "autoincrement": false,
           "default": "(unixepoch())"
-        },
-        "scrobbled_to_listenbrainz": {
-          "name": "scrobbled_to_listenbrainz",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
         }
       },
-      "indexes": {
-        "listening_history_user_id_idx": {
-          "name": "listening_history_user_id_idx",
-          "columns": [
-            "user_id"
-          ],
-          "isUnique": false
-        },
-        "listening_history_track_id_idx": {
-          "name": "listening_history_track_id_idx",
-          "columns": [
-            "track_id"
-          ],
-          "isUnique": false
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
         "listening_history_user_id_users_id_fk": {
           "name": "listening_history_user_id_users_id_fk",
@@ -505,6 +461,82 @@
           "tableTo": "tracks",
           "columnsFrom": [
             "track_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "listen_scrobbles": {
+      "name": "listen_scrobbles",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "listen_id": {
+          "name": "listen_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "target": {
+          "name": "target",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "last_error": {
+          "name": "last_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        }
+      },
+      "indexes": {
+        "listen_scrobbles_listen_target": {
+          "name": "listen_scrobbles_listen_target",
+          "columns": [
+            "listen_id",
+            "target"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "listen_scrobbles_listen_id_listening_history_id_fk": {
+          "name": "listen_scrobbles_listen_id_listening_history_id_fk",
+          "tableFrom": "listen_scrobbles",
+          "tableTo": "listening_history",
+          "columnsFrom": [
+            "listen_id"
           ],
           "columnsTo": [
             "id"
@@ -556,22 +588,7 @@
           "autoincrement": false
         }
       },
-      "indexes": {
-        "playlist_tracks_playlist_id_idx": {
-          "name": "playlist_tracks_playlist_id_idx",
-          "columns": [
-            "playlist_id"
-          ],
-          "isUnique": false
-        },
-        "playlist_tracks_track_id_idx": {
-          "name": "playlist_tracks_track_id_idx",
-          "columns": [
-            "track_id"
-          ],
-          "isUnique": false
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
         "playlist_tracks_playlist_id_playlists_id_fk": {
           "name": "playlist_tracks_playlist_id_playlists_id_fk",
@@ -815,41 +832,6 @@
             "file_path"
           ],
           "isUnique": true
-        },
-        "tracks_artist_id_idx": {
-          "name": "tracks_artist_id_idx",
-          "columns": [
-            "artist_id"
-          ],
-          "isUnique": false
-        },
-        "tracks_album_id_idx": {
-          "name": "tracks_album_id_idx",
-          "columns": [
-            "album_id"
-          ],
-          "isUnique": false
-        },
-        "tracks_resolution_status_idx": {
-          "name": "tracks_resolution_status_idx",
-          "columns": [
-            "resolution_status"
-          ],
-          "isUnique": false
-        },
-        "tracks_audio_fingerprint_idx": {
-          "name": "tracks_audio_fingerprint_idx",
-          "columns": [
-            "audio_fingerprint"
-          ],
-          "isUnique": false
-        },
-        "tracks_musicbrainz_id_idx": {
-          "name": "tracks_musicbrainz_id_idx",
-          "columns": [
-            "musicbrainz_id"
-          ],
-          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -938,13 +920,6 @@
             "position"
           ],
           "isUnique": true
-        },
-        "track_artists_artist_id_idx": {
-          "name": "track_artists_artist_id_idx",
-          "columns": [
-            "artist_id"
-          ],
-          "isUnique": false
         }
       },
       "foreignKeys": {

@@ -9,7 +9,7 @@ description: Use when the user wants a GitHub issue taken end-to-end in the Stac
 
 Take one GitHub issue in the Staccato monorepo from specification to a verified pull request: load it, clarify, plan, implement, test, verify, and open the PR. Uses the **`gh` CLI** (the rest of this repo's GitHub tooling does — see `.claude/audit/create-issues.md`), run through the **Bash tool** so multi-line bodies parse correctly.
 
-**Core principle:** two human gates — requirements and plan — come *before* any code, and nothing is claimed green without command output to back it.
+**Core principle:** two human gates — requirements and plan — come _before_ any code, and nothing is claimed green without command output to back it.
 
 This skill is whitelisted in `CLAUDE.md` to run git commands; outside it, the no-git-history rule still applies.
 
@@ -93,6 +93,7 @@ git checkout -b agent/<issue#>-<short-slug> origin/main
 ```
 
 **PATH DISCIPLINE** — every subsequent operation must use `C:\Projects\staccato-fix-issue-agent` as the root, not `C:\Projects\staccato`:
+
 - **Bash**: run `pnpm`, `git`, and `gh` from inside the worktree; never `cd` back to the main repo.
 - **Explore agents**: pass `C:\Projects\staccato-fix-issue-agent` as the search root explicitly in the agent prompt.
 - **Read / Edit / Write**: use absolute paths rooted at `C:\Projects\staccato-fix-issue-agent`.
@@ -118,30 +119,17 @@ Cover: files created/modified, the change per file, tests to add/update, and how
 The worktree and branch are already set up (Phase 2). All work happens in `C:\Projects\staccato-fix-issue-agent`.
 
 1. Make surgical changes that follow existing patterns; no unrelated churn.
-3. Honour Staccato conventions (`CLAUDE.md`):
+2. Honour Staccato conventions (`CLAUDE.md`):
    - Cross-app-boundary types use **zod** in `packages/shared/src/types/zod`, with validation at use sites; prefer the shared package for non-project-specific helpers.
    - **Logging:** every `catch` logs; every external call site (MusicBrainz/AcoustID/Lidarr/Cover Art) logs failures with context. Object-first: `log.warn({ err, operation, ...ids }, "message")` — never string interpolation. Pick the level per the log-level guidance in `CLAUDE.md`.
 
 ### Phase 6 — Tests
 
-**REQUIRED SUB-SKILL:** use `superpowers:test-driven-development` for new or changed logic.
-
-Add unit tests (and integration tests where the change crosses a boundary) covering the edge cases identified in Phase 3. Match the repo's existing test layout and framework (Vitest, run via `pnpm test`).
+Follow the **Testing** section in `CLAUDE.md`. Cover the edge cases identified in Phase 3.
 
 ### Phase 7 — Verify
 
-**REQUIRED BACKGROUND:** `superpowers:verification-before-completion` — show command output; never claim green from assumption.
-
-Run and confirm each passes, fixing and re-running on failure:
-
-```bash
-pnpm lint:fix --force  # --force bypasses turbo cache so lint runs on every package, not just ones turbo considers dirty
-pnpm check-types       # tsc across the monorepo
-pnpm test              # vitest
-pnpm build         # production build
-```
-
-If something genuinely can't be verified here (missing service/dep), state exactly what and why — don't fabricate results.
+Follow the **Before claiming work complete** section in `CLAUDE.md`. The `check-doc-updates` step comes before opening the PR.
 
 ### Phase 8 — Commit and open the PR
 
@@ -173,3 +161,15 @@ If something genuinely can't be verified here (missing service/dep), state exact
 - **Editing main-repo files from inside the worktree** — if Read/Edit/Write paths or Bash commands point at `C:\Projects\staccato\` instead of `C:\Projects\staccato-fix-issue-agent\`, changes land in the main checkout. Always use the fixed sibling path.
 - **Passing the wrong root to Explore agents** — explorers default to the session cwd. Explicitly pass `C:\Projects\staccato-fix-issue-agent` as the search root or they may search the main repo and return paths that don't translate.
 - **`gh pr create` missing `--head` in a worktree** — when `gh` is run from inside the worktree via Bash, the shell cwd may be reset between commands, causing `gh` to lose track of the current branch. Always pass `--head agent/<issue#>-<slug>` explicitly to `gh pr create`.
+- **`drizzle-kit generate` failing with "Invalid server config"** — `drizzle.config.ts` transitively imports `src/config/config.ts`, which validates all env vars at import time. Prefix the command with `STACCATO_ENV=test STACCATO_SERVER_SESSION_SECRET=change-this-to-a-random-32-plus-character-secret` so validation passes. See below for the full command.
+
+> **drizzle-kit generate note:** `drizzle.config.ts` imports `src/paths.ts` → `src/config/config.ts`, which validates all required env vars at import time. Running `drizzle-kit generate` without them fails with "Invalid server config". Prefix the command with the minimum required vars:
+>
+> ```bash
+> cd /c/Projects/staccato-fix-issue-agent/apps/server && \
+>   STACCATO_ENV=test \
+>   STACCATO_SERVER_SESSION_SECRET=change-this-to-a-random-32-plus-character-secret \
+>   pnpm exec drizzle-kit generate
+> ```
+>
+> `STACCATO_ENV=test` bypasses the placeholder-secret refine check; all other config fields have defaults.

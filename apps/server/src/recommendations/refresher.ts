@@ -2,7 +2,7 @@ import { logger } from "../logger.js";
 import { getOrCreateUserSettings } from "../db/queries/settings.js";
 import {
   claimForRefresh,
-  deleteForUser,
+  deleteRow,
   findDueRowIds,
   writeError,
   writeReady,
@@ -66,32 +66,21 @@ export async function refreshOne(rowId: string): Promise<void> {
   }
 
   const settings = getOrCreateUserSettings(claimed.userId);
-  if (!settings.listenbrainzToken) {
-    deleteForUser(claimed.userId);
+  if (!source.isEligible(settings)) {
+    deleteRow(rowId);
     log.info(
-      { userId: claimed.userId },
-      "deleted recommendation rows for user without listenbrainz token",
-    );
-    return;
-  }
-  if (!settings.musicbrainzUsername) {
-    log.warn(
-      { userId: claimed.userId },
-      "user has listenbrainz token but no musicbrainz username — invariant violated, skipping refresh",
-    );
-    writeError(
-      rowId,
-      "missing musicbrainz username",
-      claimedAt + MAX_ERROR_BACKOFF_MS,
-      claimedAt,
+      {
+        rowId,
+        userId: claimed.userId,
+        source: claimed.source,
+        kind: claimed.kind,
+      },
+      "removed recommendation row; user no longer eligible for source",
     );
     return;
   }
 
-  const ctx = {
-    listenbrainzToken: settings.listenbrainzToken,
-    musicbrainzUsername: settings.musicbrainzUsername,
-  };
+  const ctx = source.buildContext(settings);
 
   const startedAt = Date.now();
   try {

@@ -1,10 +1,9 @@
-import { and, eq, isNotNull, lte } from "drizzle-orm";
+import { and, eq, lte } from "drizzle-orm";
 import { db } from "../client.js";
 import {
   recommendationCache,
   type RecommendationCacheRow,
 } from "../schema/recommendation-cache.js";
-import { userSettings } from "../schema/user-settings.js";
 import { logger } from "../../logger.js";
 
 const log = logger.child({ module: "recommendations-cache" });
@@ -78,8 +77,10 @@ export function upsertWarmingRow(
     .run();
 }
 
-export function resetWarmingForUser(
+export function resetWarmingForUserSource(
   userId: string,
+  source: string,
+  kind: string,
   now: number = Date.now(),
 ): void {
   db.update(recommendationCache)
@@ -91,7 +92,13 @@ export function resetWarmingForUser(
       nextRefreshAt: now,
       updatedAt: now,
     })
-    .where(eq(recommendationCache.userId, userId))
+    .where(
+      and(
+        eq(recommendationCache.userId, userId),
+        eq(recommendationCache.source, source),
+        eq(recommendationCache.kind, kind),
+      ),
+    )
     .run();
 }
 
@@ -155,17 +162,22 @@ export function resetInflightOnBoot(): void {
     .run();
 }
 
-export function deleteForUser(userId: string): void {
-  db.delete(recommendationCache)
-    .where(eq(recommendationCache.userId, userId))
-    .run();
+export function deleteRow(id: string): void {
+  db.delete(recommendationCache).where(eq(recommendationCache.id, id)).run();
 }
 
-export function findUserIdsWithListenbrainzToken(): string[] {
-  const rows = db
-    .select({ userId: userSettings.userId })
-    .from(userSettings)
-    .where(isNotNull(userSettings.listenbrainzToken))
-    .all();
-  return rows.map((r) => r.userId);
+export function deleteForUserSource(
+  userId: string,
+  source: string,
+  kind: string,
+): void {
+  db.delete(recommendationCache)
+    .where(
+      and(
+        eq(recommendationCache.userId, userId),
+        eq(recommendationCache.source, source),
+        eq(recommendationCache.kind, kind),
+      ),
+    )
+    .run();
 }

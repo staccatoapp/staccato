@@ -12,19 +12,28 @@ import {
   type MBRecordingDetail,
 } from "../../musicbrainz/client.js";
 import { resolvePreview } from "../../preview/index.js";
-import type { RecommendationSource } from "../source.js";
+import type {
+  RecommendationSource,
+  RecommendationSourceContext,
+} from "../source.js";
 
 const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
 export const listenbrainzCfTracksSource: RecommendationSource<
   "cf-tracks",
-  RecommendedTrack[]
+  RecommendedTrack[],
+  RecommendationSourceContext
 > = {
   id: "listenbrainz",
   kind: "cf-tracks",
   refreshIntervalMs: SIX_HOURS_MS,
   emptyRetryIntervalMs: ONE_HOUR_MS,
+  isEligible: (s) => Boolean(s.listenbrainzToken && s.musicbrainzUsername),
+  buildContext: (s) => ({
+    listenbrainzToken: s.listenbrainzToken!,
+    musicbrainzUsername: s.musicbrainzUsername!,
+  }),
   async fetch({ listenbrainzToken, musicbrainzUsername }) {
     const mbids = await getCFRecommendations(
       musicbrainzUsername,

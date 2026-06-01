@@ -22,14 +22,11 @@ import downloadRoutes from "./routes/downloads.js";
 import { startLidarrPoller } from "./lidarr/poller.js";
 import { logger } from "./logger.js";
 import { getConfig } from "./config/config.js";
-import {
-  findUserIdsWithListenbrainzToken,
-  resetInflightOnBoot,
-  upsertWarmingRow,
-} from "./db/queries/recommendation-cache.js";
+import { resetInflightOnBoot } from "./db/queries/recommendation-cache.js";
+import { getAllUserSettings } from "./db/queries/settings.js";
 import { backfillArtistNormalizedNames } from "./db/queries/artists.js";
 import { startRefresher, tick } from "./recommendations/refresher.js";
-import { listRegisteredSources } from "./recommendations/source.js";
+import { reconcileUserRows } from "./recommendations/eligibility.js";
 import "./recommendations/sources/index.js";
 import adminRoutes from "./routes/admin/index.js";
 
@@ -93,20 +90,14 @@ const start = async () => {
 
   resetInflightOnBoot();
 
-  const tokenedUserIds = findUserIdsWithListenbrainzToken();
-  const sources = listRegisteredSources();
+  const allUserSettings = getAllUserSettings();
   const now = Date.now();
-  for (const userId of tokenedUserIds) {
-    for (const source of sources) {
-      upsertWarmingRow(userId, source.id, source.kind, now);
-    }
+  for (const settings of allUserSettings) {
+    reconcileUserRows(settings, {}, now);
   }
-  if (tokenedUserIds.length > 0) {
+  if (allUserSettings.length > 0) {
     logger.info(
-      {
-        userCount: tokenedUserIds.length,
-        sourceCount: sources.length,
-      },
+      { userCount: allUserSettings.length },
       "recommendation cache boot backfill complete",
     );
   }

@@ -15,17 +15,26 @@ import {
   MB_PRIORITY,
   type MBRecordingDetail,
 } from "../../musicbrainz/client.js";
-import type { RecommendationSource } from "../source.js";
+import type {
+  RecommendationSource,
+  RecommendationSourceContext,
+} from "../source.js";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 export const listenbrainzPlaylistsSource: RecommendationSource<
   "playlists",
-  RecommendedPlaylist[]
+  RecommendedPlaylist[],
+  RecommendationSourceContext
 > = {
   id: "listenbrainz",
   kind: "playlists",
   refreshIntervalMs: ONE_DAY_MS,
+  isEligible: (s) => Boolean(s.listenbrainzToken && s.musicbrainzUsername),
+  buildContext: (s) => ({
+    listenbrainzToken: s.listenbrainzToken!,
+    musicbrainzUsername: s.musicbrainzUsername!,
+  }),
   async fetch({ listenbrainzToken, musicbrainzUsername }) {
     const summaries = await getRecommendedPlaylists(
       musicbrainzUsername,
