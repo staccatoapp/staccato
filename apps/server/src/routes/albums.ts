@@ -38,7 +38,8 @@ import {
   confirmAlbumMatch,
 } from "../library/identify.js";
 import { requireAdmin } from "../plugins/session.js";
-import { CUID2_RE, MBID_RE } from "../lib/id-patterns.js";
+import { MBID_RE } from "../lib/id-patterns.js";
+import { isCuid } from "@paralleldrive/cuid2";
 
 const IdentifySearchQuerySchema = z.object({
   release: z.string().optional().default(""),
@@ -103,7 +104,7 @@ const albumRoutes: FastifyPluginAsync = async (fastify) => {
       const { albumId } = z
         .object({ albumId: z.string() })
         .parse(request.params);
-      if (!CUID2_RE.test(albumId)) {
+      if (!isCuid(albumId)) {
         return reply.status(404).send({ error: "Album not found" });
       }
       const filePaths = getTrackFilePathsInAlbum(albumId);
@@ -128,7 +129,7 @@ const albumRoutes: FastifyPluginAsync = async (fastify) => {
       const { albumId } = z
         .object({ albumId: z.string() })
         .parse(request.params);
-      if (!CUID2_RE.test(albumId)) {
+      if (!isCuid(albumId)) {
         return reply.status(404).send({ error: "Album not found" });
       }
       const parsed = IdentifyApplyRequestSchema.safeParse(request.body);
@@ -156,7 +157,7 @@ const albumRoutes: FastifyPluginAsync = async (fastify) => {
       const { albumId } = z
         .object({ albumId: z.string() })
         .parse(request.params);
-      if (!CUID2_RE.test(albumId)) {
+      if (!isCuid(albumId)) {
         return reply.status(404).send({ error: "Album not found" });
       }
       const result = await confirmAlbumMatch(albumId, request.log);
@@ -174,7 +175,7 @@ const albumRoutes: FastifyPluginAsync = async (fastify) => {
     // deliberate follow-up (see edit-album Phase 2+ notes).
     admin.patch("/:albumId", async (request, reply) => {
       const { albumId } = request.params as { albumId: string };
-      if (!CUID2_RE.test(albumId)) {
+      if (!isCuid(albumId)) {
         return reply.status(404).send({ error: "Album not found" });
       }
       const parsed = AlbumEditRequestSchema.safeParse(request.body);
@@ -223,7 +224,7 @@ const albumRoutes: FastifyPluginAsync = async (fastify) => {
       .object({ albumKey: z.string() })
       .parse(request.params);
 
-    const isCuid2 = CUID2_RE.test(albumKey);
+    const isCuid2 = isCuid(albumKey);
     const isMbid = MBID_RE.test(albumKey);
 
     if (!isCuid2 && !isMbid) {

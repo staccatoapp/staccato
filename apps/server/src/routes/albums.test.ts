@@ -55,7 +55,7 @@ import {
 import { applyAlbumEdit } from "../db/queries/album-edit.js";
 import { cacheCoverFromUrl } from "../coverart/store.js";
 
-// A syntactically valid cuid2 album id (matches the route's CUID2_RE).
+// A syntactically valid cuid2 album id (passes the route's isCuid check).
 const ALBUM_ID = "abcdefghijklmnopqrstuvwx";
 
 // Build an app that simulates requireAuth (sets request.userId) then mounts the

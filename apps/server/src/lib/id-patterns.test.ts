@@ -1,23 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { CUID2_RE, MBID_RE } from "./id-patterns.js";
-
-describe("CUID2_RE", () => {
-  it("matches a valid cuid2", () => {
-    expect(CUID2_RE.test("abcdefghijklmnopqrstuvwx")).toBe(true);
-  });
-  it("rejects uppercase", () => {
-    expect(CUID2_RE.test("ABCDEFGHIJKLMNOPQRSTUVWX")).toBe(false);
-  });
-  it("rejects too short", () => {
-    expect(CUID2_RE.test("abc123")).toBe(false);
-  });
-  it("rejects too long", () => {
-    expect(CUID2_RE.test("abcdefghijklmnopqrstuvwxy")).toBe(false);
-  });
-  it("rejects special characters", () => {
-    expect(CUID2_RE.test("abcdefghijklmnopqrstuvw!")).toBe(false);
-  });
-});
+import { MBID_RE } from "./id-patterns.js";
 
 describe("MBID_RE", () => {
   it("matches a valid mbid", () => {

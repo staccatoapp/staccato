@@ -22,7 +22,8 @@ import {
   type ArtistReleaseGroup,
 } from "../musicbrainz/client.js";
 import { logger } from "../logger.js";
-import { CUID2_RE, MBID_RE } from "../lib/id-patterns.js";
+import { MBID_RE } from "../lib/id-patterns.js";
+import { isCuid } from "@paralleldrive/cuid2";
 
 const DISCOGRAPHY_PRIMARY_TYPES = new Set(["Album", "EP"]);
 
@@ -122,7 +123,7 @@ const artistRoutes: FastifyPluginAsync = async (fastify) => {
       .object({ artistKey: z.string() })
       .parse(request.params);
 
-    const isCuid2 = CUID2_RE.test(artistKey);
+    const isCuid2 = isCuid(artistKey);
     const isMbid = MBID_RE.test(artistKey);
 
     if (!isCuid2 && !isMbid) {
