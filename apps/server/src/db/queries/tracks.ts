@@ -604,21 +604,23 @@ export function deleteTrackById(trackId: string): void {
     .get();
   if (!track) return;
 
-  deleteTrackFts(trackId);
-  db.delete(tracks).where(eq(tracks.id, trackId)).run();
+  db.transaction(() => {
+    deleteTrackFts(trackId);
+    db.delete(tracks).where(eq(tracks.id, trackId)).run();
 
-  if (track.albumId) {
-    const sibling = getTrackSiblingInAlbum(track.albumId);
-    if (!sibling) {
-      deleteAlbum(track.albumId);
+    if (track.albumId) {
+      const sibling = getTrackSiblingInAlbum(track.albumId);
+      if (!sibling) {
+        deleteAlbum(track.albumId);
+      }
     }
-  }
 
-  const artistTrack = getTrackByArtist(track.artistId);
-  const artistAlbum = getAlbumByArtist(track.artistId);
-  if (!artistTrack && !artistAlbum) {
-    deleteArtist(track.artistId);
-  }
+    const artistTrack = getTrackByArtist(track.artistId);
+    const artistAlbum = getAlbumByArtist(track.artistId);
+    if (!artistTrack && !artistAlbum) {
+      deleteArtist(track.artistId);
+    }
+  });
 }
 
 export function deleteTrackByPath(filePath: string): void {
