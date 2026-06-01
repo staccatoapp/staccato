@@ -135,7 +135,7 @@ Follow the **Before claiming work complete** section in `CLAUDE.md`. The `check-
 
 1. Commit with a message referencing the issue (e.g. `fix: resolve queue race (#42)`), ending with the `Co-Authored-By:` trailer the harness mandates. Prefer focused commits when the change decomposes naturally.
 2. `git push -u origin agent/<issue#>-<short-slug>`.
-3. Open the PR with `gh pr create --base main`. Fill the repo template at `.github/PULL_REQUEST_TEMPLATE/pull-request-template.md` ("What's being changed and why?" + "Verification steps") and include `Closes #<n>`. Write the body to a UTF-8 file and pass `--body-file` (inline non-ASCII gets mangled at the shell boundary) — end it with the `🤖 Generated with [Claude Code]` line.
+3. Open the PR with `gh pr create --base main`. Fill the repo template at `.github/PULL_REQUEST_TEMPLATE/pull-request-template.md` ("What's being changed and why?" + "Verification steps") and include `Closes #<n>`. Write the body to a UTF-8 file and pass `--body-file` (inline non-ASCII gets mangled at the shell boundary).
 4. Optional: add the issue to the Staccato Development board / move its card using the `gh project ... --owner staccatoapp` recipe in `.claude/audit/create-issues.md`.
 5. Give the user the PR URL.
 
@@ -161,9 +161,9 @@ Follow the **Before claiming work complete** section in `CLAUDE.md`. The `check-
 - **Editing main-repo files from inside the worktree** — if Read/Edit/Write paths or Bash commands point at `C:\Projects\staccato\` instead of `C:\Projects\staccato-fix-issue-agent\`, changes land in the main checkout. Always use the fixed sibling path.
 - **Passing the wrong root to Explore agents** — explorers default to the session cwd. Explicitly pass `C:\Projects\staccato-fix-issue-agent` as the search root or they may search the main repo and return paths that don't translate.
 - **`gh pr create` missing `--head` in a worktree** — when `gh` is run from inside the worktree via Bash, the shell cwd may be reset between commands, causing `gh` to lose track of the current branch. Always pass `--head agent/<issue#>-<slug>` explicitly to `gh pr create`.
-- **`drizzle-kit generate` failing with "Invalid server config"** — `drizzle.config.ts` transitively imports `src/config/config.ts`, which validates all env vars at import time. Prefix the command with `STACCATO_ENV=test STACCATO_SERVER_SESSION_SECRET=change-this-to-a-random-32-plus-character-secret` so validation passes. See below for the full command.
+- **`drizzle-kit generate` failing with "Invalid server config"** — only relevant if the issue changes `apps/server/src/db/schema/`. If it does: `drizzle.config.ts` transitively imports `src/config/config.ts`, which validates all env vars at import time. Prefix the command with `STACCATO_ENV=test STACCATO_SERVER_SESSION_SECRET=change-this-to-a-random-32-plus-character-secret` so validation passes. See below for the full command.
 
-> **drizzle-kit generate note:** `drizzle.config.ts` imports `src/paths.ts` → `src/config/config.ts`, which validates all required env vars at import time. Running `drizzle-kit generate` without them fails with "Invalid server config". Prefix the command with the minimum required vars:
+> **drizzle-kit generate note** _(only needed when schema files change)_: `drizzle.config.ts` imports `src/paths.ts` → `src/config/config.ts`, which validates all required env vars at import time. Running `drizzle-kit generate` without them fails with "Invalid server config". Prefix the command with the minimum required vars:
 >
 > ```bash
 > cd /c/Projects/staccato-fix-issue-agent/apps/server && \
