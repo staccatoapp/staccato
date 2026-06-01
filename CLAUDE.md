@@ -38,6 +38,22 @@ All music metadata is normalised to MusicBrainz IDs (MBIDs). MBIDs are the unive
 
 - whenever a user-created rule is loaded from .claude/rules or a skill is used from .claude/skills, provide feedback on the use of the rule or skill. Was it helpful? What could be improved? This will help us make it better for next time.
 
+### Testing
+
+For new or changed logic, use `superpowers:test-driven-development`. Add unit tests (and integration tests where the change crosses a boundary). Framework: Vitest, run via `pnpm test`.
+
+### Before claiming work complete
+
+1. Invoke `check-doc-updates` to assess whether any changed subsystem's rules or internal docs need updating.
+2. Run and confirm each passes (fix and re-run on failure). Show command output — never assert green without evidence (`superpowers:verification-before-completion`):
+   ```bash
+   pnpm lint:fix --force  # --force bypasses turbo cache
+   pnpm check-types
+   pnpm test
+   pnpm build
+   ```
+   If something genuinely can't be verified (missing service/dep), state exactly what and why — never fabricate results.
+
 ### Log Level guidance
 
 - `error` — unrecoverable failures, fatal errors, anything that breaks user-visible functionality.

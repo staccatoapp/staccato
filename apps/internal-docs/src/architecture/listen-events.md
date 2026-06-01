@@ -2,12 +2,12 @@
 
 A **listen event** is a single recorded play of a track by a user. It plays two roles at once:
 it is the local record that a user listened to a track (a row in the `listening_history` table)
-and the trigger that submits a *scrobble* to ListenBrainz. The mechanism is owned by the
+and the trigger that submits a _scrobble_ to ListenBrainz. The mechanism is owned by the
 playback-session route (`apps/server/src/routes/playback.ts`), which decides when a play counts
 and then submits to ListenBrainz fire-and-forget.
 
 Unlike the import or recommendations pipelines, this is not a multi-stage pipeline — it is a
-small, self-contained mechanism. The interesting parts are *when* a play is counted and *what*
+small, self-contained mechanism. The interesting parts are _when_ a play is counted and _what_
 happens to it afterwards.
 
 ## What a listen event is
@@ -15,7 +15,7 @@ happens to it afterwards.
 Each recorded play is one row in `listening_history`. The row does double duty:
 
 - **Local ledger** — a per-user record of "this user played this track at this time". Nothing
-  reads this back yet (see [Current limitations](#current-limitations-future-work)), but the data
+  reads this back yet (see [Current limitations](#current-limitations--future-work)), but the data
   is captured from day one.
 - **Scrobble bookkeeping** — the `scrobbledToListenbrainz` flag tracks whether the play has been
   successfully submitted to the user's ListenBrainz account, so a future retry job can find the
@@ -40,7 +40,7 @@ The server records a listen in `PUT /session/state` when all three conditions ho
 !current.currentTrackListenEventCreated &&
   isPlaying &&
   currentTrackAccumulatedPlayTimeInSeconds >
-    Math.min(240, (currentTrackDurationSeconds ?? 480) / 2)
+    Math.min(240, (currentTrackDurationSeconds ?? 480) / 2);
 ```
 
 This is the ListenBrainz rule of thumb: a play counts once it passes **half the track, or four
@@ -79,13 +79,13 @@ Because the call is fire-and-forget, a slow or failing ListenBrainz never blocks
 The `listening_history` table (`apps/server/src/db/schema/listening-history.ts`) — per-user data,
 one row per recorded play:
 
-| Column | Type | Notes |
-| --- | --- | --- |
-| `id` | `text` (cuid2) | Primary key, defaulted via `createId()`. |
-| `user_id` | `text` | `NOT NULL` FK → `users.id`, `ON DELETE CASCADE`. |
-| `track_id` | `text` | `NOT NULL` FK → `tracks.id`, `ON DELETE CASCADE`. |
-| `listened_at` | `integer` (unix epoch) | `NOT NULL`, `DEFAULT (unixepoch())` — set by SQLite at insert; callers never pass it. |
-| `scrobbled_to_listenbrainz` | `integer` (boolean) | `NOT NULL`, default `false`; flipped `true` only after a successful submit. |
+| Column                      | Type                   | Notes                                                                                 |
+| --------------------------- | ---------------------- | ------------------------------------------------------------------------------------- |
+| `id`                        | `text` (cuid2)         | Primary key, defaulted via `createId()`.                                              |
+| `user_id`                   | `text`                 | `NOT NULL` FK → `users.id`, `ON DELETE CASCADE`.                                      |
+| `track_id`                  | `text`                 | `NOT NULL` FK → `tracks.id`, `ON DELETE CASCADE`.                                     |
+| `listened_at`               | `integer` (unix epoch) | `NOT NULL`, `DEFAULT (unixepoch())` — set by SQLite at insert; callers never pass it. |
+| `scrobbled_to_listenbrainz` | `integer` (boolean)    | `NOT NULL`, default `false`; flipped `true` only after a successful submit.           |
 
 There are no indexes beyond the primary key, and no unique constraint — `insertListenEvent` does
 no dedup, so repeated triggers would write repeated rows (the `currentTrackListenEventCreated`
