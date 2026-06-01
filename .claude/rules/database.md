@@ -24,6 +24,10 @@ These types are **internal to `apps/server` only** — never exported to `packag
 
 API-facing types are defined separately as Zod schemas in `packages/shared` and derived with `z.infer<>`. Route handlers map `*Row` → API type at the response boundary.
 
+### Transaction Convention
+
+Any function that runs two or more SQL statements as a logical unit must wrap them in `db.transaction(() => { ... })`. This prevents concurrent readers from seeing partial state (e.g. after a delete but before the paired insert) and ensures a server crash mid-sequence leaves the DB consistent. Reference pattern: `replaceAlbumArtists` in `apps/server/src/db/queries/album-artists.ts`.
+
 ### Schema Change Workflow
 
 Never use `drizzle-kit push` — it bypasses migration history and breaks other developers' DBs. Always:
