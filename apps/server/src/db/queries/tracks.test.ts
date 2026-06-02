@@ -22,7 +22,7 @@ vi.mock("../../logger.js", () => ({
   logger: { child: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }) },
 }));
 
-import { deleteTrackById } from "./tracks.js";
+import { deleteTrackById, getPlaybackTracksByIds } from "./tracks.js";
 
 beforeEach(() => {
   testDb = createTestDb();
@@ -41,6 +41,51 @@ const ftsRow = (trackId: string) =>
   testDb.get<{ track_id: string }>(
     sql`SELECT track_id FROM tracks_fts WHERE track_id = ${trackId}`,
   );
+
+describe("getPlaybackTracksByIds", () => {
+  it("returns an empty array when given no ids", () => {
+    expect(getPlaybackTracksByIds([])).toEqual([]);
+  });
+
+  it("includes tracks that have an album", () => {
+    const artistId = seedArtist("Artist A");
+    const albumId = seedAlbum(artistId);
+    const trackId = seedTrack(artistId, albumId, { filePath: "/m/a1.flac" });
+
+    const results = getPlaybackTracksByIds([trackId]);
+
+    expect(results).toHaveLength(1);
+    expect(results.at(0)?.id).toBe(trackId);
+    expect(results.at(0)?.albumId).toBe(albumId);
+  });
+
+  it("includes albumless tracks (null albumId) in the result", () => {
+    const artistId = seedArtist("Artist A");
+    const trackId = seedTrack(artistId, null, { filePath: "/m/a2.flac" });
+
+    const results = getPlaybackTracksByIds([trackId]);
+
+    expect(results).toHaveLength(1);
+    expect(results.at(0)?.id).toBe(trackId);
+    expect(results.at(0)?.albumId).toBeNull();
+    expect(results.at(0)?.releaseGroupMbid).toBeNull();
+    expect(results.at(0)?.coverArtUrl).toBeNull();
+  });
+
+  it("returns both albumless and album-linked tracks together", () => {
+    const artistId = seedArtist("Artist A");
+    const albumId = seedAlbum(artistId);
+    const withAlbum = seedTrack(artistId, albumId, { filePath: "/m/a3.flac" });
+    const withoutAlbum = seedTrack(artistId, null, { filePath: "/m/a4.flac" });
+
+    const results = getPlaybackTracksByIds([withAlbum, withoutAlbum]);
+
+    expect(results).toHaveLength(2);
+    const ids = results.map((r) => r.id);
+    expect(ids).toContain(withAlbum);
+    expect(ids).toContain(withoutAlbum);
+  });
+});
 
 describe("deleteTrackById", () => {
   it("removes the track row and its FTS entry", () => {

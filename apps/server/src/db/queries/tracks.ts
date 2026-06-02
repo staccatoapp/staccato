@@ -157,7 +157,7 @@ export function getPlaybackTracksByIds(ids: string[]): PlaybackTrackRow[] {
       durationSeconds: tracks.durationSeconds,
     })
     .from(tracks)
-    .innerJoin(albums, eq(tracks.albumId, albums.id))
+    .leftJoin(albums, eq(tracks.albumId, albums.id))
     .innerJoin(artists, eq(tracks.artistId, artists.id))
     .where(inArray(tracks.id, ids))
     .all();
