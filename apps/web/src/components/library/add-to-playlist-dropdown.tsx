@@ -44,7 +44,7 @@ function PlaylistCheckboxRow({
       const res = await fetch(`/api/playlists/${playlist.id}/tracks`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trackId }),
+        body: JSON.stringify({ trackIds: [trackId] }),
       });
       if (!res.ok) throw new Error("Failed to add track");
     },
