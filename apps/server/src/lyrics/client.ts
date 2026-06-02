@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { APP_USER_AGENT } from "../constants.js";
+import { logger } from "../logger.js";
 import type { SyncedLyricsLine } from "@staccato/shared";
+
+const log = logger.child({ module: "lyrics" });
 
 const LRCLIB_BASE = "https://lrclib.net/api";
 
@@ -36,10 +39,24 @@ export async function fetchLyrics(params: {
       headers: { "User-Agent": APP_USER_AGENT },
     });
     if (res.status === 404) return null;
-    if (!res.ok) return null;
+    if (!res.ok) {
+      log.warn(
+        {
+          status: res.status,
+          artistName: params.artistName,
+          trackName: params.trackName,
+        },
+        "lrclib request failed",
+      );
+      return null;
+    }
     const json = await res.json();
     return LrclibResponseSchema.parse(json);
-  } catch {
+  } catch (err) {
+    log.warn(
+      { err, artistName: params.artistName, trackName: params.trackName },
+      "lrclib lookup failed",
+    );
     return null;
   }
 }
