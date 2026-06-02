@@ -38,13 +38,6 @@ app.register(sessionPlugin);
 fs.mkdirSync(metadataDir, { recursive: true });
 fs.mkdirSync(coversDir, { recursive: true });
 fs.mkdirSync(artistImagesDir, { recursive: true });
-app.register(fastifyStatic, {
-  root: metadataDir,
-  prefix: "/metadata/",
-  decorateReply: false,
-  maxAge: "1y",
-  immutable: true,
-});
 
 app.get("/api/health", async () => {
   return { status: "ok" };
@@ -54,6 +47,13 @@ app.register(authRoutes, { prefix: "/api/auth" });
 
 app.register(async (protectedApp) => {
   protectedApp.addHook("preHandler", requireAuth);
+  protectedApp.register(fastifyStatic, {
+    root: metadataDir,
+    prefix: "/metadata/",
+    decorateReply: false,
+    maxAge: "1y",
+    immutable: true,
+  });
   protectedApp.register(adminRoutes, { prefix: "/api/admin" });
   protectedApp.register(libraryRoutes, { prefix: "/api/library" });
   protectedApp.register(albumRoutes, { prefix: "/api/albums" });
