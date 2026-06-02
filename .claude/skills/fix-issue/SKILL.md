@@ -72,9 +72,14 @@ Use the fixed worktree at `C:\Projects\staccato-fix-issue-agent` — a sibling o
 **Setup (run via Bash tool):**
 
 ```bash
-# 1. Create the fixed worktree if it doesn't exist
+# 1. Create the fixed worktree if it doesn't exist.
+# `git worktree add ... main` fails when main is already checked out in the primary
+# worktree (the normal state). Use --no-checkout to avoid that, then detach to
+# origin/main so the worktree is on a clean base with no local branch attached.
 if [ ! -d "/c/Projects/staccato-fix-issue-agent" ]; then
-  git -C /c/Projects/staccato worktree add /c/Projects/staccato-fix-issue-agent main
+  git -C /c/Projects/staccato fetch origin
+  git -C /c/Projects/staccato worktree add --no-checkout /c/Projects/staccato-fix-issue-agent origin/main
+  git -C /c/Projects/staccato-fix-issue-agent checkout --detach origin/main
 fi
 
 # 2. Check for uncommitted work from a previous issue
@@ -151,6 +156,7 @@ Follow the **Before claiming work complete** section in `CLAUDE.md`. The `check-
 
 - **Skipping the worktree setup** — Phase 2 always sets up `C:\Projects\staccato-fix-issue-agent` via the Bash snippet. Don't skip the dirty-check; if the worktree is dirty, stop and ask the user to resolve it before proceeding.
 - **`git checkout main` in the worktree** — git prevents checking out a branch that is already checked out in another worktree. The primary repo holds `main`, so running `git checkout main` inside the fix-issue worktree always fails. Always create the issue branch directly from `origin/main` with `git checkout -b agent/... origin/main`.
+- **`git worktree add ... main` failing on first run** — `main` is already checked out in the primary worktree, so this command always fails with "already used by worktree". Use `--no-checkout` to create the worktree without checking out a branch, then `git checkout --detach origin/main` to land on the right base. The Phase 2 snippet already handles this correctly; don't revert to the simpler form.
 - **Summarising the issue and diving straight to code** — skips worktree setup and both gates; the most common failure. Set up the worktree, confirm requirements, then get plan approval.
 - **Running `gh`/`git` through PowerShell** — multi-line bodies and `\` continuations break. Use the Bash tool.
 - **Inlining the PR body** — em-dashes/curly quotes mangle on the command line. Use `--body-file` with a UTF-8 file. Pass an **absolute path** to `--body-file`; `gh` does not resolve relative paths from the repo root when invoked via Bash.
@@ -161,6 +167,7 @@ Follow the **Before claiming work complete** section in `CLAUDE.md`. The `check-
 - **Editing main-repo files from inside the worktree** — if Read/Edit/Write paths or Bash commands point at `C:\Projects\staccato\` instead of `C:\Projects\staccato-fix-issue-agent\`, changes land in the main checkout. Always use the fixed sibling path.
 - **Passing the wrong root to Explore agents** — explorers default to the session cwd. Explicitly pass `C:\Projects\staccato-fix-issue-agent` as the search root or they may search the main repo and return paths that don't translate.
 - **`gh pr create` missing `--head` in a worktree** — when `gh` is run from inside the worktree via Bash, the shell cwd may be reset between commands, causing `gh` to lose track of the current branch. Always pass `--head agent/<issue#>-<slug>` explicitly to `gh pr create`.
+- **Tests failing with "Failed to resolve entry for package"** — fresh worktrees don't have `packages/shared/dist/` built. Before running tests for the first time, build the shared package: `cd /c/Projects/staccato-fix-issue-agent/packages/shared && pnpm build`. Similarly, if `node_modules` is missing, run `pnpm install --frozen-lockfile` from the worktree root first.
 - **`drizzle-kit generate` failing with "Invalid server config"** — only relevant if the issue changes `apps/server/src/db/schema/`. If it does: `drizzle.config.ts` transitively imports `src/config/config.ts`, which validates all env vars at import time. Prefix the command with `STACCATO_ENV=test STACCATO_SERVER_SESSION_SECRET=change-this-to-a-random-32-plus-character-secret` so validation passes. See below for the full command.
 
 > **drizzle-kit generate note** _(only needed when schema files change)_: `drizzle.config.ts` imports `src/paths.ts` → `src/config/config.ts`, which validates all required env vars at import time. Running `drizzle-kit generate` without them fails with "Invalid server config". Prefix the command with the minimum required vars:

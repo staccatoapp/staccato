@@ -32,7 +32,7 @@ All music metadata is normalised to MusicBrainz IDs (MBIDs). MBIDs are the unive
 
 ## Working Practices
 
-- Don't run `git commit`, `git push`, or any command that creates or modifies git history, even when executing an implementation plan. The exception to this is when running the "fix-issue" skill, which is white-listed to modify git history.
+- Don't run `git commit`, `git push`, or any command that creates or modifies git history, even when executing an implementation plan. The exceptions are the "fix-issue" and "fix-issue-auto" skills, which are white-listed to modify git history.
 
 - Prefer adding a log over omitting one. Every `catch` block should log something. Every external API call site should log failures with enough context to debug from the log alone.
 
