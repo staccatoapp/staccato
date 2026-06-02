@@ -39,11 +39,11 @@
 
 All `/v1` routes are protected by a pre-shared API key. The `/health` route is intentionally unauthenticated.
 
-| Component | Detail |
-|-----------|--------|
-| Env var (service) | `METADATA_SERVICE_API_KEY` — empty string disables auth (zero-config dev default) |
-| Env var (server) | `STACCATO_METADATA_API_KEY` — passed as `Authorization: Bearer <key>` by `apps/server/src/musicbrainz/client.ts` `throttledFetch` |
-| Hook implementation | `apps/metadata-service/src/plugins/apiKey.ts` `createAuthPreHandler(apiKey)` |
-| Hook registration | `apps/metadata-service/src/index.ts` — `v1.addHook("preHandler", ...)` on an encapsulated Fastify scope for all `/v1` routes |
+| Component           | Detail                                                                                                                            |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Env var (service)   | `METADATA_SERVICE_API_KEY` — empty string disables auth (zero-config dev default)                                                 |
+| Env var (server)    | `STACCATO_METADATA_API_KEY` — passed as `Authorization: Bearer <key>` by `apps/server/src/musicbrainz/client.ts` `throttledFetch` |
+| Hook implementation | `apps/metadata-service/src/plugins/apiKey.ts` `createAuthPreHandler(apiKey)`                                                      |
+| Hook registration   | `apps/metadata-service/src/index.ts` — `v1.addHook("preHandler", ...)` on an encapsulated Fastify scope for all `/v1` routes      |
 
 When `METADATA_SERVICE_API_KEY` is non-empty, missing or mismatched tokens receive `401 {"error":"Unauthorized"}`. Both values must be set to the same secret in production; leaving them empty preserves the prior unauthenticated behaviour for local dev.
