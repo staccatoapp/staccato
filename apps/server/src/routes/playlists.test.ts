@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createTestDb, seedPlaylist, seedUser } from "../db/__fixtures__/db.js";
+import {
+  createTestDb,
+  seedAlbum,
+  seedArtist,
+  seedPlaylist,
+  seedTrack,
+  seedUser,
+} from "../db/__fixtures__/db.js";
 
 let testDb: ReturnType<typeof createTestDb>;
 
@@ -154,5 +161,57 @@ describe("POST /:id/tracks — validation", () => {
       payload: { notTrackIds: true },
     });
     expect(res.statusCode).toBe(400);
+  });
+
+  it("returns 400 when all provided track IDs do not exist", async () => {
+    const app = buildApp(playlistRoutes, userAId);
+    const res = await app.inject({
+      method: "POST",
+      url: `/${playlistId}/tracks`,
+      payload: { trackIds: ["nonexistent-id"] },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ error: "no-valid-tracks" });
+  });
+});
+
+describe("POST /:id/tracks — track existence filtering", () => {
+  let artistId: string;
+  let albumId: string;
+
+  beforeEach(() => {
+    artistId = seedArtist();
+    albumId = seedAlbum(artistId);
+  });
+
+  it("returns 204 and adds the track when a valid track ID is provided", async () => {
+    const trackId = seedTrack(artistId, albumId);
+    const app = buildApp(playlistRoutes, userAId);
+    const res = await app.inject({
+      method: "POST",
+      url: `/${playlistId}/tracks`,
+      payload: { trackIds: [trackId] },
+    });
+    expect(res.statusCode).toBe(204);
+
+    const listRes = await app.inject({ method: "GET", url: `/${playlistId}` });
+    const tracks = listRes.json().tracks as Array<{ trackId: string }>;
+    expect(tracks.map((t) => t.trackId)).toContain(trackId);
+  });
+
+  it("returns 204 and inserts only the valid track when mixed IDs are provided", async () => {
+    const trackId = seedTrack(artistId, albumId);
+    const app = buildApp(playlistRoutes, userAId);
+    const res = await app.inject({
+      method: "POST",
+      url: `/${playlistId}/tracks`,
+      payload: { trackIds: [trackId, "ghost-id"] },
+    });
+    expect(res.statusCode).toBe(204);
+
+    const listRes = await app.inject({ method: "GET", url: `/${playlistId}` });
+    const tracks = listRes.json().tracks as Array<{ trackId: string }>;
+    expect(tracks).toHaveLength(1);
+    expect(tracks.at(0)?.trackId).toBe(trackId);
   });
 });

@@ -14,18 +14,20 @@ export function replaceTrackArtists(
   trackId: string,
   credits: TrackArtistInput[],
 ): void {
-  db.delete(trackArtists).where(eq(trackArtists.trackId, trackId)).run();
-  if (credits.length === 0) return;
-  db.insert(trackArtists)
-    .values(
-      credits.map((c) => ({
-        trackId,
-        artistId: c.artistId,
-        position: c.position,
-        joinPhrase: c.joinPhrase,
-      })),
-    )
-    .run();
+  db.transaction(() => {
+    db.delete(trackArtists).where(eq(trackArtists.trackId, trackId)).run();
+    if (credits.length === 0) return;
+    db.insert(trackArtists)
+      .values(
+        credits.map((c) => ({
+          trackId,
+          artistId: c.artistId,
+          position: c.position,
+          joinPhrase: c.joinPhrase,
+        })),
+      )
+      .run();
+  });
 }
 
 export function deleteTrackArtists(trackId: string): void {
