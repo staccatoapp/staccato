@@ -25,6 +25,7 @@ const sessionPlugin: FastifyPluginAsync = async (fastify) => {
       path: "/",
       httpOnly: true,
       sameSite: "strict",
+      secure: getConfig().STACCATO_ENV === "production",
       maxAge: 60 * 60 * 24 * 7, // 7 days
     },
   });

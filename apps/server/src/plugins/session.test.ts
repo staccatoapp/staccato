@@ -1,6 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { requireAdmin } from "./session.js";
 import * as usersQueries from "../db/queries/users.js";
+import secureSession from "@fastify/secure-session";
+import * as configModule from "../config/config.js";
+import { makeTestConfig } from "../config/__fixtures__/config.js";
 
 vi.mock("fastify-plugin", () => ({ default: (fn: unknown) => fn }));
 vi.mock("@fastify/secure-session", () => ({ default: vi.fn() }));
@@ -15,6 +18,46 @@ const makeReply = () => {
 const makeRequest = (userId = "user-1") => ({
   userId,
   log: { warn: vi.fn() },
+});
+
+describe("sessionPlugin cookie secure flag", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("sets secure: false in non-production", async () => {
+    vi.spyOn(configModule, "getConfig").mockReturnValue(
+      makeTestConfig({ STACCATO_ENV: "development" }),
+    );
+
+    const { default: plugin } = await import("./session.js");
+    const mockFastify = { register: vi.fn(), decorateRequest: vi.fn() };
+    await plugin(mockFastify as never, {});
+
+    expect(mockFastify.register).toHaveBeenCalledWith(
+      secureSession,
+      expect.objectContaining({
+        cookie: expect.objectContaining({ secure: false }),
+      }),
+    );
+  });
+
+  it("sets secure: true in production", async () => {
+    vi.spyOn(configModule, "getConfig").mockReturnValue(
+      makeTestConfig({ STACCATO_ENV: "production" }),
+    );
+
+    const { default: plugin } = await import("./session.js");
+    const mockFastify = { register: vi.fn(), decorateRequest: vi.fn() };
+    await plugin(mockFastify as never, {});
+
+    expect(mockFastify.register).toHaveBeenCalledWith(
+      secureSession,
+      expect.objectContaining({
+        cookie: expect.objectContaining({ secure: true }),
+      }),
+    );
+  });
 });
 
 describe("requireAdmin", () => {
