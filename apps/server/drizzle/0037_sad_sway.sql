@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `playlist_tracks_playlist_id_position_unique` ON `playlist_tracks` (`playlist_id`,`position`);
