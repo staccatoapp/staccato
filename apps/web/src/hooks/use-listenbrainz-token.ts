@@ -27,7 +27,6 @@ export function useSaveLBToken() {
         body: JSON.stringify({ listenbrainzToken: token }),
       });
       if (!res.ok) throw new Error("Failed to save settings");
-      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["user-settings"] });
