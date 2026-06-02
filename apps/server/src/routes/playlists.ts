@@ -1,8 +1,9 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { parsePagination } from "@staccato/shared";
+import { parsePagination, UpdatePlaylistRequestSchema } from "@staccato/shared";
 import {
   PlaylistRow,
+  PlaylistUpdate,
   addTrackToPlaylist,
   countUserPlaylists,
   createPlaylist,
@@ -166,29 +167,28 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(403).send({ error: "Forbidden" });
     }
 
-    const parsedBody = z
-      .object({
-        name: z.string().min(1).optional(),
-        description: z.string().nullable().optional(),
-      })
-      .safeParse(req.body);
+    const parsedBody = UpdatePlaylistRequestSchema.safeParse(req.body);
     if (!parsedBody.success) {
       req.log.warn({ err: parsedBody.error }, "ROUTE: invalid request body");
       return reply.status(400).send({ error: "Invalid request" });
     }
     const { name, description } = parsedBody.data;
 
-    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    const updates: PlaylistUpdate = { updatedAt: new Date() };
     if (name !== undefined) updates.name = name;
     if (description !== undefined) updates.description = description;
 
     const updated = updatePlaylist(id, updates);
+    if (!updated) {
+      req.log.warn({ playlistId: id }, "playlist disappeared before update");
+      return reply.status(404).send({ error: "Playlist not found" });
+    }
 
     return {
-      id: updated!.id,
-      name: updated!.name,
-      description: updated!.description,
-      updatedAt: updated!.updatedAt?.toISOString() ?? null,
+      id: updated.id,
+      name: updated.name,
+      description: updated.description,
+      updatedAt: updated.updatedAt?.toISOString() ?? null,
     };
   });
 

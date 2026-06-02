@@ -267,11 +267,16 @@ export function getTracksByMusicbrainzIds(
 export function getLocalTrackMbidsByMbids(mbids: string[]): string[] {
   if (mbids.length === 0) return [];
   return db
-    .select({ musicbrainzId: tracks.musicbrainzId })
+    .select({ musicbrainzId: sql<string>`${tracks.musicbrainzId}` })
     .from(tracks)
-    .where(inArray(tracks.musicbrainzId, mbids))
+    .where(
+      and(
+        inArray(tracks.musicbrainzId, mbids),
+        isNotNull(tracks.musicbrainzId),
+      ),
+    )
     .all()
-    .map((r) => r.musicbrainzId!);
+    .map((r) => r.musicbrainzId);
 }
 
 export type TrackFullRow = typeof tracks.$inferSelect;
@@ -448,6 +453,19 @@ export function markPendingRemovalByPath(filePath: string, at: number): void {
     .set({ pendingRemovalAt: at })
     .where(eq(tracks.filePath, filePath))
     .run();
+}
+
+export function markPendingRemovalByPaths(
+  filePaths: string[],
+  at: number,
+): number {
+  if (filePaths.length === 0) return 0;
+  const result = db
+    .update(tracks)
+    .set({ pendingRemovalAt: at })
+    .where(inArray(tracks.filePath, filePaths))
+    .run();
+  return result.changes;
 }
 
 export function clearPendingRemoval(trackId: string): void {
@@ -658,11 +676,11 @@ export type UnresolvedTrackWithAlbumAndArtistDetailsRow = ReturnType<
 
 export function getResolvedTrackMbidsByAlbumId(albumId: string): string[] {
   return db
-    .select({ musicbrainzId: tracks.musicbrainzId })
+    .select({ musicbrainzId: sql<string>`${tracks.musicbrainzId}` })
     .from(tracks)
     .where(and(eq(tracks.albumId, albumId), isNotNull(tracks.musicbrainzId)))
     .all()
-    .map((t) => t.musicbrainzId!);
+    .map((t) => t.musicbrainzId);
 }
 
 export function getTrackFilePathsInAlbum(albumId: string): string[] {

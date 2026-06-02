@@ -37,3 +37,9 @@ export const PlaylistDetailSchema = z.object({
   tracks: z.array(PlaylistTrackSchema),
 });
 export type PlaylistDetail = z.infer<typeof PlaylistDetailSchema>;
+
+export const UpdatePlaylistRequestSchema = z.object({
+  name: z.string().min(1).optional(),
+  description: z.string().nullable().optional(),
+});
+export type UpdatePlaylistRequest = z.infer<typeof UpdatePlaylistRequestSchema>;

@@ -22,7 +22,11 @@ vi.mock("../../logger.js", () => ({
   logger: { child: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }) },
 }));
 
-import { deleteTrackById, getPlaybackTracksByIds } from "./tracks.js";
+import {
+  deleteTrackById,
+  getPlaybackTracksByIds,
+  markPendingRemovalByPaths,
+} from "./tracks.js";
 
 beforeEach(() => {
   testDb = createTestDb();
@@ -157,5 +161,64 @@ describe("deleteTrackById", () => {
 
     const remaining = testDb.select().from(tracks).all();
     expect(remaining).toHaveLength(1);
+  });
+});
+
+describe("markPendingRemovalByPaths", () => {
+  it("marks all provided file paths as pending removal in one call", () => {
+    const artistId = seedArtist();
+    const albumId = seedAlbum(artistId);
+    seedTrack(artistId, albumId, { filePath: "/m/a.flac" });
+    seedTrack(artistId, albumId, { filePath: "/m/b.flac", trackNumber: 2 });
+    const now = 1_000_000;
+
+    const count = markPendingRemovalByPaths(["/m/a.flac", "/m/b.flac"], now);
+
+    expect(count).toBe(2);
+    const rows = testDb
+      .select({
+        filePath: tracks.filePath,
+        pendingRemovalAt: tracks.pendingRemovalAt,
+      })
+      .from(tracks)
+      .all();
+    for (const row of rows) {
+      expect(row.pendingRemovalAt).toBe(now);
+    }
+  });
+
+  it("does not touch unrelated tracks", () => {
+    const artistId = seedArtist();
+    const albumId = seedAlbum(artistId);
+    seedTrack(artistId, albumId, { filePath: "/m/keep.flac" });
+    seedTrack(artistId, albumId, {
+      filePath: "/m/remove.flac",
+      trackNumber: 2,
+    });
+
+    markPendingRemovalByPaths(["/m/remove.flac"], 1_000_000);
+
+    const keepRow = testDb
+      .select({ pendingRemovalAt: tracks.pendingRemovalAt })
+      .from(tracks)
+      .where(eq(tracks.filePath, "/m/keep.flac"))
+      .get();
+    expect(keepRow?.pendingRemovalAt).toBeNull();
+  });
+
+  it("returns 0 and does nothing when called with an empty array", () => {
+    const artistId = seedArtist();
+    const albumId = seedAlbum(artistId);
+    seedTrack(artistId, albumId, { filePath: "/m/safe.flac" });
+
+    const count = markPendingRemovalByPaths([], 1_000_000);
+
+    expect(count).toBe(0);
+    const row = testDb
+      .select({ pendingRemovalAt: tracks.pendingRemovalAt })
+      .from(tracks)
+      .where(eq(tracks.filePath, "/m/safe.flac"))
+      .get();
+    expect(row?.pendingRemovalAt).toBeNull();
   });
 });

@@ -17,16 +17,11 @@ import {
   type PlaylistDetail,
   PlaylistDetailSchema,
 } from "@staccato/shared";
+import { formatTime } from "@/lib/music";
 
 export const Route = createFileRoute("/playlists/$playlistId")({
   component: PlaylistDetailPage,
 });
-
-function formatDuration(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
 
 function formatTotalDuration(totalSeconds: number): string {
   const h = Math.floor(totalSeconds / 3600);
@@ -249,7 +244,7 @@ function PlaylistDetailPage() {
               </span>
               <span className="text-right text-muted-foreground tabular-nums self-center text-xs">
                 {track.durationSeconds != null
-                  ? formatDuration(track.durationSeconds)
+                  ? formatTime(track.durationSeconds)
                   : "—"}
               </span>
               <button

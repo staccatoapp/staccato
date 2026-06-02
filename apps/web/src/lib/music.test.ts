@@ -21,6 +21,10 @@ describe("formatTime", () => {
   it("formats values above one hour", () => {
     expect(formatTime(3661)).toBe("61:01");
   });
+
+  it("returns em-dash for null", () => {
+    expect(formatTime(null)).toBe("—");
+  });
 });
 
 describe("formatMs", () => {

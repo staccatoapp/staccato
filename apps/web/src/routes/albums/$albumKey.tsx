@@ -46,17 +46,11 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useRetryDownload } from "@/hooks/useRequestDownload";
 import { useRequestDownloadDialog } from "@/hooks/useRequestDownloadDialog";
 import { RequestDownloadDialog } from "@/components/downloads/RequestDownloadDialog";
+import { formatTime } from "@/lib/music";
 
 export const Route = createFileRoute("/albums/$albumKey")({
   component: AlbumDetailPage,
 });
-
-function formatDurationSeconds(seconds: number | null): string {
-  if (seconds == null) return "—";
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
 
 function BackLink({ source }: { source: "local" | "external" }) {
   const to = source === "external" ? "/explore" : "/library";
@@ -351,7 +345,7 @@ function LocalAlbumView({
                 className="text-muted-foreground"
               />
             ),
-            formattedDuration: formatDurationSeconds(t.durationSeconds),
+            formattedDuration: formatTime(t.durationSeconds),
           }))}
           onPlayTrack={(index) =>
             playMutation.mutate({
@@ -539,7 +533,7 @@ function ExternalAlbumView({
                 ? `${t.discPosition}-${t.trackPosition}`
                 : String(t.trackPosition),
             title: t.title,
-            formattedDuration: formatDurationSeconds(
+            formattedDuration: formatTime(
               t.durationMs == null ? null : Math.round(t.durationMs / 1000),
             ),
           }))}

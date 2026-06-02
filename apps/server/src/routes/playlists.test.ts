@@ -150,6 +150,28 @@ describe("PUT /:id — validation", () => {
     });
     expect(res.statusCode).toBe(400);
   });
+
+  it("returns 200 and reflects updated description", async () => {
+    const app = buildApp(playlistRoutes, userAId);
+    const res = await app.inject({
+      method: "PUT",
+      url: `/${playlistId}`,
+      payload: { description: "new desc" },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().description).toBe("new desc");
+  });
+
+  it("returns 200 and sets description to null when explicitly nulled", async () => {
+    const app = buildApp(playlistRoutes, userAId);
+    const res = await app.inject({
+      method: "PUT",
+      url: `/${playlistId}`,
+      payload: { description: null },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().description).toBeNull();
+  });
 });
 
 describe("POST /:id/tracks — validation", () => {

@@ -2,7 +2,7 @@ import { logger } from "../logger.js";
 import {
   getAllTrackFilePaths,
   getPendingTrackPaths,
-  markPendingRemovalByPath,
+  markPendingRemovalByPaths,
   resetResolvingToPending,
 } from "../db/queries/tracks.js";
 import { enqueueDiscovery, enqueueResolution } from "./queue.js";
@@ -29,13 +29,8 @@ export async function reconcile(
   const inDb = new Set(getAllTrackFilePaths());
 
   const now = Date.now();
-  let pendingRemovalCount = 0;
-  for (const dbPath of inDb) {
-    if (!onDisk.has(dbPath)) {
-      markPendingRemovalByPath(dbPath, now);
-      pendingRemovalCount++;
-    }
-  }
+  const missingPaths = [...inDb].filter((p) => !onDisk.has(p));
+  const pendingRemovalCount = markPendingRemovalByPaths(missingPaths, now);
 
   let enqueued = 0;
   for (const fsPath of onDisk) {
