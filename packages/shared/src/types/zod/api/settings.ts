@@ -12,7 +12,7 @@ export type UpdateUserSettings = z.infer<typeof UpdateUserSettingsSchema>;
 
 // ─── GET /api/settings response ────────────────────────────
 export const UserSettingsSchema = z.object({
-  listenbrainzToken: z.string().nullable(),
+  listenbrainzTokenSet: z.boolean(),
   volume: z.number(),
 });
 export type UserSettings = z.infer<typeof UserSettingsSchema>;

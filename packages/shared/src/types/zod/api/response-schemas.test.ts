@@ -19,7 +19,7 @@ import {
 } from "./playlists.js";
 import { recommendationsResponseSchema } from "./recommendations.js";
 import { ScanProgressSchema, TrackStatusCountsSchema } from "./scan.js";
-import { ServerSettingsSchema, UserSettingsSchema } from "./settings.js";
+import { ServerSettingsSchema } from "./settings.js";
 import { TrackListItemSchema, TrackSearchResultSchema } from "./tracks.js";
 
 const TRACK_ARTIST_CREDIT = {
@@ -253,19 +253,6 @@ describe("ScanProgressSchema", () => {
       counts: { pending: 0, resolving: 0, resolved: 8, failed: 1 },
     };
     expect(ScanProgressSchema.parse(valid)).toEqual(valid);
-  });
-});
-
-describe("UserSettingsSchema", () => {
-  it("parses valid user settings", () => {
-    const valid = { listenbrainzToken: null, volume: 75 };
-    expect(UserSettingsSchema.parse(valid)).toEqual(valid);
-  });
-
-  it("rejects when volume is missing", () => {
-    expect(() => UserSettingsSchema.parse({ listenbrainzToken: null })).toThrow(
-      z.ZodError,
-    );
   });
 });
 

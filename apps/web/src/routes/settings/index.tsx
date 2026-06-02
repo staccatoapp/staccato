@@ -33,9 +33,9 @@ function SettingsPage() {
   const saveMutation = useSaveLBToken();
   const validateMutation = useValidateLBToken();
 
-  const savedToken = data?.listenbrainzToken ?? null;
-  const currentInput = tokenInput !== null ? tokenInput : (savedToken ?? "");
-  const isDirty = tokenInput !== null && tokenInput !== (savedToken ?? "");
+  const tokenSet = data?.listenbrainzTokenSet ?? false;
+  const currentInput = tokenInput ?? "";
+  const isDirty = tokenInput !== null;
 
   return (
     <div className="p-6 max-w-lg">
@@ -53,7 +53,9 @@ function SettingsPage() {
             <Input
               id="lb-token"
               type="password"
-              placeholder="Paste your ListenBrainz token"
+              placeholder={
+                tokenSet ? "•••••• (saved)" : "Paste your ListenBrainz token"
+              }
               value={currentInput}
               onChange={(e) => {
                 setTokenInput(e.target.value);
@@ -62,8 +64,14 @@ function SettingsPage() {
               disabled={isLoading}
             />
             <p className="text-xs text-muted-foreground">
-              Find your token at{" "}
-              <span className="font-mono">listenbrainz.org/profile/</span>
+              {tokenSet && !isDirty ? (
+                "Token saved. Enter your token above to test or update it."
+              ) : (
+                <>
+                  Find your token at{" "}
+                  <span className="font-mono">listenbrainz.org/profile/</span>
+                </>
+              )}
             </p>
           </div>
 

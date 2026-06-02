@@ -14,7 +14,7 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/", async (req) => {
     const settings = getOrCreateUserSettings(req.userId);
     return {
-      listenbrainzToken: settings.listenbrainzToken,
+      listenbrainzTokenSet: settings.listenbrainzToken != null,
       volume: settings.volume,
     };
   });
