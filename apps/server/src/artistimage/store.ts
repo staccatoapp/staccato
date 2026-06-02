@@ -54,6 +54,16 @@ export function isLocalArtistImageUrl(
   );
 }
 
+function isTrustedWikimediaUrl(url: string): boolean {
+  try {
+    const { protocol, hostname } = new URL(url);
+    if (protocol !== "https:") return false;
+    return hostname === "wikimedia.org" || hostname.endsWith(".wikimedia.org");
+  } catch {
+    return false;
+  }
+}
+
 const inflight = new Map<string, Promise<string | null>>();
 
 export async function ensureArtistImageOnDisk(
@@ -81,6 +91,14 @@ export async function ensureArtistImageOnDisk(
     try {
       const source = await lookupArtistImageSource(artistMbid, priority);
       if (!source) return null;
+
+      if (!isTrustedWikimediaUrl(source.url)) {
+        log.warn(
+          { artistMbid, url: source.url },
+          "artist image url rejected: untrusted host",
+        );
+        return null;
+      }
 
       const rawExt = path.extname(source.filename).toLowerCase();
       const ext = ALLOWED_EXTS.has(rawExt) ? rawExt : null;

@@ -169,6 +169,21 @@ async function isPublicHost(
   }
 }
 
+function isTrustedCoverArtUrl(url: string): boolean {
+  try {
+    const { protocol, hostname } = new URL(url);
+    if (protocol !== "https:") return false;
+    return (
+      hostname === "coverartarchive.org" ||
+      hostname.endsWith(".coverartarchive.org") ||
+      hostname === "archive.org" ||
+      hostname.endsWith(".archive.org")
+    );
+  } catch {
+    return false;
+  }
+}
+
 const inflight = new Map<string, Promise<string | null>>();
 
 export async function ensureCoverOnDisk(
@@ -194,6 +209,14 @@ export async function ensureCoverOnDisk(
         priority,
       );
       if (!remoteUrl) return null;
+
+      if (!isTrustedCoverArtUrl(remoteUrl)) {
+        log.warn(
+          { releaseGroupMbid, remoteUrl },
+          "cover art url rejected: untrusted host",
+        );
+        return null;
+      }
 
       const ok = await streamRemoteToFile(remoteUrl, filePath, {
         releaseGroupMbid,
