@@ -34,6 +34,7 @@ export const ConfigSchema = z.object({
       },
     ),
   STACCATO_METADATA_URL: z.string().url().default("http://localhost:8290/v1"),
+  STACCATO_METADATA_API_KEY: z.string().default(""),
   STACCATO_SERVER_LIBRARY_DISCOVERY_CONCURRENCY: intFromEnv(8, 1),
   STACCATO_SERVER_LIBRARY_WORKER_CONCURRENCY: intFromEnv(6, 1),
   STACCATO_SERVER_LIBRARY_ENRICHMENT_CONCURRENCY: intFromEnv(2, 1),

@@ -46,6 +46,7 @@ function parseReleaseYear(date?: string | null): number | null {
 
 const config = getConfig();
 export const FACADE_BASE = config.STACCATO_METADATA_URL;
+const FACADE_API_KEY = config.STACCATO_METADATA_API_KEY;
 
 // Throttle knobs for the shared MB queue. Defaults match MusicBrainz's public
 // 1-req/sec limit. When pointed at the hosted façade (STACCATO_METADATA_URL),
@@ -101,12 +102,14 @@ export async function throttledFetch(
   const res = await mbQueue.add(
     () => {
       log.debug({ url, priority }, "making mb request");
-      return fetch(url, {
-        headers: {
-          "User-Agent": APP_USER_AGENT,
-          Accept: "application/json",
-        },
-      });
+      const headers: Record<string, string> = {
+        "User-Agent": APP_USER_AGENT,
+        Accept: "application/json",
+      };
+      if (FACADE_API_KEY) {
+        headers["Authorization"] = `Bearer ${FACADE_API_KEY}`;
+      }
+      return fetch(url, { headers });
     },
     { priority },
   );
