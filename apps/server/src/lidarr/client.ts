@@ -36,11 +36,11 @@ export class LidarrClient {
     this.logger.child({ module: "lidarr-client" });
   }
 
-  private async request<T>(
+  private async request(
     method: string,
     path: string,
     body?: unknown,
-  ): Promise<T> {
+  ): Promise<unknown> {
     const res = await fetch(`${this.baseUrl}/api/v1${path}`, {
       method,
       headers: {
@@ -52,8 +52,8 @@ export class LidarrClient {
     if (!res.ok) {
       throw new Error(`Lidarr ${method} ${path} → ${res.status}`);
     }
-    if (res.status === 204) return undefined as T;
-    return res.json() as Promise<T>;
+    if (res.status === 204) return undefined;
+    return res.json();
   }
 
   async testConnection(): Promise<boolean> {
@@ -68,7 +68,7 @@ export class LidarrClient {
 
   async getQualityProfiles(): Promise<LidarrProfile[]> {
     this.logger.debug("Fetching Lidarr quality profiles");
-    const raw = await this.request<unknown>("GET", "/qualityprofile");
+    const raw = await this.request("GET", "/qualityprofile");
     try {
       return z.array(LidarrProfileSchema).parse(raw);
     } catch (err) {
@@ -82,7 +82,7 @@ export class LidarrClient {
 
   async getMetadataProfiles(): Promise<LidarrProfile[]> {
     this.logger.debug("Fetching Lidarr metadata profiles");
-    const raw = await this.request<unknown>("GET", "/metadataprofile");
+    const raw = await this.request("GET", "/metadataprofile");
     try {
       return z.array(LidarrProfileSchema).parse(raw);
     } catch (err) {
@@ -96,7 +96,7 @@ export class LidarrClient {
 
   async getRootFolders(): Promise<LidarrRootFolder[]> {
     this.logger.debug("Fetching Lidarr root folders");
-    const raw = await this.request<unknown>("GET", "/rootfolder");
+    const raw = await this.request("GET", "/rootfolder");
     try {
       return z.array(LidarrRootFolderSchema).parse(raw);
     } catch (err) {
@@ -110,7 +110,7 @@ export class LidarrClient {
 
   async getArtists(): Promise<LidarrArtist[]> {
     this.logger.debug("Fetching all Lidarr artists");
-    const raw = await this.request<unknown>("GET", "/artist");
+    const raw = await this.request("GET", "/artist");
     try {
       return z.array(LidarrArtistSchema).parse(raw);
     } catch (err) {
@@ -132,7 +132,7 @@ export class LidarrClient {
     this.logger.debug(
       `Adding artist ${params.artistName} (${params.artistMbid})`,
     );
-    const raw = await this.request<unknown>("POST", "/artist", {
+    const raw = await this.request("POST", "/artist", {
       foreignArtistId: params.artistMbid,
       artistName: params.artistName,
       qualityProfileId: params.qualityProfileId,
@@ -157,10 +157,7 @@ export class LidarrClient {
 
   async getAlbumsForArtist(lidarrArtistId: number): Promise<LidarrAlbum[]> {
     this.logger.debug(`Fetching albums for Lidarr artist ${lidarrArtistId}`);
-    const raw = await this.request<unknown>(
-      "GET",
-      `/album?artistId=${lidarrArtistId}`,
-    );
+    const raw = await this.request("GET", `/album?artistId=${lidarrArtistId}`);
     try {
       return z.array(LidarrAlbumSchema).parse(raw);
     } catch (err) {
@@ -176,7 +173,7 @@ export class LidarrClient {
     this.logger.debug(`Fetching albums by ids: ${ids.join(",")}`);
     if (ids.length === 0) return [];
     const query = ids.map((id) => `albumIds=${id}`).join("&");
-    const raw = await this.request<unknown>("GET", `/album?${query}`);
+    const raw = await this.request("GET", `/album?${query}`);
     try {
       return z.array(LidarrAlbumSchema).parse(raw);
     } catch (err) {
@@ -190,10 +187,8 @@ export class LidarrClient {
 
   async setAlbumMonitored(albumId: number, monitored: boolean): Promise<void> {
     this.logger.debug(`Setting album ${albumId} as monitored: ${monitored}`);
-    const album = await this.request<Record<string, unknown>>(
-      "GET",
-      `/album/${albumId}`,
-    );
+    const raw = await this.request("GET", `/album/${albumId}`);
+    const album = z.record(z.unknown()).parse(raw);
     await this.request("PUT", `/album/${albumId}`, { ...album, monitored });
   }
 
@@ -207,7 +202,7 @@ export class LidarrClient {
 
   async getQueue(): Promise<LidarrQueueItem[]> {
     this.logger.debug("Fetching Lidarr queue");
-    const raw = await this.request<unknown>("GET", "/queue?pageSize=1000");
+    const raw = await this.request("GET", "/queue?pageSize=1000");
     try {
       const res = LidarrQueueResponseSchema.parse(raw);
       return res.records ?? [];
