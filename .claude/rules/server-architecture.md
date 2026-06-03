@@ -28,7 +28,9 @@ All server route tests use fixtures from `apps/server/src/routes/__fixtures__/ap
 
 `buildSessionApp(plugin, userId?)` — use when the test involves the session itself (auth routes, or anything that calls `requireAuth`). Injects a fake `request.session` with `vi.fn()` mocks for `get`/`set`/`delete`; `session.get("userId")` returns the passed `userId` (or `undefined` for unauthenticated). Returns `{ app, session }` so tests can assert on `session.set`, etc.
 
-Neither fixture hits a real database — mock all DB and service modules with `vi.mock()` at the top of the test file and `vi.clearAllMocks()` in `beforeEach`.
+For pure validation tests (routes that return 400 before touching the DB), mock all DB query modules with `vi.mock()` and `vi.clearAllMocks()` in `beforeEach`.
+
+For integration-style tests that exercise real query logic against an in-memory SQLite DB, use `vi.mock("../db/client.js", () => ({ get db() { return testDb; } }))` with `createTestDb()` from `src/db/__fixtures__/db.js`, and mock only non-DB side effects (e.g. `../scrobbling/dispatch.js`, `../coverart/store.js`). See `playlists.test.ts` and `playback.test.ts` for examples.
 
 ## Authentication
 
