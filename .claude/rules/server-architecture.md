@@ -30,6 +30,10 @@ All server route tests use fixtures from `apps/server/src/routes/__fixtures__/ap
 
 Neither fixture hits a real database — mock all DB and service modules with `vi.mock()` at the top of the test file and `vi.clearAllMocks()` in `beforeEach`.
 
+## External URL Fetching (SSRF Guard)
+
+Any code that fetches a user-supplied or DB-cached external URL must use the `isPublicHost` helper from `apps/server/src/lib/ssrf.ts`. It DNS-resolves the hostname and rejects loopback, RFC1918, link-local, and cloud-metadata addresses. Always pair it with `redirect: "manual"` so a 3xx cannot redirect to an internal address after the host check. The coverart `cacheCoverFromUrl` and the preview stream route both follow this pattern and serve as reference implementations.
+
 ## Authentication
 
 - Session-based auth (`@fastify/secure-session`) for web — cookie `staccato-session`, 7-day maxAge, httpOnly, sameSite strict
