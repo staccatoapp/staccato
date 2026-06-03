@@ -1,10 +1,8 @@
 import fs from "node:fs";
-import fsp from "node:fs/promises";
 import path from "node:path";
-import { Readable } from "node:stream";
-import { pipeline } from "node:stream/promises";
 import { artistImagesDir } from "../paths.js";
 import { logger } from "../logger.js";
+import { streamRemoteToFile, MAX_IMAGE_BYTES } from "../remote-image.js";
 import { lookupArtistImageSource } from "./client.js";
 import { MB_PRIORITY, type MbPriority } from "../musicbrainz/client.js";
 import { updateArtist } from "../db/queries/artists.js";
@@ -110,27 +108,17 @@ export async function ensureArtistImageOnDisk(
         return null;
       }
 
-      const res = await fetch(source.url);
-      if (!res.ok || !res.body) {
-        log.warn(
-          { artistMbid, status: res.status, url: source.url },
-          "artist image download non-ok response",
-        );
-        return null;
-      }
-
       const filePath = path.join(artistImagesDir, `${artistMbid}${ext}`);
-      const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
-      try {
-        await pipeline(
-          Readable.fromWeb(res.body as never),
-          fs.createWriteStream(tmpPath),
-        );
-        await fsp.rename(tmpPath, filePath);
-      } catch (err) {
-        await fsp.unlink(tmpPath).catch(() => undefined);
-        throw err;
-      }
+      // redirect:"manual" prevents a Wikimedia 3xx from bouncing the fetch to an
+      // arbitrary host after the isTrustedWikimediaUrl guard has passed (SSRF).
+      // maxBytes caps the body to bound disk/memory usage.
+      const ok = await streamRemoteToFile(
+        source.url,
+        filePath,
+        { artistMbid },
+        { redirect: "manual", maxBytes: MAX_IMAGE_BYTES },
+      );
+      if (!ok) return null;
 
       map.set(artistMbid, ext);
       return localArtistImageUrl(artistMbid, ext);
