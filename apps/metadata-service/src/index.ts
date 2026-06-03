@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import { logger } from "./logger.js";
 import { config } from "./config.js";
+import { createAuthPreHandler } from "./plugins/apiKey.js";
 import healthRoutes from "./routes/health.js";
 import recordingRoutes from "./routes/recordings.js";
 import releaseRoutes from "./routes/releases.js";
@@ -20,6 +21,7 @@ logger.info(
     intervalMs: config.MIRROR_INTERVAL_MS,
     popularityEnabled: config.POPULARITY_ENABLED,
     listenbrainzUrl: config.LISTENBRAINZ_API_URL,
+    apiKeyConfigured: Boolean(config.METADATA_SERVICE_API_KEY),
   },
   "metadata-service config loaded",
 );
@@ -27,14 +29,28 @@ logger.info(
 const app = Fastify({ loggerInstance: logger });
 
 app.register(healthRoutes);
-app.register(recordingRoutes, { prefix: "/v1" });
-app.register(releaseRoutes, { prefix: "/v1" });
-app.register(releaseSearchRoutes, { prefix: "/v1" });
-app.register(releaseGroupRoutes, { prefix: "/v1" });
-app.register(artistRoutes, { prefix: "/v1" });
-app.register(artistImageRoutes, { prefix: "/v1" });
-app.register(coverArtRoutes, { prefix: "/v1" });
-app.register(searchRoutes, { prefix: "/v1" });
+
+// All /v1 routes share an encapsulated scope so the auth preHandler hook
+// applies only to them and not to /health.
+app.register(
+  async (v1) => {
+    if (config.METADATA_SERVICE_API_KEY) {
+      v1.addHook(
+        "preHandler",
+        createAuthPreHandler(config.METADATA_SERVICE_API_KEY),
+      );
+    }
+    v1.register(recordingRoutes);
+    v1.register(releaseRoutes);
+    v1.register(releaseSearchRoutes);
+    v1.register(releaseGroupRoutes);
+    v1.register(artistRoutes);
+    v1.register(artistImageRoutes);
+    v1.register(coverArtRoutes);
+    v1.register(searchRoutes);
+  },
+  { prefix: "/v1" },
+);
 
 const start = async () => {
   await app.listen({ port: config.PORT, host: "0.0.0.0" });

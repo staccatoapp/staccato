@@ -55,6 +55,10 @@ const ConfigSchema = z.object({
   POPULARITY_ENABLED: boolFromEnv(true),
   POPULARITY_TTL_MS: intFromEnv(24 * 60 * 60 * 1000), // 24h
   POPULARITY_TIMEOUT_MS: intFromEnv(4000),
+  // Pre-shared secret checked on all /v1 routes. Empty string = auth disabled
+  // (default, preserves zero-config dev). Set the same value in the server's
+  // STACCATO_METADATA_API_KEY to authenticate server→metadata requests.
+  METADATA_SERVICE_API_KEY: z.string().default(""),
 });
 
 const parsed = ConfigSchema.safeParse(process.env);

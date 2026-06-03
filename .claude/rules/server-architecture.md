@@ -36,3 +36,7 @@ Neither fixture hits a real database — mock all DB and service modules with `v
 - Long-lived API tokens (Bearer header) for mobile clients (planned)
 - Admin user created on first launch, can invite/create additional accounts
 - OIDC will be implemented at a later date.
+
+## Metadata-service client auth
+
+The server passes `Authorization: Bearer <key>` on all calls to the metadata-service façade when `STACCATO_METADATA_API_KEY` is set. Added in `apps/server/src/musicbrainz/client.ts` `throttledFetch`. An empty key disables auth (local dev default). The metadata-service side uses `METADATA_SERVICE_API_KEY` and checks via a Fastify `preHandler` hook on its `/v1` scope.
