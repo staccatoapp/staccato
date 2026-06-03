@@ -175,6 +175,38 @@ describe("LidarrClient", () => {
     });
   });
 
+  describe("setAlbumMonitored", () => {
+    it("GETs the album, merges monitored flag, and PUTs it back", async () => {
+      const albumData = {
+        id: 5,
+        title: "OK Computer",
+        foreignAlbumId: "mbid-okc",
+        artistId: 1,
+        monitored: false,
+        extraField: "preserved",
+      };
+      mockFetch
+        .mockReturnValueOnce(okResponse(albumData))
+        .mockReturnValueOnce(okResponse({}, 200));
+
+      await client.setAlbumMonitored(5, true);
+
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      const [, putCall] = mockFetch.mock.calls;
+      expect(JSON.parse(putCall![1].body)).toMatchObject({
+        ...albumData,
+        monitored: true,
+      });
+    });
+
+    it("throws ZodError when GET response is not an object", async () => {
+      mockFetch.mockReturnValueOnce(okResponse([1, 2, 3]));
+      await expect(client.setAlbumMonitored(5, true)).rejects.toBeInstanceOf(
+        ZodError,
+      );
+    });
+  });
+
   describe("fetchLidarrOptions", () => {
     it("maps quality profiles, metadata profiles, and root folders into LidarrOptions shape", async () => {
       mockFetch
