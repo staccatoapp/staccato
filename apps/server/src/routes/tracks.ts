@@ -43,22 +43,42 @@ const tracksRoutes: FastifyPluginAsync = async (fastify) => {
 
     // 3. Always advertise Range support
     reply.header("Accept-Ranges", "bytes");
-    reply.header("Content-Type", contentType);
 
     if (rangeHeader) {
       // 4a. Partial content (206) for Range requests
       const [startStr, endStr] = rangeHeader.replace(/bytes=/, "").split("-");
       const start = parseInt(startStr ?? "0", 10);
       const end = endStr ? parseInt(endStr, 10) : fileSize - 1;
-      const chunkSize = end - start + 1;
 
+      // Validate per RFC 7233: non-negative integers, start within file bounds
+      const startValid = Number.isInteger(start) && start >= 0;
+      const endValid = Number.isInteger(end) && end >= 0;
+      const clampedEnd = endValid ? Math.min(end, fileSize - 1) : NaN;
+      const rangeOk =
+        startValid && endValid && start < fileSize && start <= clampedEnd;
+
+      if (!rangeOk) {
+        req.log.warn(
+          { trackId: id, rangeHeader },
+          "unsatisfiable or invalid Range header",
+        );
+        reply.header("Content-Range", `bytes */${fileSize}`);
+        return reply.status(416).send({ error: "Range Not Satisfiable" });
+      }
+
+      const chunkSize = clampedEnd - start + 1;
+
+      reply.header("Content-Type", contentType);
       reply.status(206);
-      reply.header("Content-Range", `bytes ${start}-${end}/${fileSize}`);
+      reply.header("Content-Range", `bytes ${start}-${clampedEnd}/${fileSize}`);
       reply.header("Content-Length", chunkSize);
 
-      return reply.send(fs.createReadStream(track.filePath, { start, end }));
+      return reply.send(
+        fs.createReadStream(track.filePath, { start, end: clampedEnd }),
+      );
     } else {
       // 4b. Full file (200)
+      reply.header("Content-Type", contentType);
       reply.header("Content-Length", fileSize);
       return reply.send(fs.createReadStream(track.filePath));
     }
