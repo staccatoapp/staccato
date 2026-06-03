@@ -24,6 +24,7 @@ This page maps the moving parts so the rest of the docs have somewhere to anchor
 | ---------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------- |
 | `apps/server`                | `@staccato/server`            | Primary Fastify backend: REST API, the music import/resolution pipeline, the SQLite DB, and (in prod) serving the web SPA.           | `apps/server/src/index.ts`                |
 | `apps/web`                   | `@staccato/web`               | The React SPA — the user-facing player and library browser.                                                                          | `apps/web/src/main.tsx`                   |
+| `apps/mobile`                | `@staccato/mobile`            | Expo (React Native) mobile client, built with Expo Router. Scaffold only — default template, no app functionality yet.               | `apps/mobile/src/app/_layout.tsx`         |
 | `apps/metadata-service`      | `@staccato/metadata-service`  | A Fastify façade in front of a MusicBrainz mirror. Normalises MB wire shapes to shared DTOs, throttles, and adds popularity ranking. | `apps/metadata-service/src/index.ts`      |
 | `apps/docs`                  | `@staccato/docs`              | **Public** VitePress site (user docs). Deployed separately; not in the Docker image.                                                 | `apps/docs/.vitepress/config.ts`          |
 | `apps/internal-docs`         | `@staccato/internal-docs`     | **This** site. Local-only developer docs. Never deployed.                                                                            | `apps/internal-docs/.vitepress/config.ts` |
@@ -35,6 +36,16 @@ This page maps the moving parts so the rest of the docs have somewhere to anchor
 Anything crossing an app boundary (e.g. `server` → `web`, or `server` → `metadata-service`)
 is a zod schema in `packages/shared/src/types/zod`. Server-internal row types (`*Row`,
 `New*Row`) stay inside `apps/server` and never leak into `@staccato/shared`.
+:::
+
+::: tip Mobile tooling divergence
+`apps/mobile` deliberately does **not** extend `@staccato/typescript-config` or
+`@staccato/eslint-config`. Those presets target Node/web (`module: NodeNext`, DOM libs) and
+break Metro. The mobile app keeps Expo's own `expo/tsconfig.base` and `eslint-config-expo`
+instead. It still consumes `@staccato/shared` via `workspace:*` like every other app — Metro
+bundles the shared package's compiled `dist/` through its standard package-exports resolution.
+Its `check-types` runs `expo customize tsconfig.json` first to regenerate the (git-ignored)
+`expo-env.d.ts` so `tsc` resolves Expo's CSS-module and typed-route declarations in CI.
 :::
 
 ## Request and data flow
@@ -123,6 +134,7 @@ Ports and inspectors during `turbo dev`:
 | `server`               | `8280`            | `9329`         |
 | `metadata-service`     | `8290`            | `9330`         |
 | `web` (Vite)           | Vite default      | —              |
+| `mobile` (Expo/Metro)  | `8081`            | —              |
 | `docs` (public)        | VitePress default | —              |
 | `internal-docs` (this) | `5174`            | —              |
 
