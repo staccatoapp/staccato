@@ -42,17 +42,26 @@ The server records a listen in `PUT /session/state` when all three conditions ho
 ```ts
 !current.currentTrackListenEventCreated &&
   isPlaying &&
-  currentTrackAccumulatedPlayTimeInSeconds >
-    Math.min(240, (currentTrackDurationSeconds ?? 480) / 2);
+  shouldRecordListen(currentTrackAccumulatedPlayTimeInSeconds, currentTrackDurationSeconds);
 ```
 
-This is the ListenBrainz rule of thumb: a play counts once it passes **half the track, or four
-minutes, whichever is less** (the `?? 480` fallback assumes an 8-minute track when the duration
-is unknown, so the effective threshold is 240s). The `currentTrackListenEventCreated` flag on the
-`playback_session` row is the **dedup gate** — the server sets it `true` the instant a listen
-fires, so a single play is only ever counted once, and the client resets it to `false` on the
-next track. The accumulator and session state are described in more detail with the rest of
-playback session handling; this page only covers the listen-recording slice of it.
+`shouldRecordListen(accumulatedSeconds, durationSeconds)` is exported from
+`apps/server/src/scrobbling/dispatch.ts` and encapsulates the ListenBrainz rule of thumb: **half
+the track or four minutes, whichever is less** (`accumulatedSeconds > Math.min(240, (durationSeconds ?? 480) / 2)`). The `?? 480` fallback assumes an 8-minute track when the duration is unknown, giving a threshold of 240 s.
+
+The `currentTrackListenEventCreated` flag on the `playback_session` row is the **dedup gate** —
+once the server sets it `true`, it must not be overwritten by a concurrent client poll that races
+in with a stale `false`. The expression that persists it is:
+
+```ts
+currentTrackListenEventCreated: listenEventCreated || (currentTrackListenEventCreated ?? false)
+```
+
+This ensures that once `listenEventCreated` is set `true` for this poll cycle (the threshold just
+fired), the OR wins regardless of what the client sent. The client resets the flag to `false` on
+the next track change to re-arm the gate. The accumulator and session state are described in more
+detail with the rest of playback session handling; this page only covers the listen-recording
+slice of it.
 
 ## What happens next: scrobbling
 

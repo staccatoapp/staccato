@@ -34,7 +34,7 @@ vi.mock("../db/queries/tracks.js", async (importActual) => {
 import { listeningHistory } from "../db/schema/listening-history.js";
 import { listenScrobbles } from "../db/schema/listen-scrobbles.js";
 import { getTrackForScrobble } from "../db/queries/tracks.js";
-import { recordListen } from "./dispatch.js";
+import { recordListen, shouldRecordListen } from "./dispatch.js";
 
 const log = {
   info: vi.fn(),
@@ -74,6 +74,38 @@ beforeEach(() => {
   vi.mocked(getTrackForScrobble).mockClear();
   vi.mocked(log.warn).mockClear();
   vi.mocked(log.error).mockClear();
+});
+
+describe("shouldRecordListen", () => {
+  it("returns false below threshold", () => {
+    expect(shouldRecordListen(100, 240)).toBe(false); // threshold = 120
+  });
+
+  it("returns false at exactly the threshold", () => {
+    expect(shouldRecordListen(120, 240)).toBe(false); // > not >=
+  });
+
+  it("returns true above half-track threshold", () => {
+    expect(shouldRecordListen(121, 240)).toBe(true);
+  });
+
+  it("caps the threshold at 240 s (4 minutes) for long tracks", () => {
+    // 600 s track: threshold = min(240, 300) = 240
+    expect(shouldRecordListen(239, 600)).toBe(false);
+    expect(shouldRecordListen(241, 600)).toBe(true);
+  });
+
+  it("applies the 4-minute cap for very long tracks", () => {
+    // 3600 s track: threshold = min(240, 1800) = 240
+    expect(shouldRecordListen(240, 3600)).toBe(false);
+    expect(shouldRecordListen(241, 3600)).toBe(true);
+  });
+
+  it("assumes 480 s duration when durationSeconds is null", () => {
+    // unknown duration: threshold = min(240, 240) = 240
+    expect(shouldRecordListen(240, null)).toBe(false);
+    expect(shouldRecordListen(241, null)).toBe(true);
+  });
 });
 
 describe("recordListen", () => {

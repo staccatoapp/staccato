@@ -11,6 +11,18 @@ import { listRegisteredTargets } from "./target.js";
 import "./targets/index.js";
 
 /**
+ * Returns true when a play qualifies as a listen per the ListenBrainz rule:
+ * more than half the track's duration, or more than 4 minutes, whichever is less.
+ * When durationSeconds is unknown, 8 minutes is assumed (480 s / 2 = 240 s threshold).
+ */
+export function shouldRecordListen(
+  accumulatedSeconds: number,
+  durationSeconds: number | null,
+): boolean {
+  return accumulatedSeconds > Math.min(240, (durationSeconds ?? 480) / 2);
+}
+
+/**
  * Records a single listen: always writes the local `listening_history` ledger
  * row, then fans the listen out to every eligible scrobble target. Each target
  * gets its own `listen_scrobbles` delivery record so a slow or failing target
