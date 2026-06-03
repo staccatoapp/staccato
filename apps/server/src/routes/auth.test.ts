@@ -121,6 +121,26 @@ describe("POST /login", () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it("returns 400 when username exceeds 128 characters", async () => {
+    const { app } = buildSessionApp(authRoutes);
+    const res = await app.inject({
+      method: "POST",
+      url: "/login",
+      payload: { username: "a".repeat(129), password: "password123" },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("returns 400 when password exceeds 128 characters", async () => {
+    const { app } = buildSessionApp(authRoutes);
+    const res = await app.inject({
+      method: "POST",
+      url: "/login",
+      payload: { username: "admin", password: "a".repeat(129) },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
   it("returns 401 when user is not found", async () => {
     vi.mocked(findUserByUsername).mockReturnValue(undefined as never);
     vi.mocked(argon2.verify).mockResolvedValue(false);
