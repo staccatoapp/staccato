@@ -140,6 +140,24 @@ describe("POST / — validation", () => {
   });
 });
 
+describe("POST / — response shape", () => {
+  it("returns 201 with PlaylistDetail-shaped body including tracks: []", async () => {
+    const app = buildApp(playlistRoutes, userAId);
+    const res = await app.inject({
+      method: "POST",
+      url: "/",
+      payload: { name: "My New Playlist" },
+    });
+    expect(res.statusCode).toBe(201);
+    const body = res.json();
+    expect(body.name).toBe("My New Playlist");
+    expect(body.tracks).toEqual([]);
+    expect(body).toHaveProperty("id");
+    expect(body).toHaveProperty("description");
+    expect(body).toHaveProperty("updatedAt");
+  });
+});
+
 describe("PUT /:id — validation", () => {
   it("returns 400 on invalid body", async () => {
     const app = buildApp(playlistRoutes, userAId);
@@ -171,6 +189,47 @@ describe("PUT /:id — validation", () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().description).toBeNull();
+  });
+});
+
+describe("PUT /:id — response shape", () => {
+  it("returns PlaylistDetail-shaped body with tracks: [] when playlist is empty", async () => {
+    const app = buildApp(playlistRoutes, userAId);
+    const res = await app.inject({
+      method: "PUT",
+      url: `/${playlistId}`,
+      payload: { name: "Renamed Playlist" },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.name).toBe("Renamed Playlist");
+    expect(body.tracks).toEqual([]);
+    expect(body).toHaveProperty("id");
+    expect(body).toHaveProperty("description");
+    expect(body).toHaveProperty("updatedAt");
+  });
+
+  it("returns tracks in response when playlist has tracks", async () => {
+    const artistId = seedArtist();
+    const albumId = seedAlbum(artistId);
+    const trackId = seedTrack(artistId, albumId);
+    const app = buildApp(playlistRoutes, userAId);
+
+    await app.inject({
+      method: "POST",
+      url: `/${playlistId}/tracks`,
+      payload: { trackIds: [trackId] },
+    });
+
+    const res = await app.inject({
+      method: "PUT",
+      url: `/${playlistId}`,
+      payload: { name: "Renamed With Tracks" },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.tracks).toHaveLength(1);
+    expect(body.tracks[0].trackId).toBe(trackId);
   });
 });
 

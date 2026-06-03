@@ -107,9 +107,8 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
       id: playlist.id,
       name: playlist.name,
       description: playlist.description,
-      trackCount: 0,
-      coverArtUrl: null,
       updatedAt: playlist.updatedAt?.toISOString() ?? null,
+      tracks: [],
     });
   });
 
@@ -184,11 +183,20 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(404).send({ error: "Playlist not found" });
     }
 
+    const trackRows = getPlaylistTracks(id);
     return {
       id: updated.id,
       name: updated.name,
       description: updated.description,
       updatedAt: updated.updatedAt?.toISOString() ?? null,
+      tracks: trackRows.map((t) => ({
+        ...t,
+        coverArtUrl: resolveAlbumCoverNow({
+          albumId: t.albumId,
+          releaseGroupMbid: t.releaseGroupMbid,
+          coverArtUrl: t.coverArtUrl,
+        }),
+      })),
     };
   });
 
