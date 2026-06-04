@@ -1,7 +1,7 @@
 import path from "node:path";
-import { getConfig } from "./config/config.js";
+import { getEnvironment } from "./environment/environment.js";
 
-const root = path.resolve(getConfig().STACCATO_DATA_DIR);
+const root = path.resolve(getEnvironment().STACCATO_DATA_DIR);
 
 export const staccatoDataRoot = root;
 export const dataDir = path.join(root, "data");

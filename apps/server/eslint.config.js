@@ -11,13 +11,16 @@ export default [
           object: "process",
           property: "env",
           message:
-            "Do not access process.env directly. Import config from the src/config.ts module instead.",
+            "Do not access process.env directly. Import from the src/environment/environment.ts module instead.",
         },
       ],
     },
   },
   {
-    files: ["**/src/config/config.ts", "**/src/config/config.test.ts"],
+    files: [
+      "**/src/environment/environment.ts",
+      "**/src/environment/environment.test.ts",
+    ],
     rules: { "no-restricted-properties": "off" },
   },
 ];

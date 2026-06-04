@@ -1,7 +1,7 @@
 import PQueue from "p-queue";
 import { z } from "zod";
 import { logger } from "../../logger.js";
-import { getConfig } from "../../config/config.js";
+import { getEnvironment } from "../../environment/environment.js";
 
 const log = logger.child({ module: "library:acoustid" });
 
@@ -137,9 +137,9 @@ export async function lookupFingerprint(
 }
 
 export function isAcoustidConfigured(): boolean {
-  return Boolean(getConfig().STACCATO_SERVER_ACOUSTID_API_KEY);
+  return Boolean(getEnvironment().STACCATO_SERVER_ACOUSTID_API_KEY);
 }
 
 export function acoustidApiKey(): string | null {
-  return getConfig().STACCATO_SERVER_ACOUSTID_API_KEY || null;
+  return getEnvironment().STACCATO_SERVER_ACOUSTID_API_KEY || null;
 }

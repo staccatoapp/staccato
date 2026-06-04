@@ -14,7 +14,7 @@ const intFromEnv = (fallback: number, min = 0) =>
     return Number.isInteger(n) && n >= min ? n : fallback;
   }, z.number().int().min(min));
 
-export const ConfigSchema = z.object({
+export const EnvironmentSchema = z.object({
   STACCATO_ENV: z.string().optional(),
   PORT: intFromEnv(8280),
   STACCATO_DATA_DIR: z.string().default("./data"),
@@ -44,41 +44,42 @@ export const ConfigSchema = z.object({
   MB_RATE_LIMIT_MS: intFromEnv(1100),
 });
 
-export type Config = z.infer<typeof ConfigSchema>;
+export type Environment = z.infer<typeof EnvironmentSchema>;
 
-class ConfigError extends Error {
+class EnvironmentError extends Error {
   constructor(fieldErrors: Record<string, string[] | undefined>) {
     super("Invalid server config\n" + JSON.stringify(fieldErrors, null, 2));
-    this.name = "ConfigError";
+    this.name = "EnvironmentError";
   }
 }
 
-let cached: Config | null = null;
+let cached: Environment | null = null;
 
 /**
- * Parse and validate the full server config from the environment, caching the
- * result. Throws ConfigError on invalid config — the composition root (or Node)
- * surfaces the message; we never process.exit here so the module stays safe to
- * import (e.g. under test, where it is mocked).
+ * Parse and validate the full server environment from process.env, caching the
+ * result. Throws EnvironmentError on invalid config — the composition root (or
+ * Node) surfaces the message; we never process.exit here so the module stays
+ * safe to import (e.g. under test, where it is mocked).
  */
-export function getConfig(): Config {
+export function getEnvironment(): Environment {
   if (cached) return cached;
-  const parsed = ConfigSchema.safeParse(process.env);
+  const parsed = EnvironmentSchema.safeParse(process.env);
   if (!parsed.success) {
-    throw new ConfigError(parsed.error.flatten().fieldErrors);
+    throw new EnvironmentError(parsed.error.flatten().fieldErrors);
   }
   cached = parsed.data;
   return cached;
 }
 
-// Log settings are intentionally decoupled from getConfig: both fields have
-// defaults and none are required, so this never throws. That lets logger.ts
-// stay import-safe regardless of whether the full config would validate.
-const LogConfigSchema = z.object({
+// Log settings are intentionally decoupled from getEnvironment: both fields
+// have defaults and none are required, so this never throws. That lets
+// logger.ts stay import-safe regardless of whether the full environment would
+// validate.
+const LogEnvironmentSchema = z.object({
   STACCATO_LOG_LEVEL: z.string().default("info"),
   STACCATO_LOG_FORMAT: z.string().default("pretty"),
 });
 
-export function getLogConfig() {
-  return LogConfigSchema.parse(process.env);
+export function getLogEnvironment() {
+  return LogEnvironmentSchema.parse(process.env);
 }

@@ -1,11 +1,11 @@
 import PQueue from "p-queue";
 import { discoverFile, resolveTrack, enrichTrack } from "./worker.js";
 import { logger } from "../logger.js";
-import { getConfig } from "../config/config.js";
+import { getEnvironment } from "../environment/environment.js";
 
 const log = logger.child({ module: "library:queue" });
 
-const config = getConfig();
+const config = getEnvironment();
 const DISCOVERY_CONCURRENCY =
   config.STACCATO_SERVER_LIBRARY_DISCOVERY_CONCURRENCY;
 const RESOLUTION_CONCURRENCY =
