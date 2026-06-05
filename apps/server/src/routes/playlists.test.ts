@@ -7,6 +7,7 @@ import {
   seedTrack,
   seedUser,
 } from "../db/__fixtures__/db.js";
+import { addTrackToPlaylist } from "../db/queries/playlists.js";
 
 let testDb: ReturnType<typeof createTestDb>;
 
@@ -294,5 +295,89 @@ describe("POST /:id/tracks — track existence filtering", () => {
     const tracks = listRes.json().tracks as Array<{ trackId: string }>;
     expect(tracks).toHaveLength(1);
     expect(tracks.at(0)?.trackId).toBe(trackId);
+  });
+});
+
+describe("GET / — containsTrackId membership annotation", () => {
+  let artistId: string;
+  let albumId: string;
+  let trackId: string;
+
+  beforeEach(() => {
+    artistId = seedArtist();
+    albumId = seedAlbum(artistId);
+    trackId = seedTrack(artistId, albumId);
+  });
+
+  it("omits isMember and memberEntryId when containsTrackId is not provided", async () => {
+    const app = buildApp(playlistRoutes, userAId);
+    const res = await app.inject({ method: "GET", url: "/" });
+
+    expect(res.statusCode).toBe(200);
+    const { items } = res.json() as { items: Record<string, unknown>[] };
+    expect(items).toHaveLength(1);
+    expect(items[0]).not.toHaveProperty("isMember");
+    expect(items[0]).not.toHaveProperty("memberEntryId");
+  });
+
+  it("returns isMember: false and memberEntryId: null when track is not in playlist", async () => {
+    const app = buildApp(playlistRoutes, userAId);
+    const res = await app.inject({
+      method: "GET",
+      url: `/?containsTrackId=${trackId}`,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const { items } = res.json() as {
+      items: { isMember: boolean; memberEntryId: string | null }[];
+    };
+    expect(items).toHaveLength(1);
+    const item0 = items[0]!;
+    expect(item0.isMember).toBe(false);
+    expect(item0.memberEntryId).toBeNull();
+  });
+
+  it("returns isMember: true and the entryId when track is in playlist", async () => {
+    addTrackToPlaylist(playlistId, trackId, 0);
+
+    const app = buildApp(playlistRoutes, userAId);
+    const res = await app.inject({
+      method: "GET",
+      url: `/?containsTrackId=${trackId}`,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const { items } = res.json() as {
+      items: { isMember: boolean; memberEntryId: string | null }[];
+    };
+    expect(items).toHaveLength(1);
+    const item0 = items[0]!;
+    expect(item0.isMember).toBe(true);
+    expect(typeof item0.memberEntryId).toBe("string");
+  });
+
+  it("annotates only the playlist that contains the track when multiple playlists exist", async () => {
+    const otherPlaylistId = seedPlaylist(userAId, "Other Playlist");
+    addTrackToPlaylist(otherPlaylistId, trackId, 0);
+
+    const app = buildApp(playlistRoutes, userAId);
+    const res = await app.inject({
+      method: "GET",
+      url: `/?containsTrackId=${trackId}`,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const { items } = res.json() as {
+      items: { id: string; isMember: boolean; memberEntryId: string | null }[];
+    };
+    expect(items).toHaveLength(2);
+
+    const original = items.find((i) => i.id === playlistId)!;
+    const other = items.find((i) => i.id === otherPlaylistId)!;
+
+    expect(original.isMember).toBe(false);
+    expect(original.memberEntryId).toBeNull();
+    expect(other.isMember).toBe(true);
+    expect(typeof other.memberEntryId).toBe("string");
   });
 });

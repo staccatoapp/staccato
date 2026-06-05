@@ -192,3 +192,24 @@ export function touchPlaylist(id: string): void {
     .where(eq(playlists.id, id))
     .run();
 }
+
+export function getPlaylistMemberships(
+  playlistIds: string[],
+  trackId: string,
+): Map<string, string> {
+  if (playlistIds.length === 0) return new Map();
+  const rows = db
+    .select({
+      playlistId: playlistTracks.playlistId,
+      entryId: playlistTracks.id,
+    })
+    .from(playlistTracks)
+    .where(
+      and(
+        inArray(playlistTracks.playlistId, playlistIds),
+        eq(playlistTracks.trackId, trackId),
+      ),
+    )
+    .all();
+  return new Map(rows.map((r) => [r.playlistId, r.entryId]));
+}

@@ -1,11 +1,8 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Plus } from "lucide-react";
-import {
-  PlaylistDetailSchema,
-  PlaylistListResponseSchema,
-} from "@staccato/shared";
-import type { PlaylistDetail, PlaylistListItem } from "@staccato/shared";
+import { PlaylistListResponseSchema } from "@staccato/shared";
+import type { PlaylistListItem } from "@staccato/shared";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -16,28 +13,15 @@ import {
 function PlaylistCheckboxRow({
   trackId,
   playlist,
-  dropdownOpen,
 }: {
   trackId: string;
   playlist: PlaylistListItem;
-  dropdownOpen: boolean;
 }) {
   const queryClient = useQueryClient();
   const [hovered, setHovered] = useState(false);
 
-  const { data: detail } = useQuery({
-    queryKey: ["playlist", playlist.id],
-    queryFn: async (): Promise<PlaylistDetail> => {
-      const res = await fetch(`/api/playlists/${playlist.id}`);
-      if (!res.ok) throw new Error("Failed to fetch playlist");
-      return PlaylistDetailSchema.parse(await res.json());
-    },
-    enabled: dropdownOpen,
-    staleTime: 60_000,
-  });
-
-  const isMember = detail?.tracks.some((t) => t.trackId === trackId) ?? false;
-  const entryId = detail?.tracks.find((t) => t.trackId === trackId)?.entryId;
+  const isMember = playlist.isMember ?? false;
+  const entryId = playlist.memberEntryId ?? undefined;
 
   const addMutation = useMutation({
     mutationFn: async () => {
@@ -49,8 +33,8 @@ function PlaylistCheckboxRow({
       if (!res.ok) throw new Error("Failed to add track");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["playlist", playlist.id] });
       queryClient.invalidateQueries({ queryKey: ["playlists"] });
+      queryClient.invalidateQueries({ queryKey: ["playlist", playlist.id] });
     },
   });
 
@@ -64,8 +48,8 @@ function PlaylistCheckboxRow({
       if (!res.ok) throw new Error("Failed to remove track");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["playlist", playlist.id] });
       queryClient.invalidateQueries({ queryKey: ["playlists"] });
+      queryClient.invalidateQueries({ queryKey: ["playlist", playlist.id] });
     },
   });
 
@@ -119,12 +103,16 @@ export function AddToPlaylistDropdown({
   const [open, setOpen] = useState(false);
 
   const { data: playlistsData } = useQuery({
-    queryKey: ["playlists"],
+    queryKey: ["playlists", trackId],
     queryFn: async (): Promise<{ items: PlaylistListItem[] }> => {
-      const res = await fetch("/api/playlists");
+      const res = await fetch(
+        `/api/playlists?containsTrackId=${encodeURIComponent(trackId)}`,
+      );
       if (!res.ok) throw new Error("Failed to fetch playlists");
       return PlaylistListResponseSchema.parse(await res.json());
     },
+    enabled: open,
+    staleTime: 60_000,
   });
 
   const playlists = playlistsData?.items ?? [];
@@ -158,12 +146,7 @@ export function AddToPlaylistDropdown({
           </p>
         ) : (
           playlists.map((pl) => (
-            <PlaylistCheckboxRow
-              key={pl.id}
-              trackId={trackId}
-              playlist={pl}
-              dropdownOpen={open}
-            />
+            <PlaylistCheckboxRow key={pl.id} trackId={trackId} playlist={pl} />
           ))
         )}
       </DropdownMenuContent>
