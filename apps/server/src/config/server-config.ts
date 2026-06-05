@@ -32,8 +32,16 @@ const MetadataConfigSchema = z.object({
 export type MetadataConfig = z.infer<typeof MetadataConfigSchema>;
 
 const ServerConfigSchema = z.object({
-  lidarr: LidarrConfigSchema.default({}),
-  metadata: MetadataConfigSchema.default({}),
+  lidarr: LidarrConfigSchema.default({
+    url: null,
+    apiKey: null,
+    qualityProfileId: null,
+    metadataProfileId: null,
+    rootFolderPath: null,
+  }),
+  metadata: MetadataConfigSchema.default({
+    confidenceThreshold: 0.75,
+  }),
 });
 export type ServerConfig = z.infer<typeof ServerConfigSchema>;
 

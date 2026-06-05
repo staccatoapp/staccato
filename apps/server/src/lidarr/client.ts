@@ -188,7 +188,7 @@ export class LidarrClient {
   async setAlbumMonitored(albumId: number, monitored: boolean): Promise<void> {
     this.logger.debug(`Setting album ${albumId} as monitored: ${monitored}`);
     const raw = await this.request("GET", `/album/${albumId}`);
-    const album = z.record(z.unknown()).parse(raw);
+    const album = z.record(z.string(), z.unknown()).parse(raw);
     await this.request("PUT", `/album/${albumId}`, { ...album, monitored });
   }
 

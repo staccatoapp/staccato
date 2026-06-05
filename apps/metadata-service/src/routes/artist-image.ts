@@ -17,6 +17,7 @@ export const ArtistUrlRelsSchema = z.object({
 
 export const WikidataEntitySchema = z.object({
   entities: z.record(
+    z.string(),
     z.object({
       claims: z
         .object({
