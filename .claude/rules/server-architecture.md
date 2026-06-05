@@ -44,3 +44,7 @@ Any code that fetches a user-supplied or DB-cached external URL must use the `is
 - Long-lived API tokens (Bearer header) for mobile clients (planned)
 - Admin user created on first launch, can invite/create additional accounts
 - OIDC will be implemented at a later date.
+
+## Rate Limiting
+
+`@fastify/rate-limit` is registered at the root Fastify scope in `index.ts` with `global: false` — only routes that opt in via `config: { rateLimit: { max, timeWindow } }` are throttled. Currently `POST /api/auth/login` and `POST /api/auth/setup` are rate-limited to 10 requests per IP per minute; all other routes are unconstrained. Testing `@fastify/rate-limit` requires a separate test file that does NOT mock `fastify-plugin` (otherwise the plugin loses its skip-override symbol and its `onRoute` hook is scoped incorrectly). See `auth-rate-limit.test.ts` for the pattern: mock `@fastify/secure-session` and argon2, leave `fastify-plugin` unmocked, then register `rateLimit` before `authRoutes` in the test app.
