@@ -4,7 +4,7 @@ import { parsePagination, UpdatePlaylistRequestSchema } from "@staccato/shared";
 import {
   PlaylistRow,
   PlaylistUpdate,
-  addTrackToPlaylist,
+  addTracksToPlaylist,
   countUserPlaylists,
   createPlaylist,
   deletePlaylist,
@@ -261,9 +261,13 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
 
     const startPosition = (getMaxPlaylistTrackPosition(id) ?? -1) + 1;
 
-    validTrackIds.forEach((trackId, i) => {
-      addTrackToPlaylist(id, trackId, startPosition + i);
-    });
+    addTracksToPlaylist(
+      id,
+      validTrackIds.map((trackId, i) => ({
+        trackId,
+        position: startPosition + i,
+      })),
+    );
     touchPlaylist(id);
 
     return reply.status(204).send();
