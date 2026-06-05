@@ -21,70 +21,80 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     return { setupComplete: isSetupComplete() };
   });
 
-  fastify.post("/setup", async (req, reply) => {
-    if (isSetupComplete()) {
-      req.log.warn("setup attempted but already complete");
-      return reply.code(409).send({ error: "Setup already complete" });
-    }
-    const parsedBody = CreateUserSchema.safeParse(req.body);
-    if (!parsedBody.success) {
-      req.log.warn(
-        { err: parsedBody.error },
-        "POST /setup: invalid request body",
+  fastify.post(
+    "/setup",
+    { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
+    async (req, reply) => {
+      if (isSetupComplete()) {
+        req.log.warn("setup attempted but already complete");
+        return reply.code(409).send({ error: "Setup already complete" });
+      }
+      const parsedBody = CreateUserSchema.safeParse(req.body);
+      if (!parsedBody.success) {
+        req.log.warn(
+          { err: parsedBody.error },
+          "POST /setup: invalid request body",
+        );
+        return reply.status(400).send({ error: "Invalid request" });
+      }
+      const { username, password } = parsedBody.data;
+      const passwordHash = await argon2.hash(password, {
+        type: argon2.argon2id,
+      });
+      const user = createUser({ username, passwordHash, isAdmin: true });
+      req.session.set("userId", user.id);
+      req.log.info(
+        { userId: user.id, username: user.username },
+        "initial admin user created",
       );
-      return reply.status(400).send({ error: "Invalid request" });
-    }
-    const { username, password } = parsedBody.data;
-    const passwordHash = await argon2.hash(password, { type: argon2.argon2id });
-    const user = createUser({ username, passwordHash, isAdmin: true });
-    req.session.set("userId", user.id);
-    req.log.info(
-      { userId: user.id, username: user.username },
-      "initial admin user created",
-    );
-    return reply.code(201).send(
-      AuthenticatedUserResponseSchema.parse({
+      return reply.code(201).send(
+        AuthenticatedUserResponseSchema.parse({
+          id: user.id,
+          username: user.username,
+          isAdmin: user.isAdmin,
+          onboardingComplete: user.onboardingComplete,
+        }),
+      );
+    },
+  );
+
+  fastify.post(
+    "/login",
+    { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
+    async (req, reply) => {
+      const parsedBody = LoginSchema.safeParse(req.body);
+      if (!parsedBody.success) {
+        req.log.warn(
+          { err: parsedBody.error },
+          "POST /login: invalid request body",
+        );
+        return reply.status(400).send({ error: "Invalid request" });
+      }
+      const { username, password } = parsedBody.data;
+      const user = findUserByUsername(username);
+
+      // Always run a hash verification to prevent timing attacks
+      const hashToVerify = user?.passwordHash ?? DUMMY_HASH;
+      const valid = await argon2.verify(hashToVerify, password);
+
+      if (!user || !user.passwordHash || !valid) {
+        req.log.warn({ username }, "login failed: invalid credentials");
+        return reply.code(401).send({ error: "Invalid credentials" });
+      }
+
+      req.session.set("userId", user.id);
+      req.log.info(
+        { userId: user.id, username: user.username },
+        "user logged in",
+      );
+      return AuthenticatedUserResponseSchema.parse({
         id: user.id,
         username: user.username,
         isAdmin: user.isAdmin,
         onboardingComplete: user.onboardingComplete,
-      }),
-    );
-  });
-
-  fastify.post("/login", async (req, reply) => {
-    const parsedBody = LoginSchema.safeParse(req.body);
-    if (!parsedBody.success) {
-      req.log.warn(
-        { err: parsedBody.error },
-        "POST /login: invalid request body",
-      );
-      return reply.status(400).send({ error: "Invalid request" });
-    }
-    const { username, password } = parsedBody.data;
-    const user = findUserByUsername(username);
-
-    // Always run a hash verification to prevent timing attacks
-    const hashToVerify = user?.passwordHash ?? DUMMY_HASH;
-    const valid = await argon2.verify(hashToVerify, password);
-
-    if (!user || !user.passwordHash || !valid) {
-      req.log.warn({ username }, "login failed: invalid credentials");
-      return reply.code(401).send({ error: "Invalid credentials" });
-    }
-
-    req.session.set("userId", user.id);
-    req.log.info(
-      { userId: user.id, username: user.username },
-      "user logged in",
-    );
-    return AuthenticatedUserResponseSchema.parse({
-      id: user.id,
-      username: user.username,
-      isAdmin: user.isAdmin,
-      onboardingComplete: user.onboardingComplete,
-    });
-  });
+      });
+    },
+  );
 
   fastify.post("/logout", { preHandler: requireAuth }, async (req, reply) => {
     req.session.delete();

@@ -2,6 +2,7 @@ import Fastify from "fastify";
 import sessionPlugin, { requireAuth } from "./plugins/session.js";
 import authRoutes from "./routes/auth.js";
 import fastifyStatic from "@fastify/static";
+import rateLimit from "@fastify/rate-limit";
 import { runMigrations } from "./db/migrate.js";
 import { startLibraryPipeline } from "./library/index.js";
 import path from "node:path";
@@ -34,6 +35,7 @@ import { ZodError } from "zod";
 const app = Fastify({ loggerInstance: logger });
 
 app.register(sessionPlugin);
+app.register(rateLimit, { global: false });
 
 fs.mkdirSync(metadataDir, { recursive: true });
 fs.mkdirSync(coversDir, { recursive: true });
