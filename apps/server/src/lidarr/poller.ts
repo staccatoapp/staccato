@@ -1,5 +1,5 @@
 import { LidarrClient } from "./client.js";
-import { getOrCreateServerSettings } from "../db/queries/server-settings.js";
+import { serverConfig } from "../config/server-config.js";
 import {
   getActiveDownloadRequests,
   updateDownloadRequest,
@@ -9,8 +9,8 @@ import { logger } from "../logger.js";
 const log = logger.child({ module: "lidarr-poller" });
 
 async function pollLidarrRequests(): Promise<void> {
-  const settings = getOrCreateServerSettings();
-  if (!settings.lidarrUrl || !settings.lidarrApiKey) return;
+  const { lidarr } = serverConfig.get();
+  if (!lidarr.url || !lidarr.apiKey) return;
 
   const active = getActiveDownloadRequests();
   log.debug({ activeCount: active.length }, "lidarr poll tick");
@@ -21,11 +21,7 @@ async function pollLidarrRequests(): Promise<void> {
     .filter((id): id is number => id != null);
   if (albumIds.length === 0) return;
 
-  const client = new LidarrClient(
-    settings.lidarrUrl,
-    settings.lidarrApiKey,
-    logger,
-  );
+  const client = new LidarrClient(lidarr.url, lidarr.apiKey, logger);
   const [albums, queue] = await Promise.all([
     client.getAlbumsByIds(albumIds),
     client.getQueue(),

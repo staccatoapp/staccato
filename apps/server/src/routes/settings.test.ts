@@ -2,12 +2,44 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import settingsRoutes from "./settings.js";
 import { buildApp } from "./__fixtures__/app.js";
 import { getOrCreateUserSettings } from "../db/queries/settings.js";
+import { serverConfig } from "../config/server-config.js";
+import type { ServerConfig } from "../config/server-config.js";
 
 vi.mock("../listenbrainz/client.js");
 vi.mock("../db/queries/settings.js");
-vi.mock("../db/queries/server-settings.js");
+vi.mock("../config/server-config.js", () => ({
+  serverConfig: { get: vi.fn(), set: vi.fn().mockResolvedValue(undefined) },
+}));
 vi.mock("../recommendations/eligibility.js");
 vi.mock("../recommendations/refresher.js");
+
+const defaultConfig: ServerConfig = {
+  lidarr: {
+    url: null,
+    apiKey: null,
+    qualityProfileId: null,
+    metadataProfileId: null,
+    rootFolderPath: null,
+  },
+  metadata: {
+    confidenceThreshold: 0.75,
+  },
+};
+
+describe("GET /server", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("returns metadataConfidenceThreshold from server config", async () => {
+    vi.mocked(serverConfig.get).mockReturnValue({
+      ...defaultConfig,
+      metadata: { confidenceThreshold: 0.85 },
+    });
+    const app = buildApp(settingsRoutes);
+    const res = await app.inject({ method: "GET", url: "/server" });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toEqual({ metadataConfidenceThreshold: 0.85 });
+  });
+});
 
 describe("PATCH /", () => {
   beforeEach(() => vi.clearAllMocks());

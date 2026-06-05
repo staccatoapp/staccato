@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import { makeTestEnvironment } from "./src/config/__fixtures__/environment.js";
+import { makeTestEnvironment } from "./src/environment/__fixtures__/environment.js";
 
 // Mock environment.ts globally for every test file. vi.mock in a setup file
 // applies to all tests (see Vitest docs), so the real module — which runs

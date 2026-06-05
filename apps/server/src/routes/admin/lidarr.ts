@@ -6,37 +6,42 @@ import {
 } from "@staccato/shared";
 import { FastifyPluginAsync } from "fastify";
 import { fetchLidarrOptions, LidarrClient } from "../../lidarr/client.js";
-import {
-  getOrCreateServerSettings,
-  ServerSettingsUpdate,
-  updateServerSettings,
-} from "../../db/queries/server-settings.js";
+import { serverConfig } from "../../config/server-config.js";
+import type { LidarrConfig } from "../../config/server-config.js";
 
 const lidarrRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/", async (_req, reply) => {
-    const settings = getOrCreateServerSettings();
+    const { lidarr } = serverConfig.get();
     const response: LidarrSettings = {
-      url: settings.lidarrUrl,
-      apiKeySet: settings.lidarrApiKey != null,
-      qualityProfileId: settings.lidarrQualityProfileId,
-      metadataProfileId: settings.lidarrMetadataProfileId,
-      rootFolderPath: settings.lidarrRootFolderPath,
+      url: lidarr.url,
+      apiKeySet: lidarr.apiKey != null,
+      qualityProfileId: lidarr.qualityProfileId,
+      metadataProfileId: lidarr.metadataProfileId,
+      rootFolderPath: lidarr.rootFolderPath,
     };
     return reply.send(response);
   });
 
   fastify.patch("/", async (req, reply) => {
-    const body = UpdateLidarrSettingsSchema.parse(req.body);
-    const update: ServerSettingsUpdate = {};
-    if (body.url !== undefined) update.lidarrUrl = body.url ?? null;
-    if (body.apiKey !== undefined) update.lidarrApiKey = body.apiKey ?? null;
+    const parsed = UpdateLidarrSettingsSchema.safeParse(req.body);
+    if (!parsed.success) {
+      req.log.warn(
+        { err: parsed.error },
+        "PATCH /admin/lidarr: invalid request body",
+      );
+      return reply.status(400).send({ error: "Invalid request" });
+    }
+    const body = parsed.data;
+    const lidarr: Partial<LidarrConfig> = {};
+    if (body.url !== undefined) lidarr.url = body.url ?? null;
+    if (body.apiKey !== undefined) lidarr.apiKey = body.apiKey ?? null;
     if (body.qualityProfileId !== undefined)
-      update.lidarrQualityProfileId = body.qualityProfileId;
+      lidarr.qualityProfileId = body.qualityProfileId;
     if (body.metadataProfileId !== undefined)
-      update.lidarrMetadataProfileId = body.metadataProfileId;
+      lidarr.metadataProfileId = body.metadataProfileId;
     if (body.rootFolderPath !== undefined)
-      update.lidarrRootFolderPath = body.rootFolderPath;
-    if (Object.keys(update).length > 0) updateServerSettings(update);
+      lidarr.rootFolderPath = body.rootFolderPath;
+    if (Object.keys(lidarr).length > 0) await serverConfig.set({ lidarr });
     return reply.status(204).send();
   });
 
@@ -60,21 +65,21 @@ const lidarrRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   fastify.get("/connectivity", async (_req, reply) => {
-    const settings = getOrCreateServerSettings();
-    if (!settings.lidarrUrl || !settings.lidarrApiKey) {
+    const { lidarr } = serverConfig.get();
+    if (!lidarr.url || !lidarr.apiKey) {
       return reply.status(400).send({ error: "Lidarr not configured" });
     }
-    const client = new LidarrClient(settings.lidarrUrl, settings.lidarrApiKey);
+    const client = new LidarrClient(lidarr.url, lidarr.apiKey);
     const connected = await client.testConnection();
     return reply.send({ connected });
   });
 
   fastify.get("/options", async (req, reply) => {
-    const settings = getOrCreateServerSettings();
-    if (!settings.lidarrUrl || !settings.lidarrApiKey) {
+    const { lidarr } = serverConfig.get();
+    if (!lidarr.url || !lidarr.apiKey) {
       return reply.status(400).send({ error: "Lidarr not configured" });
     }
-    const client = new LidarrClient(settings.lidarrUrl, settings.lidarrApiKey);
+    const client = new LidarrClient(lidarr.url, lidarr.apiKey);
     try {
       const options = await fetchLidarrOptions(client);
       return reply.send(options);

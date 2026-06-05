@@ -1,6 +1,6 @@
 import { FastifyBaseLogger } from "fastify";
 import { LidarrClient, LidarrAlbum } from "./client.js";
-import { getOrCreateServerSettings } from "../db/queries/server-settings.js";
+import { serverConfig } from "../config/server-config.js";
 import {
   getDownloadRequest,
   updateDownloadRequest,
@@ -57,8 +57,8 @@ export async function submitToLidarr(
     "[lidarr] submit start",
   );
 
-  const settings = getOrCreateServerSettings();
-  if (!settings.lidarrUrl || !settings.lidarrApiKey) {
+  const { lidarr } = serverConfig.get();
+  if (!lidarr.url || !lidarr.apiKey) {
     log.warn({ requestId }, "[lidarr] not configured, marking failed");
     updateDownloadRequest(requestId, {
       status: "failed",
@@ -68,9 +68,9 @@ export async function submitToLidarr(
   }
 
   const qualityProfileId =
-    override?.qualityProfileId ?? settings.lidarrQualityProfileId;
-  const metadataProfileId = settings.lidarrMetadataProfileId;
-  const rootFolderPath = settings.lidarrRootFolderPath;
+    override?.qualityProfileId ?? lidarr.qualityProfileId;
+  const metadataProfileId = lidarr.metadataProfileId;
+  const rootFolderPath = lidarr.rootFolderPath;
   if (
     qualityProfileId == null ||
     metadataProfileId == null ||
@@ -108,7 +108,7 @@ export async function submitToLidarr(
     return;
   }
 
-  const client = new LidarrClient(settings.lidarrUrl, settings.lidarrApiKey);
+  const client = new LidarrClient(lidarr.url, lidarr.apiKey);
 
   try {
     log.info(

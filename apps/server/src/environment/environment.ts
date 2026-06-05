@@ -39,6 +39,7 @@ export const EnvironmentSchema = z.object({
   STACCATO_SERVER_LIBRARY_ENRICHMENT_CONCURRENCY: intFromEnv(2, 1),
   STACCATO_SERVER_FPCALC_PATH: z.string().default("fpcalc"),
   STACCATO_SERVER_ACOUSTID_API_KEY: z.string().default(""),
+  STACCATO_SERVER_CONFIG_PATH: z.string().optional(),
   MB_CONCURRENCY: intFromEnv(1, 1),
   MB_INTERVAL_CAP: intFromEnv(1, 1),
   MB_RATE_LIMIT_MS: intFromEnv(1100),
