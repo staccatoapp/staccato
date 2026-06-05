@@ -3,7 +3,7 @@
   "ui": "tui",
   "globalDependencies": [".env*"],
   "globalEnv": ["NODE_ENV"],
-  "globalPassThroughEnv": ["STACCATO_*", "PORT"],
+  "globalPassThroughEnv": ["STACCATO_*", "PORT", "EXPO_*"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
