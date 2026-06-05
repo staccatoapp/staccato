@@ -7,6 +7,8 @@ export const PlaylistListItemSchema = z.object({
   trackCount: z.number(),
   coverArtUrl: z.string().nullable(),
   updatedAt: z.string().nullable(),
+  isMember: z.boolean().optional(),
+  memberEntryId: z.string().nullable().optional(),
 });
 export type PlaylistListItem = z.infer<typeof PlaylistListItemSchema>;
 

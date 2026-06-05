@@ -12,6 +12,7 @@ import {
   getMaxPlaylistTrackPosition,
   getPlaylist,
   getPlaylistCoverArtUrls,
+  getPlaylistMemberships,
   getPlaylistTrackCounts,
   getPlaylistTrackEntry,
   getPlaylistTracks,
@@ -37,11 +38,16 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/", async (req, reply) => {
     const userId = req.userId;
     const parsedQuery = z
-      .object({ limit: z.string().optional(), offset: z.string().optional() })
+      .object({
+        limit: z.string().optional(),
+        offset: z.string().optional(),
+        containsTrackId: z.string().optional(),
+      })
       .safeParse(req.query);
     if (!parsedQuery.success)
       return reply.status(400).send({ error: "Invalid request" });
-    const paginationOptions = parsePagination(parsedQuery.data);
+    const { containsTrackId, ...paginationData } = parsedQuery.data;
+    const paginationOptions = parsePagination(paginationData);
 
     const userPlaylists = getUserPlaylists(userId, paginationOptions);
     const total = countUserPlaylists(userId);
@@ -70,15 +76,28 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
       }
     }
 
+    const membershipByPlaylist = containsTrackId
+      ? getPlaylistMemberships(playlistIds, containsTrackId)
+      : null;
+
     return {
-      items: userPlaylists.map((p) => ({
-        id: p.id,
-        name: p.name,
-        description: p.description,
-        trackCount: countByPlaylist.get(p.id) ?? 0,
-        coverArtUrl: artByPlaylist.get(p.id) ?? null,
-        updatedAt: p.updatedAt?.toISOString() ?? null,
-      })),
+      items: userPlaylists.map((p) => {
+        const base = {
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          trackCount: countByPlaylist.get(p.id) ?? 0,
+          coverArtUrl: artByPlaylist.get(p.id) ?? null,
+          updatedAt: p.updatedAt?.toISOString() ?? null,
+        };
+        if (membershipByPlaylist === null) return base;
+        const entryId = membershipByPlaylist.get(p.id);
+        return {
+          ...base,
+          isMember: entryId !== undefined,
+          memberEntryId: entryId ?? null,
+        };
+      }),
       total,
     };
   });
