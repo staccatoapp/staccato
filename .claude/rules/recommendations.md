@@ -123,8 +123,7 @@ pass before responding. The wire contract is the zod source of truth in
 
 `apps/web/src/hooks/useRecommendations.ts` exposes the TanStack Query hooks `useRecommendedTracks`
 and `useRecommendedPlaylists`. They poll every 5 seconds while `status === "warming"` and
-otherwise hold a 10-minute `staleTime`. Note the deliberate Zod v3/v4 duck-typing workaround
-(`ParseSchema<T>`) documented in that file.
+otherwise hold a 10-minute `staleTime`. Schema parameters are typed as `z.ZodType<T>` (Zod v4).
 
 ## Adding A New Source
 

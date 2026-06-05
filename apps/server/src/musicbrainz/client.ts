@@ -1,7 +1,7 @@
 import PQueue from "p-queue";
 import { APP_USER_AGENT } from "../constants.js";
 import { logger } from "../logger.js";
-import { getConfig } from "../config/config.js";
+import { getEnvironment } from "../environment/environment.js";
 import {
   IdentifySearchResponseSchema,
   MetadataAlbumDetailSchema,
@@ -44,7 +44,7 @@ function parseReleaseYear(date?: string | null): number | null {
   return Number.isNaN(year) ? null : year;
 }
 
-const config = getConfig();
+const config = getEnvironment();
 export const FACADE_BASE = config.STACCATO_METADATA_URL;
 
 // Throttle knobs for the shared MB queue. Defaults match MusicBrainz's public

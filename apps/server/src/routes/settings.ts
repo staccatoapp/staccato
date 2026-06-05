@@ -6,7 +6,7 @@ import {
   getOrCreateUserSettings,
   updateUserSettings,
 } from "../db/queries/settings.js";
-import { getOrCreateServerSettings } from "../db/queries/server-settings.js";
+import { serverConfig } from "../config/server-config.js";
 import { reconcileUserRows } from "../recommendations/eligibility.js";
 import { tick as recommendationTick } from "../recommendations/refresher.js";
 
@@ -115,11 +115,10 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
     return validateToken(token);
   });
 
-  // TODO - refactor once there's dedicated admin server settings routes
   fastify.get("/server", async (_req, reply) => {
-    const settings = getOrCreateServerSettings();
+    const { metadata } = serverConfig.get();
     return reply.send({
-      metadataConfidenceThreshold: settings.metadataConfidenceThreshold,
+      metadataConfidenceThreshold: metadata.confidenceThreshold,
     });
   });
 };

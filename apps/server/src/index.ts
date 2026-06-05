@@ -21,7 +21,7 @@ import recommendationRoutes from "./routes/recommendations.js";
 import downloadRoutes from "./routes/downloads.js";
 import { startLidarrPoller } from "./lidarr/poller.js";
 import { logger } from "./logger.js";
-import { getConfig } from "./config/config.js";
+import { getEnvironment } from "./environment/environment.js";
 import { resetInflightOnBoot } from "./db/queries/recommendation-cache.js";
 import { getAllUserSettings } from "./db/queries/settings.js";
 import { backfillArtistNormalizedNames } from "./db/queries/artists.js";
@@ -70,7 +70,7 @@ app.register(async (protectedApp) => {
   protectedApp.register(downloadRoutes, { prefix: "/api/downloads" });
 });
 
-if (getConfig().STACCATO_ENV !== "development") {
+if (getEnvironment().STACCATO_ENV !== "development") {
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
   app.register(fastifyStatic, {
     root: path.join(__dirname, "../../web/dist"),
@@ -111,7 +111,7 @@ const start = async () => {
     );
   }
 
-  const config = getConfig();
+  const config = getEnvironment();
   const musicDir = config.STACCATO_SERVER_MUSIC_DIR;
   const port = config.PORT;
   await app.listen({ port, host: "0.0.0.0" });

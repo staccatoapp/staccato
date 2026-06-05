@@ -1,20 +1,20 @@
 import pino, { type LoggerOptions } from "pino";
-import { getLogConfig } from "./config/config.js";
+import { getLogEnvironment } from "./environment/environment.js";
 
 const VALID_LEVELS = ["error", "warn", "info", "debug"] as const;
 type LogLevel = (typeof VALID_LEVELS)[number];
 
-const logConfig = getLogConfig();
+const logEnvironment = getLogEnvironment();
 
 function resolveLevel(): LogLevel {
-  const raw = logConfig.STACCATO_LOG_LEVEL.toLowerCase();
+  const raw = logEnvironment.STACCATO_LOG_LEVEL.toLowerCase();
   return (VALID_LEVELS as readonly string[]).includes(raw)
     ? (raw as LogLevel)
     : "info";
 }
 
 const level = resolveLevel();
-const format = logConfig.STACCATO_LOG_FORMAT.toLowerCase();
+const format = logEnvironment.STACCATO_LOG_FORMAT.toLowerCase();
 
 const options: LoggerOptions = {
   level,

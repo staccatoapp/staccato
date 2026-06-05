@@ -1,6 +1,8 @@
-import type { Config } from "../config.js";
+import type { Environment } from "../environment.js";
 
-export function makeTestConfig(overrides: Partial<Config> = {}): Config {
+export function makeTestEnvironment(
+  overrides: Partial<Environment> = {},
+): Environment {
   return {
     STACCATO_ENV: "test",
     PORT: 8280,
