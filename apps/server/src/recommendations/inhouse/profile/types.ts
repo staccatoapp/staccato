@@ -3,7 +3,12 @@ import type { HeardIndex } from "./heard.js";
 
 export interface GenreAffinity {
   genre: string;
-  weight: number;
+  weight: number; // normalised share — drives ORDERING among qualifying genres
+  /** Recency-decayed sum over DISTINCT tracks classified into this genre. Drives
+   * the relevance GATE (Genre Mix's isApplicable) — breadth + currency in one
+   * number, so an abandoned genre fades and a single repeated track can't mint a
+   * mix. See spec §6. */
+  effectiveRecentTracks: number;
 }
 export interface ArtistAffinity {
   artistName: string;

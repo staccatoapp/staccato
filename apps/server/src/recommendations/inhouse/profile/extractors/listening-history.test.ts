@@ -59,6 +59,7 @@ describe("listeningHistoryExtractor", () => {
     expect(profile.genreAffinity?.[0]).toEqual({
       genre: "hip-hop",
       weight: 1,
+      effectiveRecentTracks: 1,
     });
     expect(profile.decadeAffinity?.[0]).toEqual({ decade: 2000, weight: 1 });
     expect(profile.artistAffinity?.[0]!.artistName).toBe("Artist A");
@@ -100,5 +101,78 @@ describe("listeningHistoryExtractor", () => {
     expect(profile.genreAffinity).toEqual([]);
     expect(profile.artistAffinity).toEqual([]);
     expect(profile.heard?.size).toBe(0);
+  });
+});
+
+describe("effectiveRecentTracks (gate metric)", () => {
+  const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+  function aggFixture(
+    over: Partial<
+      import("../../../../db/queries/listening-history.js").ListenAggregate
+    >,
+  ) {
+    return {
+      trackId: "t",
+      recordingMbid: "mbid",
+      title: "Song",
+      artistName: "Artist",
+      artistMbid: "a-mbid",
+      albumId: null,
+      albumTitle: null,
+      releaseGroupMbid: null,
+      releaseYear: null,
+      playCount: 1,
+      lastListenedAtMs: now,
+      ...over,
+    };
+  }
+
+  it("sums recency-decayed contributions over DISTINCT tracks (≈ track count when all fresh)", async () => {
+    mAgg.mockReturnValue([
+      aggFixture({ trackId: "t1", recordingMbid: "m1", lastListenedAtMs: now }),
+      aggFixture({ trackId: "t2", recordingMbid: "m2", lastListenedAtMs: now }),
+    ]);
+    mTags.mockResolvedValue([{ name: "hip-hop", weight: 100 }]);
+
+    const profile = await listeningHistoryExtractor.extract("user-1", ctx);
+    const hipHop = profile.genreAffinity?.find((g) => g.genre === "hip-hop");
+    expect(hipHop?.effectiveRecentTracks).toBeCloseTo(2, 5);
+  });
+
+  it("does not let one obsessively-repeated track inflate breadth (≈ 1 for 50 plays)", async () => {
+    mAgg.mockReturnValue([
+      aggFixture({
+        trackId: "t1",
+        recordingMbid: "m1",
+        playCount: 50,
+        lastListenedAtMs: now,
+      }),
+    ]);
+    mTags.mockResolvedValue([{ name: "hip-hop", weight: 100 }]);
+
+    const profile = await listeningHistoryExtractor.extract("user-1", ctx);
+    const hipHop = profile.genreAffinity?.find((g) => g.genre === "hip-hop");
+    expect(hipHop?.effectiveRecentTracks).toBeCloseTo(1, 5);
+  });
+
+  it("decays an abandoned genre toward zero (tracks last heard ~2 years ago)", async () => {
+    const twoYearsAgo = now - 2 * ONE_YEAR_MS;
+    mAgg.mockReturnValue([
+      aggFixture({
+        trackId: "t1",
+        recordingMbid: "m1",
+        lastListenedAtMs: twoYearsAgo,
+      }),
+      aggFixture({
+        trackId: "t2",
+        recordingMbid: "m2",
+        lastListenedAtMs: twoYearsAgo,
+      }),
+    ]);
+    mTags.mockResolvedValue([{ name: "hip-hop", weight: 100 }]);
+
+    const profile = await listeningHistoryExtractor.extract("user-1", ctx);
+    const hipHop = profile.genreAffinity?.find((g) => g.genre === "hip-hop");
+    expect(hipHop?.effectiveRecentTracks ?? 0).toBeLessThan(0.001);
   });
 });

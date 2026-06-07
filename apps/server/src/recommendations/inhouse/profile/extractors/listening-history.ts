@@ -18,7 +18,7 @@ import type {
   ProfileContext,
   SignalExtractor,
 } from "../types.js";
-import { trackWeight } from "../weighting.js";
+import { recencyDecay, trackWeight } from "../weighting.js";
 
 // How many top affinities seed the adjacency fan-out (keeps Last.fm calls bounded).
 const ADJACENCY_SEED_GENRES = 3;
@@ -70,6 +70,10 @@ export const listeningHistoryExtractor: SignalExtractor = {
     );
 
     const genreScores = new Map<string, number>();
+    // Recency-decayed breadth: sum of per-track decay over DISTINCT tracks in a
+    // genre (one entry per aggregate), independent of the play-count weighting
+    // that drives ordering. Feeds GenreAffinity.effectiveRecentTracks (spec §6).
+    const genreEffective = new Map<string, number>();
     const artistScores = new Map<
       string,
       { affinity: Omit<ArtistAffinity, "weight">; weight: number }
@@ -82,6 +86,8 @@ export const listeningHistoryExtractor: SignalExtractor = {
 
     for (const agg of aggregates) {
       const weight = trackWeight(agg.playCount, agg.lastListenedAtMs, ctx.now);
+      // Distinct-track recency decay (no play-count factor) for the gate metric.
+      const decay = recencyDecay(agg.lastListenedAtMs, ctx.now);
 
       // Genre: distribute the track weight across its blended genre vector.
       const vector = await classifyAggregate(agg);
@@ -91,6 +97,7 @@ export const listeningHistoryExtractor: SignalExtractor = {
             genre,
             (genreScores.get(genre) ?? 0) + weight * share,
           );
+          genreEffective.set(genre, (genreEffective.get(genre) ?? 0) + decay);
         }
       } else {
         ctx.log.debug(
@@ -124,7 +131,11 @@ export const listeningHistoryExtractor: SignalExtractor = {
     }
 
     const genreAffinity: GenreAffinity[] = topNormalised(
-      [...genreScores].map(([genre, weight]) => ({ genre, weight })),
+      [...genreScores].map(([genre, weight]) => ({
+        genre,
+        weight,
+        effectiveRecentTracks: genreEffective.get(genre) ?? 0,
+      })),
     );
     const artistAffinity: ArtistAffinity[] = topNormalised(
       [...artistScores.values()].map((v) => ({

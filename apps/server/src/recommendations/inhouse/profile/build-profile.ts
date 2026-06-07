@@ -1,6 +1,11 @@
 import { listRegisteredExtractors } from "./extractors/registry.js";
 import { buildHeardIndex } from "./heard.js";
 import type { PartialProfile, ProfileContext, TasteProfile } from "./types.js";
+// Side-effect: registers the signal extractors into the registry consumed below
+// (mirrors how eligibility.ts imports sources/index.js next to
+// listRegisteredSources). Without this the registry is empty in production and
+// every profile comes back blank.
+import "./extractors/index.js";
 
 /** Run every eligible signal extractor and merge into a TasteProfile.
  * v1 has a single extractor; the merge below is the seam future extractors

@@ -21,7 +21,12 @@ vi.mock("../lib/rate-limit.js", async (importActual) => {
 });
 
 import { serverConfig } from "../config/server-config.js";
-import { getTopTags, getSimilarTags, getSimilarArtists } from "./client.js";
+import {
+  getTopTags,
+  getSimilarTags,
+  getSimilarArtists,
+  getTopTracksForTag,
+} from "./client.js";
 
 const mockGet = vi.mocked(serverConfig.get);
 
@@ -121,6 +126,64 @@ describe("similarity", () => {
       mockFetchJson({ similarartists: { artist: [{ name: "J. Cole" }] } }),
     );
     expect(await getSimilarArtists("Kendrick Lamar")).toEqual(["J. Cole"]);
+  });
+});
+
+describe("getTopTracksForTag", () => {
+  const body = {
+    tracks: {
+      track: [
+        { name: "Alright", mbid: "mbid-1", artist: { name: "Kendrick Lamar" } },
+        { name: "Nuvole Bianche", mbid: "", artist: { name: "Ludovico" } },
+        { name: "No Artist Mbid", artist: { name: "Someone" } },
+      ],
+    },
+  };
+
+  it("parses tracks in popularity order with mbid null-handling", async () => {
+    const fetchMock = mockFetchJson(body);
+    vi.stubGlobal("fetch", fetchMock);
+
+    const tracks = await getTopTracksForTag("hip-hop");
+
+    expect(tracks).toEqual([
+      { name: "Alright", artist: "Kendrick Lamar", mbid: "mbid-1" },
+      { name: "Nuvole Bianche", artist: "Ludovico", mbid: null },
+      { name: "No Artist Mbid", artist: "Someone", mbid: null },
+    ]);
+    const calledUrl = String(fetchMock.mock.calls[0]![0]);
+    expect(calledUrl).toContain("method=tag.gettoptracks");
+    expect(calledUrl).toContain("tag=hip-hop");
+  });
+
+  it("passes a custom limit", async () => {
+    const fetchMock = mockFetchJson({ tracks: { track: [] } });
+    vi.stubGlobal("fetch", fetchMock);
+    await getTopTracksForTag("jazz", 10);
+    expect(String(fetchMock.mock.calls[0]![0])).toContain("limit=10");
+  });
+
+  it("drops entries with no artist name", async () => {
+    vi.stubGlobal(
+      "fetch",
+      mockFetchJson({
+        tracks: { track: [{ name: "Orphan", mbid: "m" }] },
+      }),
+    );
+    expect(await getTopTracksForTag("ambient")).toEqual([]);
+  });
+
+  it("returns [] on a non-OK response", async () => {
+    vi.stubGlobal("fetch", mockFetchJson({}, false, 500));
+    expect(await getTopTracksForTag("rock")).toEqual([]);
+  });
+
+  it("returns [] and does not fetch when no api key is configured", async () => {
+    configWithKey(null);
+    const fetchMock = mockFetchJson(body);
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await getTopTracksForTag("rock")).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

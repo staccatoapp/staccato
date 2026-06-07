@@ -38,6 +38,19 @@ function apiKey(): string | null {
   return serverConfig.get().lastfm.apiKey;
 }
 
+// Last.fm auth params that must never reach logs. Read methods never set these
+// (the api_key is added to the URL separately, not via `params`), but future
+// signed/write calls — scrobbling's per-user session key `sk` and the `api_sig`
+// signature — would, so redact defensively before logging any param bag.
+const SENSITIVE_PARAM_KEYS = new Set(["api_key", "sk", "api_sig", "token"]);
+function safeParams(params: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(params)) {
+    if (!SENSITIVE_PARAM_KEYS.has(k)) out[k] = v;
+  }
+  return out;
+}
+
 /** Low-level GET against the Last.fm 2.0 API. Returns parsed JSON or null.
  * Never throws. Logs failures object-first with the method for context. */
 async function lfmGet(
@@ -85,7 +98,7 @@ async function lfmGet(
     }
     if (!res.ok) {
       log.warn(
-        { status: res.status, operation: method },
+        { status: res.status, operation: method, params: safeParams(params) },
         "lastfm non-ok response",
       );
       return null;
@@ -133,6 +146,21 @@ const SimilarTagsSchema = z.object({
 const SimilarArtistsSchema = z.object({
   similarartists: z
     .object({ artist: z.array(z.object({ name: z.string() })).optional() })
+    .optional(),
+});
+const TagTopTracksSchema = z.object({
+  tracks: z
+    .object({
+      track: z
+        .array(
+          z.object({
+            name: z.string(),
+            mbid: z.string().optional(),
+            artist: z.object({ name: z.string() }).optional(),
+          }),
+        )
+        .optional(),
+    })
     .optional(),
 });
 
@@ -221,6 +249,35 @@ export async function getSimilarTags(tag: string): Promise<string[]> {
     return [];
   }
   return (parsed.data.similartags?.tag ?? []).map((t) => t.name);
+}
+
+/** Popularity-ranked top tracks for a tag (tag.getTopTracks). The response is
+ * already ranked by Last.fm, so the returned order IS the popularity ranking —
+ * callers derive `popularityRank` from the index, no getPopularity calls needed
+ * (recs spec §7.1/7.2). `mbid` is the recording MBID, null when Last.fm omits or
+ * blanks it. Entries without an artist name are dropped (unresolvable). Empty
+ * array on any failure. */
+export async function getTopTracksForTag(
+  tag: string,
+  limit = 100,
+): Promise<Array<{ name: string; artist: string; mbid: string | null }>> {
+  const body = await lfmGet("tag.gettoptracks", { tag, limit: String(limit) });
+  if (!body) return [];
+  const parsed = TagTopTracksSchema.safeParse(body);
+  if (!parsed.success) {
+    log.warn(
+      { operation: "tag.gettoptracks", err: parsed.error },
+      "lastfm getTopTracksForTag parse failed",
+    );
+    return [];
+  }
+  return (parsed.data.tracks?.track ?? [])
+    .map((t) => ({
+      name: t.name,
+      artist: t.artist?.name ?? "",
+      mbid: t.mbid && t.mbid.length > 0 ? t.mbid : null,
+    }))
+    .filter((t) => t.artist.length > 0);
 }
 
 /** Adjacent artists via artist.getSimilar. Empty on failure. */
