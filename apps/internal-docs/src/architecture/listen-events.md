@@ -18,8 +18,9 @@ target:
 
 - **Local ledger** — `listening_history` is the unconditional, per-user record of "this user
   played this track at this time". It is written for every recorded play regardless of whether any
-  scrobble target is configured. Nothing reads this back yet (see
-  [Current limitations](#current-limitations--future-work)), but the data is captured from day one.
+  scrobble target is configured. Its one reader so far is the in-house recommendations profile
+  foundation (see [Current limitations](#current-limitations--future-work)); the data has been
+  captured from day one.
 - **Per-target delivery status** — each scrobble target gets its own `listen_scrobbles` row
   (`pending` → `delivered`/`failed`), so a future retry job can find the deliveries that haven't
   landed, per target, without a single ListenBrainz-specific flag.
@@ -140,9 +141,10 @@ record per target per listen. Rows cascade-delete with their parent `listening_h
 
 ## Current limitations & future work
 
-- **Write-only.** Nothing in the codebase reads `listening_history` or `listen_scrobbles` today —
-  there is no recently-played view, no listening stats, and no export. The data is captured for
-  future features but currently only flows outward to scrobble targets.
+- **Barely read.** The only reader of `listening_history` is the in-house recommendations profile
+  foundation (`getListenAggregatesForUser`, which aggregates plays per track to build a taste
+  profile); `listen_scrobbles` is still unread. There is no recently-played view, no listening
+  stats, and no export. Otherwise the data flows outward to scrobble targets.
 - **No retry.** A failed scrobble leaves its `listen_scrobbles` row at `failed` (or `pending` if
   the process died mid-submit) and is never retried. The per-target status table is in place to
   support a future replay job, but that job is not yet implemented.

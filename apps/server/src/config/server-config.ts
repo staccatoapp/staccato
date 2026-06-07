@@ -13,6 +13,7 @@ const log = logger.child({ module: "server-config" });
 export const ServerConfigSections = {
   Lidarr: "lidarr",
   Metadata: "metadata",
+  Lastfm: "lastfm",
 } as const;
 export type ServerConfigSection =
   (typeof ServerConfigSections)[keyof typeof ServerConfigSections];
@@ -31,6 +32,12 @@ const MetadataConfigSchema = z.object({
 });
 export type MetadataConfig = z.infer<typeof MetadataConfigSchema>;
 
+const LastfmConfigSchema = z.object({
+  apiKey: z.string().nullable().default(null),
+  secret: z.string().nullable().default(null),
+});
+export type LastfmConfig = z.infer<typeof LastfmConfigSchema>;
+
 const ServerConfigSchema = z.object({
   lidarr: LidarrConfigSchema.default({
     url: null,
@@ -41,6 +48,10 @@ const ServerConfigSchema = z.object({
   }),
   metadata: MetadataConfigSchema.default({
     confidenceThreshold: 0.75,
+  }),
+  lastfm: LastfmConfigSchema.default({
+    apiKey: null,
+    secret: null,
   }),
 });
 export type ServerConfig = z.infer<typeof ServerConfigSchema>;

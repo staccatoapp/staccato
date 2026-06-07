@@ -43,6 +43,12 @@ export const EnvironmentSchema = z.object({
   MB_CONCURRENCY: intFromEnv(1, 1),
   MB_INTERVAL_CAP: intFromEnv(1, 1),
   MB_RATE_LIMIT_MS: intFromEnv(1100),
+  // Last.fm publishes no hard limit (only a "reasonable usage" cap); ~5 req/s
+  // per API key is the community ceiling. Tunable so a throttled deployer can
+  // dial it down. Mirrors the MB_* knobs above.
+  STACCATO_SERVER_LASTFM_CONCURRENCY: intFromEnv(5, 1),
+  STACCATO_SERVER_LASTFM_INTERVAL_CAP: intFromEnv(5, 1),
+  STACCATO_SERVER_LASTFM_RATE_LIMIT_MS: intFromEnv(1000),
 });
 
 export type Environment = z.infer<typeof EnvironmentSchema>;

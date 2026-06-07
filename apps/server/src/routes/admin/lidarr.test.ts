@@ -20,6 +20,10 @@ const defaultConfig: ServerConfig = {
   metadata: {
     confidenceThreshold: 0.75,
   },
+  lastfm: {
+    apiKey: null,
+    secret: null,
+  },
 };
 
 describe("GET /", () => {

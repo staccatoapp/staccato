@@ -87,9 +87,11 @@ it's a new integration), and register it in `scrobbling/targets/index.ts`. No ch
 
 ## Current Limitations
 
-The `listening_history` table is currently **write-only**: nothing in the codebase reads it (no
-stats, recently-played, or export features yet). Submissions are single listens only — there is
-no batching or `listenType: "import"`. A retry job that would replay `listen_scrobbles` rows stuck
+The `listening_history` table has one reader: the in-house recommendations profile foundation
+(`getListenAggregatesForUser` in `db/queries/listening-history.ts`, see [[recommendations]])
+aggregates it per track to build a taste profile. There is still no recently-played view, listening
+stats, or export. Submissions are single listens only — there is no batching or
+`listenType: "import"`. A retry job that would replay `listen_scrobbles` rows stuck
 at `pending`/`failed` (e.g. after a transient target failure) is not yet implemented — the
 per-target status table is in place to support one, but a failed scrobble is currently never
 automatically retried.

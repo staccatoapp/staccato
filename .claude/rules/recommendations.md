@@ -1,10 +1,14 @@
 ---
 paths:
   - "apps/server/src/recommendations/**/*.ts"
+  - "apps/server/src/lastfm/**/*.ts"
   - "apps/server/src/routes/recommendations.ts"
   - "apps/server/src/routes/settings.ts"
   - "apps/server/src/db/queries/recommendation-cache.ts"
+  - "apps/server/src/db/queries/lastfm-cache.ts"
   - "apps/server/src/db/schema/recommendation-cache.ts"
+  - "apps/server/src/db/schema/lastfm-tags.ts"
+  - "apps/server/src/db/schema/lastfm-popularity.ts"
   - "apps/web/src/hooks/useRecommendations.ts"
 ---
 
@@ -54,6 +58,51 @@ Two concrete sources exist, both with `id` `"listenbrainz"`:
 Both sources call `getTracksByMusicbrainzIds` first to short-circuit MusicBrainz lookups and
 enrichment for recordings already in the local library, and both validate their output against the
 shared zod schema (`RecommendedTrackSchema` / `RecommendedPlaylistSchema`) before it is cached.
+
+## In-House Profile Foundation (Last.fm)
+
+An in-house, Last.fm-backed engine is being built to generate personalised themed playlists from
+the user's own listening history, alongside the external ListenBrainz sources. Only its
+**foundation** exists so far (sub-project 1): there is no generator, no `RecommendationSource`
+registration, and nothing served yet — generation and serving are a later sub-project. What exists
+today is internal infrastructure under `apps/server/src/recommendations/inhouse/profile/` plus a
+Last.fm read client under `apps/server/src/lastfm/`.
+
+The Last.fm client (`lastfm/client.ts`) is a rate-limited read client mirroring the MusicBrainz
+client's `p-queue` pattern. Last.fm publishes no hard limit (only a "reasonable usage" cap), so the
+client defaults to ~5 req/s per key with no bursting, tunable via `STACCATO_SERVER_LASTFM_*` env
+vars, and on an HTTP 429 or Last.fm error-code 29 it pauses all outbound calls for a cooldown
+window — growing exponentially per consecutive hit, honouring `Retry-After` — via a generic,
+instance-based backoff gate (`lib/rate-limit.ts`, `createRateLimitGate`) reusable by any external
+client. The key is
+per-deployment (the admin registers their own Last.fm API account), so the usage cap is per-instance
+— Staccato never bundles a shared key. It reads the application `api_key` from
+`serverConfig.get().lastfm.apiKey` — a **server-global** secret in `serverConfig` (not a per-user
+credential), because public Last.fm reads need only the app key. It exposes `getTopTags`
+(track/album/artist), `getPopularity`, and `getSimilarTags`/`getSimilarArtists`, each addressing
+the entity by MBID when present and falling back to artist+name otherwise, and parsing Last.fm's
+loosely-typed JSON defensively. Two shared (no `user_id`) durable cache tables back it:
+`lastfm_tags` and `lastfm_popularity`, each keyed by `(entityType, entityKey)` where `entityKey`
+is the MBID or a normalised `artist|title` name key, with a `fetchedAt` epoch-ms TTL. The
+cache-through helper `lastfm/tag-cache.ts` (`getTagsCached`, 30-day TTL) sits between the client
+and `db/queries/lastfm-cache.ts`.
+
+The profile layer turns listening history into a taste profile. `getListenAggregatesForUser`
+(`db/queries/listening-history.ts`) is the first reader of `listening_history`: it aggregates rows
+per track (play count, max listened-at converted to ms) joined with track/artist/album metadata.
+Pure modules compute the signal: `genre-blend.ts` blends Last.fm tags across track/album/artist
+levels weighted by level specificity (track strongest, artist weakest — no hard artist fallback),
+drops sub-threshold noise, and returns a normalised genre vector or null (unclassified);
+`weighting.ts` applies play-count × exponential recency decay; `heard.ts` builds an MBID-keyed
+heard-index (`isHeard`/`playCount`/`lastPlayed`). A pluggable **signal-extractor** registry
+(`profile/extractors/registry.ts`, `registerExtractor`/`listRegisteredExtractors`, mirroring the
+source registry) is the future-metrics seam; v1 ships exactly one extractor, `listening-history`,
+which produces genre/artist/album/decade affinity plus an adjacency set (neighbours via
+`getSimilar`, excluding existing top affinities). `build-profile.ts` (`buildTasteProfile`) runs
+every eligible extractor and merges their partials into a `TasteProfile`. The profile is a plain
+internal typed object recomputed on demand — it never crosses an app boundary and is not persisted
+(only the `lastfm_*` caches persist). There is intentionally no standalone `lastfm` rule; the
+client is documented here as part of recommendations.
 
 ## Refresher
 
