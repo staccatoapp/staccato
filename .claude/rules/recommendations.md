@@ -127,16 +127,27 @@ The shared resolution pass (`inhouse/resolution/resolve.ts`) turns all generator
 `RecommendedPlaylist`s in one batched pass mirroring `listenbrainz-playlists.ts`: it name-resolves
 **every** candidate by `(artist, title)` through `resolveRecordingByName` (the evidence-free
 importer-nucleus core extracted from `library/candidates/fromSearch.ts`) scored with
-`scoreCandidates`/`pickWinner` and accepted only at `RECS_RESOLUTION_THRESHOLD` (~0.70, below the
-importer's 0.85 because Last.fm candidates lack duration/AcoustID and favour yield). The Last.fm
-candidate mbid is deliberately **not trusted** for resolution: it superseded the original
-trust-the-mbid policy (spec decision E4) after live testing showed Last.fm mbids are too flaky —
-a large share are non-MusicBrainz (version-3 UUIDs) or stale/merged ids that 404, and even ones that
-resolve can point at the wrong recording — so the scored mirror search is the reliable signal and
-also yields a canonical mbid that sharpens in-library detection. It then batch-looks-up the local
-library on the resolved mbids, batch-enriches the non-local remainder via `lookupRecording` plus
-per-release-group cover art, and assembles each spec preserving order minus drops (an all-dropped
-playlist is not served). It logs a per-playlist `resolved X of Y` summary so yield is observable. The source (`inhouse/source.ts`, `id` `"inhouse"`, kind
+`scoreCandidates`, then picks a winner per `(artist, title)` via `selectWinner`, accepted only at
+`RECS_RESOLUTION_THRESHOLD` (~0.70, below the importer's 0.85 because Last.fm candidates lack
+duration/AcoustID and favour yield). The Last.fm candidate mbid is deliberately **not trusted** for
+resolution: it superseded the original trust-the-mbid policy (spec decision E4) after live testing
+showed Last.fm mbids are too flaky — a large share are non-MusicBrainz (version-3 UUIDs) or
+stale/merged ids that 404, and even ones that resolve can point at the wrong recording — so the
+scored mirror search is the reliable signal and also yields a canonical mbid that sharpens in-library
+detection. Because Last.fm candidates have no duration, every same-title recording ties on score, so
+`selectWinner` breaks ties (still under E4) by a strict priority: **(1) a recording already in the
+local library** — the only reliable ownership signal, since a song may be owned as an album OR a
+compilation, so release type cannot stand in for ownership; **(2) the most canonical release** (clean
+Official Album over compilation/DJ-mix, via a `releaseRank` mirroring the importer's
+`pickCanonicalRelease`), strictly below ownership so it never overrides a real library hit and only
+decides display quality for not-owned discovery tracks; then **(3) score, then search order**. This
+converges an owned song onto the same recording the importer committed (via AcoustID), fixing the
+false "not in library" the old take-the-top-search-hit tiebreak produced when MusicBrainz ranked a
+compilation cut first. To feed (1), it runs **one** batched `getTracksByMusicbrainzIds` over the full
+candidate superset (every search hit, not just winners), reused both for the ownership tiebreak and
+to short-circuit enrichment for owned winners. It then batch-enriches the non-local remainder via
+`lookupRecording` plus per-release-group cover art, and assembles each spec preserving order minus
+drops (an all-dropped playlist is not served). It logs a per-playlist `resolved X of Y` summary so yield is observable. The source (`inhouse/source.ts`, `id` `"inhouse"`, kind
 `playlists`, refresh 24h, empty-retry 1h) ties it together: `isEligible` reads
 `serverConfig.get().lastfm.apiKey` (the credential is server-global, so eligibility ignores the user
 row), `buildContext` carries `userId` for profile identity, and `fetch` runs
@@ -191,6 +202,23 @@ using `getLocalTrackMbidsByMbids` / `getTracksByMusicbrainzIds`. This is intenti
 a track can transition into the local library at any time (download completion, library scan,
 manual import), so the live DB is the only correct source for whether the UI shows "play now" vs.
 "request download".
+
+This pass is the **source-agnostic** seam (every source flows through it), so it also carries a
+**song-level fallback** for the recording-granularity mismatch that the inhouse `selectWinner` fix
+cannot reach: a source may resolve a song to a *different MusicBrainz recording* than the one the
+importer committed (the importer matches by AcoustID; ListenBrainz trusts its own MBID and never
+name-searches, so `selectWinner` never runs for it). When the exact recording-MBID lookup misses
+and the recommendation carries an `artistMbid`, the pass matches on `(artistMbid, normalized title)`
+against the library via `getLibraryTracksByArtistMbids`, which returns **both** the raw tag title and
+the MusicBrainz canonical title — they routinely disagree (e.g. raw "3005" vs canonical "V. 3005",
+and a name search only surfaces "V. 3005", which scores ~0.69 and is rejected by the importer-nucleus
+threshold — why `selectWinner` alone misses this), and the source may have used either form, so each
+library track is indexed under both. The match is deliberately conservative — **exact** normalized
+title plus `artistMbid` — so remixes/live cuts ("3005 (Friction Remix)") do not collide, and on a hit
+it only flips `inLibrary` (+ `localTrackId` for playlists); the displayed album/cover are left as the
+source resolved them (play uses `localTrackId`). It complements the inhouse resolution fix
+(`selectWinner`) rather than replacing it: that fix still converges owned songs onto the library
+recording at resolution time and sharpens not-owned display, while this is the universal safety net.
 
 ## Serving
 

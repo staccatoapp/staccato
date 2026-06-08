@@ -5,7 +5,6 @@ vi.mock("../../../library/candidates/fromSearch.js", () => ({
 }));
 vi.mock("../../../library/scoring.js", () => ({
   scoreCandidates: vi.fn(),
-  pickWinner: vi.fn(),
 }));
 vi.mock("../../../db/queries/tracks.js", () => ({
   getTracksByMusicbrainzIds: vi.fn(),
@@ -19,7 +18,7 @@ vi.mock("../../../coverart/store.js", () => ({
 }));
 
 import { resolveRecordingByName } from "../../../library/candidates/fromSearch.js";
-import { pickWinner, scoreCandidates } from "../../../library/scoring.js";
+import { scoreCandidates } from "../../../library/scoring.js";
 import { getTracksByMusicbrainzIds } from "../../../db/queries/tracks.js";
 import { lookupRecording } from "../../../musicbrainz/client.js";
 import { ensureCoverOnDisk } from "../../../coverart/store.js";
@@ -31,7 +30,6 @@ import { RECS_RESOLUTION_THRESHOLD, resolvePlaylists } from "./resolve.js";
 
 const mResolveByName = vi.mocked(resolveRecordingByName);
 const mScore = vi.mocked(scoreCandidates);
-const mPick = vi.mocked(pickWinner);
 const mLocal = vi.mocked(getTracksByMusicbrainzIds);
 const mLookup = vi.mocked(lookupRecording);
 const mCover = vi.mocked(ensureCoverOnDisk);
@@ -98,7 +96,7 @@ function localTrack(
 function resolvesTo(map: Record<string, { mbid: string; score: number }>) {
   mResolveByName.mockImplementation(async ({ title }) => {
     const hit = map[title];
-    return hit ? [{ recordingMbid: hit.mbid } as never] : [];
+    return hit ? [{ recordingMbid: hit.mbid, releases: [] } as never] : [];
   });
   mScore.mockImplementation(
     (cands) =>
@@ -111,12 +109,59 @@ function resolvesTo(map: Record<string, { mbid: string; score: number }>) {
   );
 }
 
+/** A minimal release candidate (Official studio Album by default); override
+ * `secondaryTypes`/`status`/`primaryType` to model compilations, DJ-mixes, etc. */
+function release(over: Record<string, unknown> = {}) {
+  return {
+    releaseMbid: "rel-1",
+    releaseGroupMbid: "rel-rg",
+    title: "Release",
+    date: null,
+    country: null,
+    status: "Official",
+    primaryType: "Album",
+    secondaryTypes: [],
+    mediaFormats: [],
+    ...over,
+  };
+}
+
+/**
+ * Like {@link resolvesTo} but a title resolves to *several* scored candidates
+ * (in search order), each carrying its own releases — exercising the winner
+ * tiebreak (in-library first, then canonical release type, then score).
+ */
+function resolvesToMany(
+  map: Record<
+    string,
+    Array<{ mbid: string; score: number; releases?: unknown[] }>
+  >,
+) {
+  mResolveByName.mockImplementation(async ({ title }) => {
+    const list = map[title];
+    return list
+      ? (list.map((c) => ({
+          recordingMbid: c.mbid,
+          releases: c.releases ?? [],
+        })) as never)
+      : [];
+  });
+  mScore.mockImplementation(
+    (cands) =>
+      cands.map((c) => {
+        const entry = Object.values(map)
+          .flat()
+          .find((m) => m.mbid === c.recordingMbid);
+        return { ...c, score: entry?.score ?? 0 };
+      }) as never,
+  );
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mLocal.mockReturnValue(new Map());
   mLookup.mockResolvedValue(null);
   mCover.mockResolvedValue(null);
-  mPick.mockImplementation((scored) => scored[0] ?? null);
 });
 
 describe("resolvePlaylists", () => {
@@ -271,5 +316,83 @@ describe("resolvePlaylists", () => {
 
     expect(out[0]!.tracks[0]!.coverArtUrl).toBeNull();
     expect(out[0]!.coverArtUrl).toBe("/metadata/covers/rg-2.jpg");
+  });
+
+  it("resolves to the owned recording even when MusicBrainz ranks another first", async () => {
+    // Both recordings of the song tie on score (no duration to separate them);
+    // MB returns the compilation cut first, but the album cut is the one owned.
+    resolvesToMany({
+      "Track 0": [
+        {
+          mbid: "comp",
+          score: 0.786,
+          releases: [release({ secondaryTypes: ["Compilation"] })],
+        },
+        { mbid: "album", score: 0.786, releases: [release()] },
+      ],
+    });
+    mLocal.mockReturnValue(
+      new Map([["album", localTrack({ trackId: "t-own" })]]),
+    );
+
+    const out = await resolvePlaylists(
+      [spec([cand({ popularityRank: 0 })])],
+      log,
+    );
+
+    expect(mLookup).not.toHaveBeenCalled(); // owned → no enrichment
+    expect(out[0]!.tracks[0]!.recordingMbid).toBe("album");
+    expect(out[0]!.tracks[0]!.inLibrary).toBe(true);
+    expect(out[0]!.tracks[0]!.localTrackId).toBe("t-own");
+  });
+
+  it("prefers the canonical album over a compilation when neither is owned", async () => {
+    resolvesToMany({
+      "Track 0": [
+        {
+          mbid: "comp",
+          score: 0.786,
+          releases: [release({ secondaryTypes: ["Compilation"] })],
+        },
+        { mbid: "album", score: 0.786, releases: [release()] },
+      ],
+    });
+    mLookup.mockImplementation(async (mbid) =>
+      recording({ recordingMbid: mbid }),
+    );
+
+    const out = await resolvePlaylists(
+      [spec([cand({ popularityRank: 0 })])],
+      log,
+    );
+
+    expect(out[0]!.tracks[0]!.recordingMbid).toBe("album");
+    expect(out[0]!.tracks[0]!.inLibrary).toBe(false);
+  });
+
+  it("ownership outranks release type: an owned compilation beats an unowned album", async () => {
+    // The clean album is listed first and is more canonical, but the user only
+    // owns the compilation cut — ownership must still win (option 1 over 2).
+    resolvesToMany({
+      "Track 0": [
+        { mbid: "album", score: 0.786, releases: [release()] },
+        {
+          mbid: "owned-comp",
+          score: 0.786,
+          releases: [release({ secondaryTypes: ["Compilation"] })],
+        },
+      ],
+    });
+    mLocal.mockReturnValue(
+      new Map([["owned-comp", localTrack({ trackId: "t-comp" })]]),
+    );
+
+    const out = await resolvePlaylists(
+      [spec([cand({ popularityRank: 0 })])],
+      log,
+    );
+
+    expect(out[0]!.tracks[0]!.recordingMbid).toBe("owned-comp");
+    expect(out[0]!.tracks[0]!.inLibrary).toBe(true);
   });
 });
