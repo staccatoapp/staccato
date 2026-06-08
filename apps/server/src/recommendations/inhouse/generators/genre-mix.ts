@@ -1,10 +1,6 @@
 import type { TasteProfile } from "../profile/types.js";
-import type {
-  Candidate,
-  Generator,
-  GeneratorContext,
-  PlaylistSpec,
-} from "./types.js";
+import { blendCandidates } from "./blend.js";
+import type { Generator, GeneratorContext, PlaylistSpec } from "./types.js";
 
 // Tunable starting values — tune against real yield/relevance data (recs spec §7.4).
 export const GENRE_MIX_MIN_RECENT_TRACKS = 3;
@@ -66,8 +62,10 @@ export const genreMixGenerator: Generator = {
           );
           return null;
         }
-        const ordered = downWeightHeard(candidates, ctx).slice(
-          0,
+        const ordered = blendCandidates(
+          [{ candidates }],
+          ctx.heard,
+          "downweight",
           GENRE_MIX_TARGET_TRACKS,
         );
         return {
@@ -82,19 +80,3 @@ export const genreMixGenerator: Generator = {
     return specs.filter((s): s is PlaylistSpec => s !== null);
   },
 };
-
-/** Order popularity-ranked candidates with heard tracks sunk behind unheard,
- * preserving popularity order within each group. mbid-less candidates can't be
- * heard-matched, so they count as unheard. */
-function downWeightHeard(
-  candidates: Candidate[],
-  ctx: GeneratorContext,
-): Candidate[] {
-  const unheard: Candidate[] = [];
-  const heard: Candidate[] = [];
-  for (const c of candidates) {
-    if (c.mbid && ctx.heard.isHeard(c.mbid)) heard.push(c);
-    else unheard.push(c);
-  }
-  return [...unheard, ...heard];
-}

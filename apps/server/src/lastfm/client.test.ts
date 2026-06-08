@@ -26,6 +26,7 @@ import {
   getSimilarTags,
   getSimilarArtists,
   getTopTracksForTag,
+  getTopTracksForArtist,
 } from "./client.js";
 
 const mockGet = vi.mocked(serverConfig.get);
@@ -183,6 +184,79 @@ describe("getTopTracksForTag", () => {
     const fetchMock = mockFetchJson(body);
     vi.stubGlobal("fetch", fetchMock);
     expect(await getTopTracksForTag("rock")).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("getTopTracksForArtist", () => {
+  const body = {
+    toptracks: {
+      track: [
+        { name: "HUMBLE.", mbid: "rec-1", artist: { name: "Kendrick Lamar" } },
+        { name: "DNA.", mbid: "", artist: { name: "Kendrick Lamar" } },
+        { name: "No Mbid", artist: { name: "Kendrick Lamar" } },
+      ],
+    },
+  };
+
+  it("parses tracks in popularity order with mbid null-handling", async () => {
+    const fetchMock = mockFetchJson(body);
+    vi.stubGlobal("fetch", fetchMock);
+
+    const tracks = await getTopTracksForArtist({ artist: "Kendrick Lamar" });
+
+    expect(tracks).toEqual([
+      { name: "HUMBLE.", artist: "Kendrick Lamar", mbid: "rec-1" },
+      { name: "DNA.", artist: "Kendrick Lamar", mbid: null },
+      { name: "No Mbid", artist: "Kendrick Lamar", mbid: null },
+    ]);
+    const calledUrl = String(fetchMock.mock.calls[0]![0]);
+    expect(calledUrl).toContain("method=artist.gettoptracks");
+    expect(calledUrl).toContain("artist=Kendrick+Lamar");
+    expect(calledUrl).not.toContain("mbid=");
+  });
+
+  it("addresses by mbid when present, not by name", async () => {
+    const fetchMock = mockFetchJson({ toptracks: { track: [] } });
+    vi.stubGlobal("fetch", fetchMock);
+    await getTopTracksForArtist({ mbid: "artist-mbid", artist: "Kendrick" });
+    const calledUrl = String(fetchMock.mock.calls[0]![0]);
+    expect(calledUrl).toContain("mbid=artist-mbid");
+    expect(calledUrl).not.toContain("artist=Kendrick");
+  });
+
+  it("passes a custom limit", async () => {
+    const fetchMock = mockFetchJson({ toptracks: { track: [] } });
+    vi.stubGlobal("fetch", fetchMock);
+    await getTopTracksForArtist({ artist: "X" }, 10);
+    expect(String(fetchMock.mock.calls[0]![0])).toContain("limit=10");
+  });
+
+  it("drops entries with no artist name", async () => {
+    vi.stubGlobal(
+      "fetch",
+      mockFetchJson({ toptracks: { track: [{ name: "Orphan", mbid: "m" }] } }),
+    );
+    expect(await getTopTracksForArtist({ artist: "X" })).toEqual([]);
+  });
+
+  it("returns [] on a non-OK response", async () => {
+    vi.stubGlobal("fetch", mockFetchJson({}, false, 500));
+    expect(await getTopTracksForArtist({ artist: "X" })).toEqual([]);
+  });
+
+  it("returns [] and does not fetch when no api key is configured", async () => {
+    configWithKey(null);
+    const fetchMock = mockFetchJson(body);
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await getTopTracksForArtist({ artist: "X" })).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("returns [] when ref has neither mbid nor artist (no fetch)", async () => {
+    const fetchMock = mockFetchJson(body);
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await getTopTracksForArtist({})).toEqual([]);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

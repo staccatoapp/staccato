@@ -86,9 +86,7 @@ export function refreshPlaylistsInLibrary(
     }
   }
   const localMap =
-    allMbids.length === 0
-      ? new Map()
-      : getTracksByMusicbrainzIds(allMbids);
+    allMbids.length === 0 ? new Map() : getTracksByMusicbrainzIds(allMbids);
 
   // Song-level fallback only for the tracks the exact MBID match missed.
   const unmatched = playlists.flatMap((p) =>

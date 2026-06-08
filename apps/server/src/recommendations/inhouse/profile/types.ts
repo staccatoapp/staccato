@@ -1,28 +1,31 @@
 import type { FastifyBaseLogger } from "fastify";
 import type { HeardIndex } from "./heard.js";
 
-export interface GenreAffinity {
-  genre: string;
-  weight: number; // normalised share — drives ORDERING among qualifying genres
-  /** Recency-decayed sum over DISTINCT tracks classified into this genre. Drives
-   * the relevance GATE (Genre Mix's isApplicable) — breadth + currency in one
-   * number, so an abandoned genre fades and a single repeated track can't mint a
-   * mix. See spec §6. */
+/** Shared by every affinity type. `weight` is the normalised relative share
+ * (each score ÷ the type's total, summing to 1.0) — it is *relative*, so a thin
+ * history still shows high weight on its one or two entries; therefore weight can
+ * only ORDER / proportion, never gate. `effectiveRecentTracks` is the *absolute*
+ * recency-decayed count of DISTINCT contributing tracks, so it is the GATE
+ * (cold-start + relevance + currency in one number): one repeated track can't
+ * mint a mix (breadth), and an abandoned entity fades (recency). See spec §4/§6,
+ * decision E8. */
+export interface Affinity {
+  weight: number;
   effectiveRecentTracks: number;
 }
-export interface ArtistAffinity {
+export interface GenreAffinity extends Affinity {
+  genre: string;
+}
+export interface ArtistAffinity extends Affinity {
   artistName: string;
   artistMbid: string | null;
-  weight: number;
 }
-export interface AlbumAffinity {
+export interface AlbumAffinity extends Affinity {
   albumId: string;
   albumTitle: string;
-  weight: number;
 }
-export interface DecadeAffinity {
+export interface DecadeAffinity extends Affinity {
   decade: number; // e.g. 2000
-  weight: number;
 }
 export interface AdjacencySet {
   tags: string[];
@@ -32,7 +35,10 @@ export interface AdjacencySet {
 /** The per-user taste profile, recomputed each refresh (not persisted). */
 export interface TasteProfile {
   userId: string;
-  genreAffinity: GenreAffinity[]; // normalised, descending
+  // All affinity vectors are normalised and sorted by weight descending (the
+  // `topNormalised` helper in the listening-history extractor guarantees this),
+  // so consumers can take the dominant entries by slicing from the front.
+  genreAffinity: GenreAffinity[];
   artistAffinity: ArtistAffinity[];
   albumAffinity: AlbumAffinity[];
   decadeAffinity: DecadeAffinity[];

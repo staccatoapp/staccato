@@ -31,6 +31,7 @@ function ctx(
   return {
     candidateService: {
       popularTracksForTag: vi.fn(async (tag: string) => popular(tag)),
+      topTracksForArtist: vi.fn(async () => []),
     },
     heard: buildHeardIndex(
       heardMbids.map((mbid) => ({

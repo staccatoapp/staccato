@@ -169,9 +169,7 @@ describe("refreshTracksInLibrary", () => {
 
 describe("refreshPlaylistsInLibrary", () => {
   it("sets inLibrary + localTrackId on an exact match", () => {
-    mTracksByMbids.mockReturnValue(
-      new Map([["rec-1", localDetail("lt-1")]]),
-    );
+    mTracksByMbids.mockReturnValue(new Map([["rec-1", localDetail("lt-1")]]));
     const out = refreshPlaylistsInLibrary([
       playlist([plTrack({ recordingMbid: "rec-1" })]),
     ]);
@@ -206,7 +204,9 @@ describe("refreshPlaylistsInLibrary", () => {
     mTracksByMbids.mockReturnValue(
       new Map([["rec-1", localDetail("exact-id")]]),
     );
-    mByArtist.mockReturnValue([libSong({ trackId: "song-id", title: "Title" })]);
+    mByArtist.mockReturnValue([
+      libSong({ trackId: "song-id", title: "Title" }),
+    ]);
     const out = refreshPlaylistsInLibrary([
       playlist([plTrack({ recordingMbid: "rec-1", title: "Title" })]),
     ]);

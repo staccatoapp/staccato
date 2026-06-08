@@ -163,6 +163,21 @@ const TagTopTracksSchema = z.object({
     })
     .optional(),
 });
+const ArtistTopTracksSchema = z.object({
+  toptracks: z
+    .object({
+      track: z
+        .array(
+          z.object({
+            name: z.string(),
+            mbid: z.string().optional(),
+            artist: z.object({ name: z.string() }).optional(),
+          }),
+        )
+        .optional(),
+    })
+    .optional(),
+});
 
 function methodFor(
   entityType: LastfmEntityType,
@@ -272,6 +287,40 @@ export async function getTopTracksForTag(
     return [];
   }
   return (parsed.data.tracks?.track ?? [])
+    .map((t) => ({
+      name: t.name,
+      artist: t.artist?.name ?? "",
+      mbid: t.mbid && t.mbid.length > 0 ? t.mbid : null,
+    }))
+    .filter((t) => t.artist.length > 0);
+}
+
+/** Popularity-ranked top tracks for an artist (artist.getTopTracks). Like
+ * getTopTracksForTag, the response is already ranked, so the returned order IS
+ * the popularity ranking — callers derive `popularityRank` from the index. The
+ * artist is addressed by MBID when present, else by name (refParams), mirroring
+ * getTopTags. `mbid` is the recording MBID, null when Last.fm omits/blanks it.
+ * Entries without an artist name are dropped. Empty array on any failure. */
+export async function getTopTracksForArtist(
+  ref: LastfmEntityRef,
+  limit = 100,
+): Promise<Array<{ name: string; artist: string; mbid: string | null }>> {
+  const params = refParams("artist", ref);
+  if (!params) return [];
+  const body = await lfmGet("artist.gettoptracks", {
+    ...params,
+    limit: String(limit),
+  });
+  if (!body) return [];
+  const parsed = ArtistTopTracksSchema.safeParse(body);
+  if (!parsed.success) {
+    log.warn(
+      { operation: "artist.gettoptracks", err: parsed.error },
+      "lastfm getTopTracksForArtist parse failed",
+    );
+    return [];
+  }
+  return (parsed.data.toptracks?.track ?? [])
     .map((t) => ({
       name: t.name,
       artist: t.artist?.name ?? "",

@@ -76,13 +76,25 @@ export const listeningHistoryExtractor: SignalExtractor = {
     const genreEffective = new Map<string, number>();
     const artistScores = new Map<
       string,
-      { affinity: Omit<ArtistAffinity, "weight">; weight: number }
+      {
+        affinity: Pick<ArtistAffinity, "artistName" | "artistMbid">;
+        weight: number;
+      }
     >();
+    // Per-aggregate recency decay over DISTINCT tracks, mirroring genreEffective —
+    // the absolute breadth+currency GATE metric (spec §4/§6). Keyed exactly like
+    // the matching *Scores map so the value joins back at build time.
+    const artistEffective = new Map<string, number>();
     const albumScores = new Map<
       string,
-      { affinity: Omit<AlbumAffinity, "weight">; weight: number }
+      {
+        affinity: Pick<AlbumAffinity, "albumId" | "albumTitle">;
+        weight: number;
+      }
     >();
+    const albumEffective = new Map<string, number>();
     const decadeScores = new Map<number, number>();
+    const decadeEffective = new Map<number, number>();
 
     for (const agg of aggregates) {
       const weight = trackWeight(agg.playCount, agg.lastListenedAtMs, ctx.now);
@@ -113,6 +125,7 @@ export const listeningHistoryExtractor: SignalExtractor = {
         affinity: { artistName: agg.artistName, artistMbid: agg.artistMbid },
         weight: (aPrev?.weight ?? 0) + weight,
       });
+      artistEffective.set(aKey, (artistEffective.get(aKey) ?? 0) + decay);
 
       // Album affinity.
       if (agg.albumId && agg.albumTitle) {
@@ -121,12 +134,17 @@ export const listeningHistoryExtractor: SignalExtractor = {
           affinity: { albumId: agg.albumId, albumTitle: agg.albumTitle },
           weight: (alPrev?.weight ?? 0) + weight,
         });
+        albumEffective.set(
+          agg.albumId,
+          (albumEffective.get(agg.albumId) ?? 0) + decay,
+        );
       }
 
       // Decade affinity.
       if (agg.releaseYear != null) {
         const decade = Math.floor(agg.releaseYear / 10) * 10;
         decadeScores.set(decade, (decadeScores.get(decade) ?? 0) + weight);
+        decadeEffective.set(decade, (decadeEffective.get(decade) ?? 0) + decay);
       }
     }
 
@@ -138,19 +156,25 @@ export const listeningHistoryExtractor: SignalExtractor = {
       })),
     );
     const artistAffinity: ArtistAffinity[] = topNormalised(
-      [...artistScores.values()].map((v) => ({
+      [...artistScores.entries()].map(([key, v]) => ({
         ...v.affinity,
         weight: v.weight,
+        effectiveRecentTracks: artistEffective.get(key) ?? 0,
       })),
     );
     const albumAffinity: AlbumAffinity[] = topNormalised(
-      [...albumScores.values()].map((v) => ({
+      [...albumScores.entries()].map(([albumId, v]) => ({
         ...v.affinity,
         weight: v.weight,
+        effectiveRecentTracks: albumEffective.get(albumId) ?? 0,
       })),
     );
     const decadeAffinity: DecadeAffinity[] = topNormalised(
-      [...decadeScores].map(([decade, weight]) => ({ decade, weight })),
+      [...decadeScores].map(([decade, weight]) => ({
+        decade,
+        weight,
+        effectiveRecentTracks: decadeEffective.get(decade) ?? 0,
+      })),
     );
 
     // Adjacency: neighbours of the top affinities, excluding existing top picks.

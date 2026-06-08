@@ -10,8 +10,8 @@ import { listRegisteredGenerators } from "./generators/registry.js";
 import type { PlaylistSpec } from "./generators/types.js";
 import { resolvePlaylists } from "./resolution/resolve.js";
 import { buildTasteProfile } from "./profile/build-profile.js";
-// Side-effect: registers Genre Mix into the generator registry (mirrors how
-// sources/index.ts self-registers sources).
+// Side-effect: registers all in-house generators into the generator registry
+// (mirrors how sources/index.ts self-registers sources).
 import "./generators/index.js";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
