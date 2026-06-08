@@ -74,3 +74,12 @@ export const RecommendedTracksResponseSchema = recommendationsResponseSchema(
 export const RecommendedPlaylistsResponseSchema = recommendationsResponseSchema(
   z.array(RecommendedPlaylistSchema),
 );
+
+// SP3 playlist track-suggestions reuse the playlist-track shape (preview by
+// recordingMbid needs no payload field; localTrackId/inLibrary drive add/play).
+export type PlaylistSuggestionsResponse = RecommendationsResponse<
+  RecommendedPlaylistTrack[]
+>;
+export const PlaylistSuggestionsResponseSchema = recommendationsResponseSchema(
+  z.array(RecommendedPlaylistTrackSchema),
+);

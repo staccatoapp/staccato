@@ -27,6 +27,7 @@ import {
   getSimilarArtists,
   getTopTracksForTag,
   getTopTracksForArtist,
+  getSimilarTracks,
 } from "./client.js";
 
 const mockGet = vi.mocked(serverConfig.get);
@@ -258,6 +259,72 @@ describe("getTopTracksForArtist", () => {
     vi.stubGlobal("fetch", fetchMock);
     expect(await getTopTracksForArtist({})).toEqual([]);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("getSimilarTracks", () => {
+  it("parses track.getSimilar, preserves order and match score", async () => {
+    const fetchMock = mockFetchJson({
+      similartracks: {
+        track: [
+          {
+            name: "Pyramids",
+            mbid: "rec-1",
+            match: "1",
+            artist: { name: "Frank Ocean" },
+          },
+          {
+            name: "Nights",
+            mbid: "",
+            match: "0.42",
+            artist: { name: "Frank Ocean" },
+          },
+          { name: "NoArtist", mbid: "rec-3", match: "0.3" },
+        ],
+      },
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const out = await getSimilarTracks(
+      { artist: "Frank Ocean", title: "Thinkin Bout You" },
+      50,
+    );
+
+    expect(out).toEqual([
+      { name: "Pyramids", artist: "Frank Ocean", mbid: "rec-1", matchScore: 1 },
+      { name: "Nights", artist: "Frank Ocean", mbid: null, matchScore: 0.42 },
+    ]); // entry with no artist name dropped
+    const url = String(fetchMock.mock.calls[0]![0]);
+    expect(url).toContain("method=track.getsimilar");
+    expect(url).toContain("artist=Frank+Ocean");
+    expect(url).toContain("track=Thinkin+Bout+You");
+    expect(url).toContain("limit=50");
+  });
+
+  it("addresses by mbid when present", async () => {
+    const fetchMock = mockFetchJson({ similartracks: { track: [] } });
+    vi.stubGlobal("fetch", fetchMock);
+    await getSimilarTracks({ mbid: "seed-mbid", artist: "X", title: "Y" });
+    const url = String(fetchMock.mock.calls[0]![0]);
+    expect(url).toContain("method=track.getsimilar");
+    expect(url).toContain("mbid=seed-mbid");
+    expect(url).not.toContain("track=");
+  });
+
+  it("returns [] without fetching when no api key", async () => {
+    configWithKey(null);
+    const fetchMock = mockFetchJson({});
+    vi.stubGlobal("fetch", fetchMock);
+    const out = await getSimilarTracks({ artist: "X", title: "Y" });
+    expect(out).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("returns [] on a non-ok response", async () => {
+    const fetchMock = mockFetchJson({}, false, 500);
+    vi.stubGlobal("fetch", fetchMock);
+    const out = await getSimilarTracks({ artist: "X", title: "Y" });
+    expect(out).toEqual([]);
   });
 });
 

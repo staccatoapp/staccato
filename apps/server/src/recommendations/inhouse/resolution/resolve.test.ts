@@ -26,7 +26,12 @@ import type { LocalTrackDetail } from "../../../db/queries/tracks.js";
 import type { MBRecordingDetail } from "../../../musicbrainz/client.js";
 import type { Candidate } from "../candidates/service.js";
 import type { PlaylistSpec } from "../generators/types.js";
-import { RECS_RESOLUTION_THRESHOLD, resolvePlaylists } from "./resolve.js";
+import {
+  candidateNameKey,
+  RECS_RESOLUTION_THRESHOLD,
+  resolveCandidates,
+  resolvePlaylists,
+} from "./resolve.js";
 
 const mResolveByName = vi.mocked(resolveRecordingByName);
 const mScore = vi.mocked(scoreCandidates);
@@ -394,5 +399,65 @@ describe("resolvePlaylists", () => {
 
     expect(out[0]!.tracks[0]!.recordingMbid).toBe("owned-comp");
     expect(out[0]!.tracks[0]!.inLibrary).toBe(true);
+  });
+});
+
+describe("resolveCandidates (shared nucleus)", () => {
+  it("returns a map keyed by candidateNameKey with assembled tracks, owned-first", async () => {
+    resolvesTo({ Pyramids: { mbid: "owned-1", score: 0.9 } });
+    mLocal.mockReturnValue(
+      new Map([["owned-1", localTrack({ trackId: "track-1" })]]),
+    );
+
+    const candidates: Candidate[] = [
+      {
+        name: "Pyramids",
+        artist: "Frank Ocean",
+        mbid: null,
+        popularityRank: 0,
+      },
+    ];
+    const map = await resolveCandidates(candidates, log);
+
+    const track = map.get(candidateNameKey("Frank Ocean", "Pyramids"));
+    expect(track?.inLibrary).toBe(true);
+    expect(track?.localTrackId).toBe("track-1");
+    expect(track?.recordingMbid).toBe("owned-1");
+  });
+
+  it("omits candidates that fail the resolution threshold", async () => {
+    resolvesTo({
+      Obscure: { mbid: "m-low", score: RECS_RESOLUTION_THRESHOLD - 0.1 },
+    });
+
+    const map = await resolveCandidates(
+      [{ name: "Obscure", artist: "Nobody", mbid: null, popularityRank: 0 }],
+      log,
+    );
+
+    expect(map.size).toBe(0);
+  });
+
+  it("enriches a resolved non-owned candidate via MusicBrainz", async () => {
+    resolvesTo({ Nights: { mbid: "rec-2", score: 0.9 } });
+    mLookup.mockResolvedValue(recording({ recordingMbid: "rec-2" }));
+    mCover.mockResolvedValue("/metadata/covers/rg-1.jpg");
+
+    const map = await resolveCandidates(
+      [
+        {
+          name: "Nights",
+          artist: "Frank Ocean",
+          mbid: null,
+          popularityRank: 0,
+        },
+      ],
+      log,
+    );
+
+    const track = map.get(candidateNameKey("Frank Ocean", "Nights"));
+    expect(track?.inLibrary).toBe(false);
+    expect(track?.recordingMbid).toBe("rec-2");
+    expect(track?.coverArtUrl).toBe("/metadata/covers/rg-1.jpg");
   });
 });

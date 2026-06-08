@@ -14,7 +14,7 @@ In development, Vite runs its dev server and proxies `/api` to the Fastify backe
 The app supports multiple users (target: 5–15) sharing a single music library. This is baked into the data model from day one.
 
 - **Shared data** (no user_id): tracks, albums, artists, MusicBrainz mappings, cover art cache, fingerprint data
-- **Per-user data** (scoped by user_id): playlists, listening history, ListenBrainz credentials, recommendation cache, playback state, download requests
+- **Per-user data** (scoped by user_id): playlists, listening history, ListenBrainz credentials, recommendation cache, playlist suggestions cache, playback state, download requests
 
 ## Static Assets
 

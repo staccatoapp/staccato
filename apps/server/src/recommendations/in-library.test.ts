@@ -20,6 +20,7 @@ import {
 } from "../db/queries/tracks.js";
 import {
   refreshPlaylistsInLibrary,
+  refreshPlaylistTracksInLibrary,
   refreshTracksInLibrary,
 } from "./in-library.js";
 
@@ -211,5 +212,29 @@ describe("refreshPlaylistsInLibrary", () => {
       playlist([plTrack({ recordingMbid: "rec-1", title: "Title" })]),
     ]);
     expect(out[0]!.tracks[0]!.localTrackId).toBe("exact-id");
+  });
+});
+
+describe("refreshPlaylistTracksInLibrary", () => {
+  it("flips inLibrary + localTrackId on an exact recording-mbid hit", () => {
+    mTracksByMbids.mockReturnValue(new Map([["rec-1", localDetail("t1")]]));
+    const out = refreshPlaylistTracksInLibrary([
+      plTrack({ recordingMbid: "rec-1" }),
+    ]);
+    expect(out[0]).toMatchObject({ inLibrary: true, localTrackId: "t1" });
+    expect(mByArtist).not.toHaveBeenCalled();
+  });
+
+  it("falls back to a song-level match when the recording mbid differs", () => {
+    mTracksByMbids.mockReturnValue(new Map()); // exact miss
+    mByArtist.mockReturnValue([libSong({ trackId: "lt-3005", title: "3005" })]);
+    const out = refreshPlaylistTracksInLibrary([
+      plTrack({ recordingMbid: "lb-single", title: "3005" }),
+    ]);
+    expect(out[0]).toMatchObject({ inLibrary: true, localTrackId: "lt-3005" });
+  });
+
+  it("returns [] unchanged for an empty list", () => {
+    expect(refreshPlaylistTracksInLibrary([])).toEqual([]);
   });
 });

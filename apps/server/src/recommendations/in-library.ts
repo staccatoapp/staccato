@@ -1,4 +1,8 @@
-import type { RecommendedPlaylist, RecommendedTrack } from "@staccato/shared";
+import type {
+  RecommendedPlaylist,
+  RecommendedPlaylistTrack,
+  RecommendedTrack,
+} from "@staccato/shared";
 import {
   getLibraryTracksByArtistMbids,
   getLocalTrackMbidsByMbids,
@@ -75,6 +79,24 @@ export function refreshTracksInLibrary(
   });
 }
 
+/** Map a list of playlist tracks against a prebuilt local index. Shared by the
+ * multi-playlist pass (one batched lookup) and the flat single-list pass. */
+function applyLibraryToTracks(
+  tracks: RecommendedPlaylistTrack[],
+  localMap: Map<string, { trackId: string }>,
+  songIndex: Map<string, string>,
+): RecommendedPlaylistTrack[] {
+  return tracks.map((t) => {
+    const local = t.recordingMbid ? localMap.get(t.recordingMbid) : undefined;
+    if (local) return { ...t, inLibrary: true, localTrackId: local.trackId };
+    if (t.artistMbid) {
+      const trackId = songIndex.get(songKey(t.artistMbid, t.title));
+      if (trackId) return { ...t, inLibrary: true, localTrackId: trackId };
+    }
+    return { ...t, inLibrary: false, localTrackId: null };
+  });
+}
+
 export function refreshPlaylistsInLibrary(
   playlists: RecommendedPlaylist[],
 ): RecommendedPlaylist[] {
@@ -99,14 +121,25 @@ export function refreshPlaylistsInLibrary(
 
   return playlists.map((p) => ({
     ...p,
-    tracks: p.tracks.map((t) => {
-      const local = t.recordingMbid ? localMap.get(t.recordingMbid) : undefined;
-      if (local) return { ...t, inLibrary: true, localTrackId: local.trackId };
-      if (t.artistMbid) {
-        const trackId = songIndex.get(songKey(t.artistMbid, t.title));
-        if (trackId) return { ...t, inLibrary: true, localTrackId: trackId };
-      }
-      return { ...t, inLibrary: false, localTrackId: null };
-    }),
+    tracks: applyLibraryToTracks(p.tracks, localMap, songIndex),
   }));
+}
+
+/** Live in-library pass for a FLAT list of recommended playlist tracks (SP3
+ * playlist-suggestions). Same semantics as refreshPlaylistsInLibrary, one batched
+ * lookup. inLibrary is never cached — re-resolved on every serve. */
+export function refreshPlaylistTracksInLibrary(
+  tracks: RecommendedPlaylistTrack[],
+): RecommendedPlaylistTrack[] {
+  if (tracks.length === 0) return tracks;
+  const allMbids = tracks
+    .map((t) => t.recordingMbid)
+    .filter((m): m is string => Boolean(m));
+  const localMap =
+    allMbids.length === 0 ? new Map() : getTracksByMusicbrainzIds(allMbids);
+  const unmatched = tracks.filter(
+    (t) => !(t.recordingMbid && localMap.has(t.recordingMbid)) && t.artistMbid,
+  );
+  const songIndex = buildSongIndex(unmatched);
+  return applyLibraryToTracks(tracks, localMap, songIndex);
 }

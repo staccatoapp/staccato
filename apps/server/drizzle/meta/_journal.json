@@ -281,6 +281,13 @@
       "when": 1780742321992,
       "tag": "0039_salty_black_tarantula",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "6",
+      "when": 1780948306446,
+      "tag": "0040_wealthy_swarm",
+      "breakpoints": true
     }
   ]
 }

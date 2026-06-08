@@ -1,7 +1,15 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { ChevronLeft, Clock, ListMusic, Play, Trash2 } from "lucide-react";
+import {
+  ChevronLeft,
+  Clock,
+  Download,
+  ListMusic,
+  Play,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,6 +26,10 @@ import {
   PlaylistDetailSchema,
 } from "@staccato/shared";
 import { formatTime } from "@/lib/music";
+import { usePreviewAudio } from "@/hooks/usePreviewAudio";
+import { usePlaylistSuggestions } from "@/hooks/usePlaylistSuggestions";
+import { useRequestDownloadDialog } from "@/hooks/useRequestDownloadDialog";
+import { RequestDownloadDialog } from "@/components/downloads/RequestDownloadDialog";
 
 export const Route = createFileRoute("/playlists/$playlistId")({
   component: PlaylistDetailPage,
@@ -113,6 +125,27 @@ function PlaylistDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["playlist", playlistId] });
       queryClient.invalidateQueries({ queryKey: ["playlists"] });
+    },
+  });
+
+  const suggestionsQuery = usePlaylistSuggestions(playlistId);
+  const { audioRef, playingMbid, handlePreview } = usePreviewAudio();
+  const requestDialog = useRequestDownloadDialog();
+  const [windowStart, setWindowStart] = useState(0);
+
+  const addSuggestionMutation = useMutation({
+    mutationFn: async (localTrackId: string) => {
+      const res = await fetch(`/api/playlists/${playlistId}/tracks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trackIds: [localTrackId] }),
+      });
+      if (!res.ok) throw new Error("Failed to add suggested track");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["playlist", playlistId] });
+      queryClient.invalidateQueries({ queryKey: ["playlists"] });
+      setWindowStart((s) => s + 1); // reveal the next suggestion
     },
   });
 
@@ -270,6 +303,81 @@ function PlaylistDetailPage() {
           ))}
         </div>
       )}
+
+      {(() => {
+        const sres = suggestionsQuery.data;
+        if (!sres || sres.status !== "ready" || sres.data.length === 0)
+          return null;
+        const visible = sres.data.slice(windowStart, windowStart + 3);
+        if (visible.length === 0) return null;
+        return (
+          <div className="mt-10">
+            <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-3">
+              Suggested tracks
+            </h2>
+            {visible.map((t) => (
+              <div
+                key={t.recordingMbid ?? `${t.artistName}-${t.title}`}
+                className="group grid grid-cols-[1fr_1fr_2rem_2rem] gap-3 px-3 py-2.5 rounded-md text-sm hover:bg-accent/50 transition-colors items-center"
+              >
+                <span className="truncate">{t.title}</span>
+                <span className="text-muted-foreground truncate text-xs">
+                  {t.artistName ?? "—"}
+                </span>
+                <button
+                  onClick={() =>
+                    t.recordingMbid &&
+                    handlePreview(t.recordingMbid, t.artistName ?? "", t.title)
+                  }
+                  className={`transition-opacity flex justify-end ${
+                    playingMbid === t.recordingMbid
+                      ? "opacity-100"
+                      : "opacity-0 group-hover:opacity-100"
+                  }`}
+                  aria-label={`Preview ${t.title}`}
+                >
+                  <Play className="w-3.5 h-3.5 text-muted-foreground" />
+                </button>
+                {t.inLibrary && t.localTrackId ? (
+                  <button
+                    onClick={() =>
+                      addSuggestionMutation.mutate(t.localTrackId!)
+                    }
+                    disabled={addSuggestionMutation.isPending}
+                    className="flex justify-end"
+                    aria-label={`Add ${t.title} to playlist`}
+                  >
+                    <Plus className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      if (!t.releaseGroupMbid || !t.artistMbid || !t.artistName)
+                        return;
+                      requestDialog.openSingle({
+                        subject: "track",
+                        subjectName: t.title,
+                        payload: {
+                          releaseGroupMbid: t.releaseGroupMbid,
+                          artistMbid: t.artistMbid,
+                          artistName: t.artistName,
+                          albumTitle: t.albumTitle,
+                        },
+                      });
+                    }}
+                    className="flex justify-end"
+                    aria-label={`Request ${t.title}`}
+                  >
+                    <Download className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+      <audio ref={audioRef} className="hidden" />
+      <RequestDownloadDialog {...requestDialog.dialogProps} />
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent>

@@ -88,8 +88,9 @@ per-deployment (the admin registers their own Last.fm API account), so the usage
 `serverConfig.get().lastfm.apiKey` — a **server-global** secret in `serverConfig` (not a per-user
 credential), because public Last.fm reads need only the app key. It exposes `getTopTags`
 (track/album/artist), `getPopularity`, `getSimilarTags`/`getSimilarArtists`, `getTopTracksForTag`
-(`tag.getTopTracks`), and `getTopTracksForArtist` (`artist.getTopTracks`) — the latter two
-popularity-ranked, order preserved, dropping entries with no artist name. Each addresses the entity
+(`tag.getTopTracks`), `getTopTracksForArtist` (`artist.getTopTracks`), and `getSimilarTracks`
+(`track.getSimilar`, the SP3 seed — co-listening neighbours carrying a 0..1 `matchScore`, order
+preserved) — the popularity/similar-track methods drop entries with no artist name. Each addresses the entity
 by MBID when present and falls back to artist+name otherwise, and parses Last.fm's loosely-typed JSON
 defensively. Two shared (no `user_id`) durable cache tables back it:
 `lastfm_tags` and `lastfm_popularity`, each keyed by `(entityType, entityKey)` where `entityKey`
@@ -173,6 +174,53 @@ row), `buildContext` carries `userId` for profile identity, and `fetch` runs
 profile→applicable-generators→resolution and zod-validates the output. Because the api key is
 config-file-only in 2a, adding or changing it needs a restart (boot `reconcileUserRows` seeds the
 rows); the runtime config-change fan-out is deferred.
+
+### Playlist Track-Suggestions (SP3)
+
+Sub-project 3 adds per-playlist track-suggestions — "more like this playlist" — served at
+`GET /api/playlists/:id/suggestions` and shown three-at-a-time under the playlist on the web. It
+reuses the in-house resolution and in-library machinery but runs on its own cache and refresher
+because its key is per `(userId, playlistId)`, a shape the per-`(userId, source, kind)`
+`recommendation_cache` cannot express. The parallel `playlist_suggestions_cache` table
+(`db/schema/playlist-suggestions-cache.ts`, queries in `db/queries/playlist-suggestions-cache.ts`)
+mirrors `recommendation_cache`'s columns and `warming|ready|error`/`inflight`/`nextRefreshAt`
+lifecycle but is keyed by `(userId, playlistId)` (unique index), cascade-deleting with both the user
+and the playlist, with the same partial due-index on `nextRefreshAt WHERE inflight = 0`. A dedicated
+refresher (`recommendations/playlist-suggestions/refresher.ts`, `startSuggestionsRefresher`, 60s
+tick) scans due rows and runs `refreshOneSuggestion` with the same atomic `claimSuggestionForRefresh`
+guard; boot calls `resetInflightSuggestionsOnBoot()` then `startSuggestionsRefresher()` alongside the
+ListenBrainz refresher. `computeSuggestions` (`compute.ts`) is the orchestrator: it reads the
+playlist's tracks via `getPlaylistTracksForSeeding`, builds a capped recency-weighted seed set
+(`seeds.ts` `buildSeeds`, newest-added first, `SEED_CAP` 30, gated below `MIN_SEEDS` 3 so a
+brand-new/tiny playlist yields nothing), fans `track.getSimilar` across the seeds — addressing each
+by **artist+title, never the local recording MBID** (Last.fm's similarity index has poor
+per-recording-MBID coverage: addressing by MBID frequently errors with "Track not found"/code 6 or
+returns an empty neighbour set even when the MBID resolves, so the `Seed` carries no MBID — the same
+"don't trust Last.fm MBIDs" stance the resolution layer takes, decision E4) — and aggregates the
+neighbours by **overlap** — the count of distinct seeds that returned a candidate, tie-broken by
+summed `matchScore` (`similarity.ts` `aggregateSimilar`, `PER_SEED_CAP` 50, capped to
+`TARGET_TRACKS` 25) — excluding any track already in the playlist by recording-MBID or normalized
+`(artist, title)`, and finally resolves the ranked candidates to MBIDs. Resolution reuses the
+in-house nucleus: `resolve.ts` was refactored to export `resolveCandidates` (the batched
+name-resolve → owned-first `selectWinner` → batched library+MB enrichment core, formerly inlined in
+`resolvePlaylists`, which now just calls it and groups per spec) plus the shared key function
+`candidateNameKey`. In-library status is re-resolved live on every serve via
+`refreshPlaylistTracksInLibrary` (`in-library.ts`), a flat-list sibling of `refreshPlaylistsInLibrary`
+sharing the same `applyLibraryToTracks` mapping (one batched lookup, recording-MBID match then the
+`(artistMbid, normalized title)` song-level fallback). The route gates on the server-global Last.fm
+key first (returns `no-token`, so the UI hides the section, rather than seeding rows that would only
+compute empty), lazily seeds a `warming` row on first view, serves the cached payload through the
+live in-library pass (`ready`, or `error` with stale data if present), and is debounced: adding or
+removing a playlist track calls `markSuggestionStale(userId, playlistId, now + DEBOUNCE_MS)` to pull
+the next recompute forward (`DEBOUNCE_MS` 60s trailing). The wire envelope is
+`PlaylistSuggestionsResponseSchema` in shared (reusing `RecommendedPlaylistTrackSchema`); the web
+hook `usePlaylistSuggestions` polls every 5s while `warming` and the playlist page shows three
+suggestions at a time, advancing the window as in-library tracks are added (out-of-library tracks
+reuse the Explore request-download dialog). A successful refresh schedules `+24h`
+(`REFRESH_INTERVAL_MS`); an empty result retries in `EMPTY_RETRY_MS` 1h; errors back off
+`min(REFRESH_INTERVAL_MS, MAX_ERROR_BACKOFF_MS=15min)`. Deferred (design §12): a genre-affinity
+fallback for thin/obscure playlists that come up empty, per-session dismissal, an artist-similarity
+axis, and boot pre-warming.
 
 ## Refresher
 

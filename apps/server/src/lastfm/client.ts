@@ -179,6 +179,23 @@ const ArtistTopTracksSchema = z.object({
     .optional(),
 });
 
+const SimilarTracksSchema = z.object({
+  similartracks: z
+    .object({
+      track: z
+        .array(
+          z.object({
+            name: z.string(),
+            mbid: z.string().optional(),
+            match: z.coerce.number().optional(),
+            artist: z.object({ name: z.string() }).optional(),
+          }),
+        )
+        .optional(),
+    })
+    .optional(),
+});
+
 function methodFor(
   entityType: LastfmEntityType,
   verb: "gettoptags" | "getinfo",
@@ -342,4 +359,46 @@ export async function getSimilarArtists(artist: string): Promise<string[]> {
     return [];
   }
   return (parsed.data.similarartists?.artist ?? []).map((a) => a.name);
+}
+
+/** Tracks similar to a given track via track.getSimilar — Last.fm's co-listening
+ * signal, the seed for playlist track-suggestions (SP3). Addresses the track by
+ * MBID when present, else artist+title (refParams). Response is ordered by
+ * descending `match`; order preserved. `matchScore` is Last.fm's 0..1 similarity.
+ * Entries without an artist name are dropped (unresolvable). Empty array on any
+ * failure or missing api key (no fetch). */
+export async function getSimilarTracks(
+  ref: LastfmEntityRef,
+  limit = 100,
+): Promise<
+  Array<{
+    name: string;
+    artist: string;
+    mbid: string | null;
+    matchScore: number;
+  }>
+> {
+  const params = refParams("track", ref);
+  if (!params) return [];
+  const body = await lfmGet("track.getsimilar", {
+    ...params,
+    limit: String(limit),
+  });
+  if (!body) return [];
+  const parsed = SimilarTracksSchema.safeParse(body);
+  if (!parsed.success) {
+    log.warn(
+      { operation: "track.getsimilar", err: parsed.error },
+      "lastfm getSimilarTracks parse failed",
+    );
+    return [];
+  }
+  return (parsed.data.similartracks?.track ?? [])
+    .map((t) => ({
+      name: t.name,
+      artist: t.artist?.name ?? "",
+      mbid: t.mbid && t.mbid.length > 0 ? t.mbid : null,
+      matchScore: t.match ?? 0,
+    }))
+    .filter((t) => t.artist.length > 0);
 }
