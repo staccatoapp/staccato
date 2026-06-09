@@ -70,6 +70,7 @@ const validPlaylist: RecommendedPlaylist = {
   ],
   coverArtUrl: null,
   expiresAt: null,
+  source: "staccato",
 };
 
 beforeEach(() => {

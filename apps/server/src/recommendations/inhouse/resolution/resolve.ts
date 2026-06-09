@@ -320,6 +320,7 @@ export async function resolvePlaylists(
       coverArtUrl:
         tracks.find((t) => t.coverArtUrl !== null)?.coverArtUrl ?? null,
       expiresAt: null,
+      source: "staccato",
     });
   }
   return playlists;

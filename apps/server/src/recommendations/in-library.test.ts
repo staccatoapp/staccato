@@ -71,6 +71,7 @@ function playlist(tracks: RecommendedPlaylistTrack[]): RecommendedPlaylist {
     tracks,
     coverArtUrl: null,
     expiresAt: null,
+    source: "staccato",
   };
 }
 function libSong(over: Partial<LibrarySongRow> = {}): LibrarySongRow {

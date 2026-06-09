@@ -26,6 +26,9 @@ export const RecommendedPlaylistTrackSchema = z.object({
   localTrackId: z.string().nullable(),
 });
 
+export const PlaylistSourceSchema = z.enum(["staccato", "listenbrainz"]);
+export type PlaylistSource = z.infer<typeof PlaylistSourceSchema>;
+
 export const RecommendedPlaylistSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -34,6 +37,7 @@ export const RecommendedPlaylistSchema = z.object({
   tracks: z.array(RecommendedPlaylistTrackSchema),
   coverArtUrl: z.string().nullable(),
   expiresAt: z.string().nullable(),
+  source: PlaylistSourceSchema,
 });
 
 export const RecommendationErrorSchema = z.object({
