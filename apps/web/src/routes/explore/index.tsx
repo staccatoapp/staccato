@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import {
   type ExternalSearchResults,
   ExternalSearchResultsSchema,
+  type PlaylistSource,
   type RecommendedTrack,
 } from "@staccato/shared";
 import { AlbumCard } from "@/components/music/AlbumCard";
@@ -27,6 +28,11 @@ import { RequestDownloadDialog } from "@/components/downloads/RequestDownloadDia
 import { toUiStatus, useDownloads } from "@/hooks/useDownloads";
 
 export const Route = createFileRoute("/explore/")({ component: ExplorePage });
+
+const SOURCE_LABELS: Record<PlaylistSource, string> = {
+  staccato: "Staccato",
+  listenbrainz: "ListenBrainz",
+};
 
 // Compact listen-count label, e.g. 517066 → "517K", 9003749 → "9M".
 function formatListens(n: number | null | undefined): string | null {
@@ -401,7 +407,7 @@ function ExplorePage() {
                       id: playlist.id,
                       name: playlist.name,
                       description: playlist.description ?? "",
-                      tag: "For you",
+                      tag: SOURCE_LABELS[playlist.source],
                       trackCount: playlist.trackCount,
                       gradient: generateAlbumGradient(
                         playlist.name,

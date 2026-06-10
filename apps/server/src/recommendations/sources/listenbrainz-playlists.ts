@@ -156,6 +156,7 @@ export const listenbrainzPlaylistsSource: RecommendationSource<
           tracks,
           coverArtUrl: playlistCoverArtUrl,
           expiresAt: summary.expiresAt,
+          source: "listenbrainz",
         };
       },
     );

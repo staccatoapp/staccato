@@ -11,9 +11,10 @@
 > Cover: which tables are library-wide (no `user_id`) vs. scoped per user, and why.
 >
 > - **Shared:** `artists`, `albums`, `tracks`, `track_artists`, `album_artists`,
->   `preview_cache`, `track_lyrics`, `server_settings`.
+>   `preview_cache`, `track_lyrics`, `server_settings`, `lastfm_tags`, `lastfm_popularity`.
 > - **Per-user:** `users`, `playlists`, `playlist_tracks`, `listening_history`,
->   `playback_session`, `user_settings`, `recommendation_cache`, `download_requests`.
+>   `playback_session`, `user_settings`, `recommendation_cache`,
+>   `playlist_suggestions_cache`, `download_requests`.
 
 ## Core library tables
 

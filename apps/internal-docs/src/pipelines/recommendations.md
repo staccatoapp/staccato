@@ -192,6 +192,96 @@ via a small `ParseSchema<T>` interface — a deliberate duck-typing workaround f
 version skew between `@staccato/shared` and the web bundle, documented inline and to be removed when
 shared upgrades to Zod v4.
 
+## In-house recommendations (Last.fm)
+
+Alongside the ListenBrainz sources, an in-house engine generates personalised themed virtual
+playlists from the user's own listening history, backed by a rate-limited Last.fm read client
+(`apps/server/src/lastfm/client.ts`). It plugs into the same pipeline as a `RecommendationSource` of
+kind `playlists` (`inhouse/source.ts`, `id` `"inhouse"`), so it needs no bespoke refresher or route:
+`fetch` runs profile → applicable generators → resolution and zod-validates the result. Eligibility
+reads the **server-global** Last.fm `apiKey` from `serverConfig` (not a per-user credential), because
+public Last.fm reads need only the application key. Four generators ship (Genre Mix, More From
+Artists You Love, Something New, Decade Mix), each emitting 0 or 1 mix per refresh. The shared
+resolution pass (`inhouse/resolution/resolve.ts`) name-resolves every `(artist, title)` candidate by
+scored mirror search (the flaky Last.fm candidate MBID is deliberately not trusted), picks an
+owned-first winner via `selectWinner` at `RECS_RESOLUTION_THRESHOLD` (~0.70), then batch-enriches the
+non-local remainder via MusicBrainz and cover art. See the `recommendations` rule
+(`.claude/rules/recommendations.md`) for the full profile/candidate/generator detail.
+
+### Playlist track-suggestions (SP3)
+
+Sub-project 3 adds **per-playlist** track-suggestions ("more like this playlist"), served at
+`GET /api/playlists/:id/suggestions` and shown three-at-a-time under the playlist on the web. It
+reuses the in-house resolution and in-library machinery but runs on its **own** cache and refresher,
+because its natural key is `(userId, playlistId)` — a shape the per-`(userId, source, kind)`
+`recommendation_cache` cannot express.
+
+**Data model.** `playlist_suggestions_cache` (`db/schema/playlist-suggestions-cache.ts`) mirrors
+`recommendation_cache`'s columns and `warming|ready|error` / `inflight` / `nextRefreshAt` lifecycle,
+but is keyed by a unique `(user_id, playlist_id)` index and cascade-deletes with **both** the user
+and the playlist. The same partial index `idx_playlist_suggestions_cache_due` on
+`nextRefreshAt WHERE inflight = 0` drives the due-scan. Queries live in
+`db/queries/playlist-suggestions-cache.ts` (`upsertWarmingSuggestionRow`,
+`claimSuggestionForRefresh`, `writeSuggestionReady`/`writeSuggestionError`, `markSuggestionStale`,
+`resetInflightSuggestionsOnBoot`, …).
+
+**Compute.** `computeSuggestions` (`recommendations/playlist-suggestions/compute.ts`) orchestrates:
+
+1. **Seed.** `getPlaylistTracksForSeeding` reads the playlist's tracks (canonical title/artist + the
+   MBIDs and `addedAt`); `buildSeeds` (`seeds.ts`) sorts newest-added first, caps at `SEED_CAP`, and
+   returns `[]` below `MIN_SEEDS` (the cold-start gate — a brand-new or tiny playlist yields nothing).
+2. **Fan out + aggregate.** `aggregateSimilar` (`similarity.ts`) calls `getSimilarTracks`
+   (`track.getSimilar`) for each seed (up to `PER_SEED_CAP` neighbours each), **addressing by
+   artist+title — never the local recording MBID**. Last.fm's similarity index has poor
+   per-recording-MBID coverage: addressing by MBID frequently errors (`"Track not found"`, code 6) or
+   returns an empty neighbour set even when the MBID resolves, while the name lookup resolves
+   reliably — so the `Seed` deliberately carries no MBID (the same "don't trust Last.fm MBIDs" stance
+   resolution takes, decision E4). It ranks candidates by **overlap** — the number of distinct seeds
+   that returned them — tie-broken by summed `matchScore`, excluding any track already in the playlist
+   by recording-MBID or by normalized `(artist, title)`, capped to `TARGET_TRACKS`. Each survivor's `popularityRank` is its final rank index, so resolution
+   preserves the order.
+3. **Resolve.** The ranked candidates go through `resolveCandidates`, the shared nucleus extracted
+   from `resolvePlaylists` (batched name-resolve → owned-first `selectWinner` → batched library + MB
+   enrichment), returning a flat `RecommendedPlaylistTrack[]`. Empty on cold-start or when nothing
+   resolves.
+
+| Constant               | Value | Role                                            |
+| ---------------------- | ----- | ----------------------------------------------- |
+| `MIN_SEEDS`            | 3     | Cold-start gate: fewer tracks → no suggestions. |
+| `SEED_CAP`             | 30    | Max seeds fanned out per recompute.             |
+| `PER_SEED_CAP`         | 50    | Similar tracks pulled per seed.                 |
+| `TARGET_TRACKS`        | 25    | Final ranked suggestion count.                  |
+| `REFRESH_INTERVAL_MS`  | 24h   | Reschedule after a non-empty refresh.           |
+| `EMPTY_RETRY_MS`       | 1h    | Retry sooner when the result is empty.          |
+| `DEBOUNCE_MS`          | 60s   | Trailing debounce after a playlist edit.        |
+| `MAX_ERROR_BACKOFF_MS` | 15min | Error backoff cap.                              |
+
+**Refresher.** `startSuggestionsRefresher` (`refresher.ts`) installs a 60s tick that scans due rows
+and fires `refreshOneSuggestion` per id (fire-and-forget). `refreshOneSuggestion` atomically claims
+the row (`claimSuggestionForRefresh`), deletes it if the playlist is gone (guarding the
+cascade-delete race), runs `computeSuggestions`, and writes `ready` (`+24h`, or `+1h` for an empty
+payload) or `error` (capped backoff). Boot wires `resetInflightSuggestionsOnBoot()` then
+`startSuggestionsRefresher()` alongside the ListenBrainz refresher in `index.ts`.
+
+**Serving.** The route (`routes/playlists.ts`) requires playlist ownership (404/403), then gates on
+the server-global Last.fm key — returning `no-token` (the UI hides the section) rather than seeding
+rows that would only compute empty. On the first view with no row it lazily seeds a `warming` row;
+otherwise it parses the cached payload, runs it through `refreshPlaylistTracksInLibrary`
+(`in-library.ts`, a flat-list sibling of `refreshPlaylistsInLibrary` sharing the same
+`applyLibraryToTracks` mapping so `inLibrary`/`localTrackId` are live, never cached), and returns
+`ready` (or `error` with stale data if present). Adding or removing a playlist track calls
+`markSuggestionStale(userId, playlistId, now + DEBOUNCE_MS)` to pull the next recompute forward
+(trailing debounce). The wire envelope is `PlaylistSuggestionsResponseSchema` (reusing
+`RecommendedPlaylistTrackSchema`).
+
+**Web.** `usePlaylistSuggestions` polls every 5s while `warming` and holds a 10-minute `staleTime`
+otherwise. The playlist page renders three suggestions at a time, advancing the window as in-library
+tracks are added (out-of-library tracks reuse the Explore request-download dialog, in-library tracks
+get an add-to-playlist button).
+
+**Deferred** (design §12): a genre-affinity fallback for thin/obscure playlists that come up empty,
+per-session dismissal, an artist-similarity axis, and boot pre-warming.
+
 ## Adding a source
 
 1. Implement `RecommendationSource<Kind, Payload, Ctx>` in `sources/`: a zod-validated `fetch`,

@@ -28,6 +28,8 @@ import { backfillArtistNormalizedNames } from "./db/queries/artists.js";
 import { startRefresher, tick } from "./recommendations/refresher.js";
 import { reconcileUserRows } from "./recommendations/eligibility.js";
 import "./recommendations/sources/index.js";
+import { resetInflightSuggestionsOnBoot } from "./db/queries/playlist-suggestions-cache.js";
+import { startSuggestionsRefresher } from "./recommendations/playlist-suggestions/refresher.js";
 import adminRoutes from "./routes/admin/index.js";
 import { ZodError } from "zod";
 
@@ -98,6 +100,7 @@ const start = async () => {
   backfillArtistNormalizedNames();
 
   resetInflightOnBoot();
+  resetInflightSuggestionsOnBoot();
 
   const allUserSettings = getAllUserSettings();
   const now = Date.now();
@@ -126,6 +129,8 @@ const start = async () => {
   void tick().catch((err) =>
     logger.error({ err }, "initial recommendation tick failed"),
   );
+
+  startSuggestionsRefresher();
 };
 
 start().catch((err) => {

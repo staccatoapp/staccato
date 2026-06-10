@@ -26,6 +26,9 @@ export const RecommendedPlaylistTrackSchema = z.object({
   localTrackId: z.string().nullable(),
 });
 
+export const PlaylistSourceSchema = z.enum(["staccato", "listenbrainz"]);
+export type PlaylistSource = z.infer<typeof PlaylistSourceSchema>;
+
 export const RecommendedPlaylistSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -34,6 +37,7 @@ export const RecommendedPlaylistSchema = z.object({
   tracks: z.array(RecommendedPlaylistTrackSchema),
   coverArtUrl: z.string().nullable(),
   expiresAt: z.string().nullable(),
+  source: PlaylistSourceSchema,
 });
 
 export const RecommendationErrorSchema = z.object({
@@ -73,4 +77,13 @@ export const RecommendedTracksResponseSchema = recommendationsResponseSchema(
 );
 export const RecommendedPlaylistsResponseSchema = recommendationsResponseSchema(
   z.array(RecommendedPlaylistSchema),
+);
+
+// SP3 playlist track-suggestions reuse the playlist-track shape (preview by
+// recordingMbid needs no payload field; localTrackId/inLibrary drive add/play).
+export type PlaylistSuggestionsResponse = RecommendationsResponse<
+  RecommendedPlaylistTrack[]
+>;
+export const PlaylistSuggestionsResponseSchema = recommendationsResponseSchema(
+  z.array(RecommendedPlaylistTrackSchema),
 );

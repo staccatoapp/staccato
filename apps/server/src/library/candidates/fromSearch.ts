@@ -19,15 +19,19 @@ export function sanitizeTitleForSearch(title: string): string {
   return out || title;
 }
 
-export async function candidatesFromSearch(
-  evidence: Evidence,
-): Promise<RecordingCandidate[]> {
-  const { tags } = evidence;
-  const title = tags.title;
-  // Recording search keys on the *track* artist (who performed the song), not
-  // the album artist — a mistagged or compilation albumartist must not poison
-  // the lookup.
-  const artist = tags.artistName;
+/** Evidence-free recording search by name. Builds the same Lucene query cascade
+ * the importer uses (artist + recording [+ release], with cleaned-title fallback
+ * variants) and returns the candidates from the first query that yields results.
+ *
+ * Shared by the importer's {@link candidatesFromSearch} adapter and the in-house
+ * recommendations resolution pass, which name-resolves Last.fm candidates lacking
+ * an MBID (recs spec §5). Returns [] when artist or title is missing. */
+export async function resolveRecordingByName(q: {
+  artist: string;
+  title: string;
+  album?: string | null;
+}): Promise<RecordingCandidate[]> {
+  const { artist, title, album } = q;
   if (!title || !artist) return [];
 
   const safeArtist = escapeLuceneTerm(artist);
@@ -40,10 +44,10 @@ export async function candidatesFromSearch(
   const queries: string[] = [];
   for (const t of titleVariants) {
     const safeTitle = escapeLuceneTerm(t);
-    if (tags.albumTitle) {
+    if (album) {
       queries.push(
         `artist:"${safeArtist}" AND recording:"${safeTitle}" AND release:"${escapeLuceneTerm(
-          tags.albumTitle,
+          album,
         )}" AND video:false`,
       );
     }
@@ -52,11 +56,25 @@ export async function candidatesFromSearch(
     );
   }
 
-  for (const q of queries) {
-    const results = await searchRecordingsRich(q);
+  for (const queryStr of queries) {
+    const results = await searchRecordingsRich(queryStr);
     if (results.length > 0) {
       return results.map((r) => r.candidate);
     }
   }
   return [];
+}
+
+export async function candidatesFromSearch(
+  evidence: Evidence,
+): Promise<RecordingCandidate[]> {
+  const { tags } = evidence;
+  // Recording search keys on the *track* artist (who performed the song), not
+  // the album artist — a mistagged or compilation albumartist must not poison
+  // the lookup.
+  return resolveRecordingByName({
+    artist: tags.artistName,
+    title: tags.title,
+    album: tags.albumTitle,
+  });
 }

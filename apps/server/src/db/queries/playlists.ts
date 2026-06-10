@@ -149,6 +149,36 @@ export function getPlaylistTracks(playlistId: string): PlaylistTrackRow[] {
     .all();
 }
 
+export interface PlaylistSeedRow {
+  trackId: string;
+  title: string;
+  artistName: string;
+  recordingMbid: string | null;
+  artistMbid: string | null;
+  addedAt: Date | null;
+}
+
+/** Playlist tracks shaped for SP3 seeding: canonical title/artist + the MBIDs
+ * the Last.fm seed and in-playlist exclusion need + addedAt for recency. */
+export function getPlaylistTracksForSeeding(
+  playlistId: string,
+): PlaylistSeedRow[] {
+  return db
+    .select({
+      trackId: tracks.id,
+      title: sql<string>`COALESCE(${tracks.canonicalTitle}, ${tracks.title})`,
+      artistName: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
+      recordingMbid: tracks.musicbrainzId,
+      artistMbid: artists.musicbrainzId,
+      addedAt: playlistTracks.addedAt,
+    })
+    .from(playlistTracks)
+    .innerJoin(tracks, eq(playlistTracks.trackId, tracks.id))
+    .innerJoin(artists, eq(tracks.artistId, artists.id))
+    .where(eq(playlistTracks.playlistId, playlistId))
+    .all();
+}
+
 export function getMaxPlaylistTrackPosition(playlistId: string): number | null {
   const result = db
     .select({ maxPos: sql<number | null>`max(position)` })

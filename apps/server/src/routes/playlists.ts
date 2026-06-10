@@ -1,6 +1,19 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { parsePagination, UpdatePlaylistRequestSchema } from "@staccato/shared";
+import {
+  parsePagination,
+  RecommendedPlaylistTrackSchema,
+  UpdatePlaylistRequestSchema,
+  type RecommendedPlaylistTrack,
+} from "@staccato/shared";
+import { serverConfig } from "../config/server-config.js";
+import {
+  getSuggestionRow,
+  markSuggestionStale,
+  upsertWarmingSuggestionRow,
+} from "../db/queries/playlist-suggestions-cache.js";
+import { refreshPlaylistTracksInLibrary } from "../recommendations/in-library.js";
+import { DEBOUNCE_MS } from "../recommendations/playlist-suggestions/constants.js";
 import {
   PlaylistRow,
   PlaylistUpdate,
@@ -148,6 +161,71 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 
+  fastify.get("/:id/suggestions", async (req, reply) => {
+    const parsedParams = z.object({ id: z.string() }).safeParse(req.params);
+    if (!parsedParams.success)
+      return reply.status(400).send({ error: "Invalid request" });
+    const { id } = parsedParams.data;
+    const result = requireOwnPlaylist(id, req.userId);
+    if (result === 404) {
+      req.log.warn({ playlistId: id }, "playlist not found");
+      return reply.status(404).send({ error: "Playlist not found" });
+    }
+    if (result === 403) {
+      req.log.warn(
+        { playlistId: id, userId: req.userId },
+        "playlist suggestions access forbidden",
+      );
+      return reply.status(403).send({ error: "Forbidden" });
+    }
+
+    // Suggestions need the server-global Last.fm key (public reads). Without it
+    // the feature is unavailable — return no-token (the UI hides the section)
+    // rather than seeding rows that would only ever compute empty.
+    if (!serverConfig.get().lastfm.apiKey) {
+      return { status: "no-token" as const };
+    }
+
+    const row = getSuggestionRow(req.userId, id);
+    if (!row) {
+      upsertWarmingSuggestionRow(req.userId, id);
+      return { status: "warming" as const };
+    }
+    if (row.status === "warming" && !row.payload) {
+      return { status: "warming" as const };
+    }
+
+    let tracks: RecommendedPlaylistTrack[] = [];
+    if (row.payload) {
+      // safeParse guards the schema shape; JSON.parse can still throw on a
+      // corrupt row, so guard it and treat a bad payload as empty.
+      try {
+        const parsed = z
+          .array(RecommendedPlaylistTrackSchema)
+          .safeParse(JSON.parse(row.payload));
+        if (parsed.success) {
+          tracks = parsed.data;
+        } else {
+          req.log.warn(
+            { playlistId: id, errors: parsed.error.issues },
+            "playlist suggestions payload failed validation; treating as empty",
+          );
+        }
+      } catch (err) {
+        req.log.warn(
+          { err, playlistId: id },
+          "playlist suggestions payload not parseable JSON; treating as empty",
+        );
+      }
+    }
+
+    const live = refreshPlaylistTracksInLibrary(tracks);
+    if (row.status === "error") {
+      return { status: "error" as const, data: live.length ? live : null };
+    }
+    return { status: "ready" as const, data: live };
+  });
+
   fastify.put("/:id", async (req, reply) => {
     const parsedParams = z.object({ id: z.string() }).safeParse(req.params);
     if (!parsedParams.success)
@@ -265,6 +343,7 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
       addTrackToPlaylist(id, trackId, startPosition + i);
     });
     touchPlaylist(id);
+    markSuggestionStale(req.userId, id, Date.now() + DEBOUNCE_MS);
 
     return reply.status(204).send();
   });
@@ -300,6 +379,7 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
 
     removePlaylistTrackEntry(entryId);
     touchPlaylist(id);
+    markSuggestionStale(req.userId, id, Date.now() + DEBOUNCE_MS);
 
     return reply.status(204).send();
   });

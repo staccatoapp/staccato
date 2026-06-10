@@ -1,5 +1,33 @@
-import { describe, it, expect } from "vitest";
-import { sanitizeTitleForSearch, escapeLuceneTerm } from "./fromSearch.js";
+import { beforeEach, describe, it, expect, vi } from "vitest";
+
+vi.mock("../mbLookup.js", () => ({ searchRecordingsRich: vi.fn() }));
+
+import { searchRecordingsRich } from "../mbLookup.js";
+import {
+  sanitizeTitleForSearch,
+  escapeLuceneTerm,
+  resolveRecordingByName,
+} from "./fromSearch.js";
+import type { RecordingCandidate } from "../types.js";
+
+const mSearch = vi.mocked(searchRecordingsRich);
+
+function candidate(mbid: string): RecordingCandidate {
+  return {
+    method: "search",
+    recordingMbid: mbid,
+    title: "T",
+    durationMs: null,
+    artistCredits: [],
+    releases: [],
+    acoustidScore: null,
+  };
+}
+function hit(mbid: string) {
+  return { candidate: candidate(mbid), mbScore: 100 };
+}
+
+beforeEach(() => vi.clearAllMocks());
 
 // Characterization tests. sanitizeTitleForSearch strips trailing bracket
 // annotations that break MusicBrainz phrase matching; escapeLuceneTerm
@@ -56,5 +84,69 @@ describe("escapeLuceneTerm", () => {
 
   it("escapes both backslash and quote together", () => {
     expect(escapeLuceneTerm('back\\and"quote')).toBe('back\\\\and\\"quote');
+  });
+});
+
+describe("resolveRecordingByName", () => {
+  it("returns [] without searching when artist or title is missing", async () => {
+    expect(await resolveRecordingByName({ artist: "", title: "T" })).toEqual(
+      [],
+    );
+    expect(await resolveRecordingByName({ artist: "A", title: "" })).toEqual(
+      [],
+    );
+    expect(mSearch).not.toHaveBeenCalled();
+  });
+
+  it("tries the album-filtered query first, then falls back to album-less", async () => {
+    mSearch.mockResolvedValueOnce([]).mockResolvedValueOnce([hit("m1")]);
+
+    const out = await resolveRecordingByName({
+      artist: "Artist",
+      title: "Song",
+      album: "Album",
+    });
+
+    expect(out).toEqual([candidate("m1")]);
+    expect(mSearch).toHaveBeenCalledTimes(2);
+    expect(mSearch.mock.calls[0]![0]).toBe(
+      'artist:"Artist" AND recording:"Song" AND release:"Album" AND video:false',
+    );
+    expect(mSearch.mock.calls[1]![0]).toBe(
+      'artist:"Artist" AND recording:"Song" AND video:false',
+    );
+  });
+
+  it("issues only the album-less query when no album is given", async () => {
+    mSearch.mockResolvedValue([hit("m1")]);
+
+    await resolveRecordingByName({ artist: "Artist", title: "Song" });
+
+    expect(mSearch).toHaveBeenCalledTimes(1);
+    expect(mSearch.mock.calls[0]![0]).toBe(
+      'artist:"Artist" AND recording:"Song" AND video:false',
+    );
+  });
+
+  it("returns candidates from the first query that yields results", async () => {
+    mSearch.mockResolvedValue([hit("m1"), hit("m2")]);
+
+    const out = await resolveRecordingByName({ artist: "A", title: "B" });
+
+    expect(out).toEqual([candidate("m1"), candidate("m2")]);
+    expect(mSearch).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to a cleaned-title variant when the raw title yields nothing", async () => {
+    mSearch.mockResolvedValue([]); // every query empty
+    await resolveRecordingByName({ artist: "A", title: "Song [Hidden]" });
+
+    const queries = mSearch.mock.calls.map((c) => c[0]);
+    expect(queries).toContain(
+      'artist:"A" AND recording:"Song [Hidden]" AND video:false',
+    );
+    expect(queries).toContain(
+      'artist:"A" AND recording:"Song" AND video:false',
+    );
   });
 });

@@ -279,6 +279,48 @@ export function getLocalTrackMbidsByMbids(mbids: string[]): string[] {
     .map((r) => r.musicbrainzId);
 }
 
+export type LibrarySongRow = {
+  trackId: string;
+  artistMbid: string;
+  title: string;
+  canonicalTitle: string | null;
+  durationMs: number | null;
+};
+
+/** All library tracks whose artist carries one of the given artist MBIDs, with
+ * BOTH the raw file-tag title and the MusicBrainz canonical title. Backs the
+ * recommendations' song-level in-library fallback (in-library.ts): when a
+ * recommendation's recording MBID doesn't match the library exactly, we match on
+ * (artistMbid, normalized title) instead — the library and external sources
+ * routinely hold *different recordings of the same song*. Both titles are
+ * returned because they can disagree (e.g. raw tag "3005" vs canonical
+ * "V. 3005") and either may be the form the source used, so the matcher indexes
+ * the track under each. */
+export function getLibraryTracksByArtistMbids(
+  artistMbids: string[],
+): LibrarySongRow[] {
+  if (artistMbids.length === 0) return [];
+  return db
+    .select({
+      trackId: tracks.id,
+      artistMbid: sql<string>`${artists.musicbrainzId}`,
+      title: tracks.title,
+      canonicalTitle: tracks.canonicalTitle,
+      durationSeconds: tracks.durationSeconds,
+    })
+    .from(tracks)
+    .innerJoin(artists, eq(tracks.artistId, artists.id))
+    .where(inArray(artists.musicbrainzId, artistMbids))
+    .all()
+    .map((r) => ({
+      trackId: r.trackId,
+      artistMbid: r.artistMbid,
+      title: r.title,
+      canonicalTitle: r.canonicalTitle,
+      durationMs: r.durationSeconds != null ? r.durationSeconds * 1000 : null,
+    }));
+}
+
 export type TrackFullRow = typeof tracks.$inferSelect;
 
 export function getTrackByFilePath(filePath: string): TrackFullRow | undefined {

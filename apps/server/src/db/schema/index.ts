@@ -14,3 +14,6 @@ export * from "./user-settings.js";
 export * from "./preview-cache.js";
 export * from "./recommendation-cache.js";
 export * from "./track-lyrics.js";
+export * from "./lastfm-tags.js";
+export * from "./lastfm-popularity.js";
+export * from "./playlist-suggestions-cache.js";
