@@ -6,4 +6,8 @@ const { getDefaultConfig } = require('expo/metro-config');
 
 const config = getDefaultConfig(__dirname);
 
+// Exclude test files from the native bundle — test libraries import Node
+// built-ins (console, util) that don't exist in the native runtime.
+config.resolver.blockList = /.*\.test\.[jt]sx?$/;
+
 module.exports = config;

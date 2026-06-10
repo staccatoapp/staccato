@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import sessionPlugin, { requireAuth } from "./plugins/session.js";
 import authRoutes from "./routes/auth.js";
+import healthRoutes from "./routes/health.js";
 import fastifyStatic from "@fastify/static";
 import { runMigrations } from "./db/migrate.js";
 import { startLibraryPipeline } from "./library/index.js";
@@ -41,9 +42,7 @@ fs.mkdirSync(metadataDir, { recursive: true });
 fs.mkdirSync(coversDir, { recursive: true });
 fs.mkdirSync(artistImagesDir, { recursive: true });
 
-app.get("/api/health", async () => {
-  return { status: "ok" };
-});
+app.register(healthRoutes);
 
 app.register(authRoutes, { prefix: "/api/auth" });
 

@@ -1,6 +1,8 @@
 export * from "./types/zod/api/settings.js";
 export * from "./types/zod/api/search.js";
 export * from "./types/zod/api/auth.js";
+export * from "./types/zod/api/health.js";
+export * from "./types/zod/api/token.js";
 export * from "./types/zod/api/users.js";
 export * from "./types/zod/api/recommendations.js";
 export * from "./types/zod/api/albums.js";
@@ -27,3 +29,7 @@ export * from "./pagination.js";
 export * from "./search-rank.js";
 
 export * from "./artist-credit.js";
+
+export * from "./lib/server-url.js";
+
+export * from "./theme/colors.js";

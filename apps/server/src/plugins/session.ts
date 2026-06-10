@@ -1,8 +1,13 @@
 import { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
 import fp from "fastify-plugin";
 import secureSession from "@fastify/secure-session";
+import { createHash } from "node:crypto";
 import { getEnvironment } from "../environment/environment.js";
 import { findUserById } from "../db/queries/users.js";
+import {
+  findAuthTokenByHash,
+  updateAuthTokenLastUsed,
+} from "../db/queries/auth-tokens.js";
 
 declare module "@fastify/secure-session" {
   interface SessionData {
@@ -13,7 +18,13 @@ declare module "@fastify/secure-session" {
 declare module "fastify" {
   interface FastifyRequest {
     userId: string;
+    /** Set when the request authenticated via a bearer token (mobile clients). */
+    tokenId?: string;
   }
+}
+
+export function hashAuthToken(rawToken: string): string {
+  return createHash("sha256").update(rawToken).digest("hex");
 }
 
 const sessionPlugin: FastifyPluginAsync = async (fastify) => {
@@ -36,11 +47,37 @@ export async function requireAuth(
   request: FastifyRequest,
   reply: FastifyReply,
 ) {
+  // Web clients: session cookie (checked first — always present same-origin).
   const userId = request.session.get("userId");
-  if (!userId) {
-    return reply.code(401).send({ error: "Unauthorized" });
+  if (userId) {
+    request.userId = userId;
+    return;
   }
-  request.userId = userId;
+
+  // Mobile clients: Authorization: Bearer <opaque token>, looked up by hash.
+  const authorization = request.headers.authorization;
+  if (authorization?.startsWith("Bearer ")) {
+    const rawToken = authorization.slice("Bearer ".length).trim();
+    const tokenRow = rawToken
+      ? findAuthTokenByHash(hashAuthToken(rawToken))
+      : undefined;
+    if (tokenRow) {
+      request.userId = tokenRow.userId;
+      request.tokenId = tokenRow.id;
+      try {
+        // Best-effort bookkeeping; never block or fail the request over it.
+        updateAuthTokenLastUsed(tokenRow.id);
+      } catch (err) {
+        request.log.warn(
+          { err, tokenId: tokenRow.id },
+          "failed to update auth token lastUsedAt",
+        );
+      }
+      return;
+    }
+  }
+
+  return reply.code(401).send({ error: "Unauthorized" });
 }
 
 export async function requireAdmin(

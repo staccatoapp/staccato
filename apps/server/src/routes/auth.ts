@@ -1,20 +1,22 @@
 import { FastifyPluginAsync } from "fastify";
 import * as argon2 from "argon2";
+import { randomBytes } from "node:crypto";
 import {
   AuthenticatedUserResponseSchema,
+  CreateTokenSchema,
   CreateUserSchema,
   LoginSchema,
+  TokenResponseSchema,
 } from "@staccato/shared";
 import {
   createUser,
   findUserById,
-  findUserByUsername,
   isSetupComplete,
   markOnboardingComplete,
 } from "../db/queries/users.js";
-import { requireAuth } from "../plugins/session.js";
-
-const DUMMY_HASH = await argon2.hash("dummy-password-for-timing-safety");
+import { createAuthToken, deleteAuthToken } from "../db/queries/auth-tokens.js";
+import { hashAuthToken, requireAuth } from "../plugins/session.js";
+import { verifyCredentials } from "../lib/verify-credentials.js";
 
 const authRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/status", async () => {
@@ -62,14 +64,8 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send({ error: "Invalid request" });
     }
     const { username, password } = parsedBody.data;
-    const user = findUserByUsername(username);
-
-    // Always run a hash verification to prevent timing attacks
-    const hashToVerify = user?.passwordHash ?? DUMMY_HASH;
-    const valid = await argon2.verify(hashToVerify, password);
-
-    if (!user || !user.passwordHash || !valid) {
-      req.log.warn({ username }, "login failed: invalid credentials");
+    const user = await verifyCredentials(username, password, req.log);
+    if (!user) {
       return reply.code(401).send({ error: "Invalid credentials" });
     }
 
@@ -84,6 +80,65 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       isAdmin: user.isAdmin,
       onboardingComplete: user.onboardingComplete,
     });
+  });
+
+  // Issues a long-lived opaque bearer token for mobile clients. The raw token
+  // is returned exactly once; only its sha-256 hash is persisted.
+  fastify.post("/token", async (req, reply) => {
+    const parsedBody = CreateTokenSchema.safeParse(req.body);
+    if (!parsedBody.success) {
+      req.log.warn(
+        { err: parsedBody.error },
+        "POST /token: invalid request body",
+      );
+      return reply.status(400).send({ error: "Invalid request" });
+    }
+    const { username, password, deviceName } = parsedBody.data;
+    const user = await verifyCredentials(username, password, req.log);
+    if (!user) {
+      return reply.code(401).send({ error: "Invalid credentials" });
+    }
+
+    const token = randomBytes(32).toString("base64url");
+    createAuthToken({
+      userId: user.id,
+      tokenHash: hashAuthToken(token),
+      deviceName: deviceName ?? null,
+    });
+    req.log.info(
+      { userId: user.id, username: user.username, deviceName },
+      "api token issued",
+    );
+    return reply.code(201).send(
+      TokenResponseSchema.parse({
+        token,
+        user: {
+          id: user.id,
+          username: user.username,
+          isAdmin: user.isAdmin,
+          onboardingComplete: user.onboardingComplete,
+        },
+      }),
+    );
+  });
+
+  // Revokes the bearer token used to authenticate this request (mobile sign-out).
+  fastify.delete("/token", { preHandler: requireAuth }, async (req, reply) => {
+    if (!req.tokenId) {
+      req.log.warn(
+        { userId: req.userId },
+        "DELETE /token: called without bearer authentication",
+      );
+      return reply.status(400).send({
+        error: "Token revocation requires Bearer authentication",
+      });
+    }
+    deleteAuthToken(req.tokenId);
+    req.log.info(
+      { tokenId: req.tokenId, userId: req.userId },
+      "api token revoked",
+    );
+    return reply.code(204).send();
   });
 
   fastify.post("/logout", { preHandler: requireAuth }, async (req, reply) => {

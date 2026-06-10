@@ -1,4 +1,5 @@
 export * from "./album-artists.js";
+export * from "./auth-tokens.js";
 export * from "./albums.js";
 export * from "./artists.js";
 export * from "./download-requests.js";
