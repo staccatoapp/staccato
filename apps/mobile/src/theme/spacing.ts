@@ -8,5 +8,7 @@ export const spacing = {
   controlHeight: 50,
   /** Minimum tap target (e.g. show/hide-password toggle) */
   minHitTarget: 44,
+  /** Horizontal screen padding on the home screen */
+  homeScreenPadding: 20,
 } as const;
 export type ThemeSpacing = typeof spacing;

@@ -1,5 +1,4 @@
 import { Colors } from "@staccato/shared";
-import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
@@ -7,24 +6,13 @@ import { useEffect } from "react";
 
 import { StaccatoThemeProvider } from "@/theme";
 
-// Hold the native splash until the Inter font is ready, so the in-app splash
-// never flashes a fallback font.
+// Hold the native splash until the first JS frame so it never flashes white.
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
-    Inter: require("@/assets/fonts/Inter-VariableFont_opsz_wght.ttf"),
-  });
-
   useEffect(() => {
-    if (fontsLoaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [fontsLoaded]);
-
-  if (!fontsLoaded) {
-    return null;
-  }
+    SplashScreen.hideAsync();
+  }, []);
 
   return (
     <StaccatoThemeProvider>

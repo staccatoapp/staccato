@@ -26,9 +26,18 @@ describe("useTheme", () => {
     expect(result.current.spacing.minHitTarget).toBe(44);
   });
 
-  it("exposes the Inter font family", () => {
+  it("uses the platform system font (no custom fontFamily)", () => {
     const { result } = renderHook(() => useTheme(), { wrapper });
-    expect(result.current.typography.fontFamily).toBe("Inter");
+    expect(result.current.typography.fontFamily).toBeUndefined();
+  });
+
+  it("exposes the home screen metrics", () => {
+    const { result } = renderHook(() => useTheme(), { wrapper });
+    expect(result.current.spacing.homeScreenPadding).toBe(20);
+    expect(result.current.radius.heroCard).toBe(16);
+    expect(result.current.radius.carouselArt).toBe(10);
+    expect(result.current.radius.quickStartCell).toBe(10);
+    expect(result.current.radius.quickStartArt).toBe(6);
   });
 
   it("throws when used outside the provider", () => {

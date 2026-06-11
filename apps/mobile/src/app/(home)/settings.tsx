@@ -3,13 +3,13 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { useTheme } from "@/theme";
 
-/** Placeholder until the Explore screen is designed. */
-export default function ExploreScreen() {
+/** Placeholder until the Settings screen is designed. */
+export default function SettingsScreen() {
   const { colors } = useTheme();
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
-      <Text style={[styles.title, { color: colors.fg }]}>Explore</Text>
+      <Text style={[styles.title, { color: colors.fg }]}>Settings</Text>
     </View>
   );
 }

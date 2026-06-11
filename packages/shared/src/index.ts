@@ -33,3 +33,4 @@ export * from "./artist-credit.js";
 export * from "./lib/server-url.js";
 
 export * from "./theme/colors.js";
+export * from "./theme/gradients.js";

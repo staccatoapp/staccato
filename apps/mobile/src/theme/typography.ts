@@ -1,12 +1,9 @@
 /**
- * Inter variable font, loaded in the root layout via expo-font under the
- * family name "Inter"; weight is selected with the fontWeight style prop.
- *
- * Known limitation: the handoff wordmark uses OpenType features ss01 + cv11,
- * which React Native cannot enable — the wordmark renders with default
- * Inter letterforms (subtle difference, accepted).
+ * Platform system font: leaving fontFamily undefined renders SF Pro on iOS
+ * and Roboto on Android, per the home-screen design handoff. Weight is
+ * selected with the fontWeight style prop.
  */
 export const typography = {
-  fontFamily: "Inter",
+  fontFamily: undefined as string | undefined,
 } as const;
 export type ThemeTypography = typeof typography;
