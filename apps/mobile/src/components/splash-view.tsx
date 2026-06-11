@@ -1,33 +1,16 @@
-import { router } from "expo-router";
-import React, { useEffect } from "react";
+import React from "react";
 import { Text, View } from "react-native";
 
 import { LogoMark } from "@/components/logo-mark";
 import { Screen } from "@/components/ui/screen";
 import { Spinner } from "@/components/ui/spinner";
-import { resolveStartRoute } from "@/lib/start-route";
 import { useTheme } from "@/theme";
-
-/** Minimum dwell so the splash never flashes. */
-const MIN_DWELL_MS = 800;
 
 const WORDMARK_SIZE = 32;
 
-export default function SplashScreen() {
+/** Branded launch splash shown while the stored session is being resolved. */
+export function SplashView() {
   const { colors, typography } = useTheme();
-
-  useEffect(() => {
-    let cancelled = false;
-    const dwell = new Promise((resolve) => setTimeout(resolve, MIN_DWELL_MS));
-    Promise.all([resolveStartRoute(), dwell]).then(([route]) => {
-      if (!cancelled) {
-        router.replace(route);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   return (
     <Screen variant="fade">

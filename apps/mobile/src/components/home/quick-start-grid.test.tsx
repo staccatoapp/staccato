@@ -1,10 +1,15 @@
 import { render, screen } from "@testing-library/react-native";
 import React from "react";
 
-import { type HomeAlbum, type HomePlaylist } from "@/lib/home-data";
+import { type HomeAlbum, type HomePlaylist } from "@/lib/home-types";
 import { StaccatoThemeProvider } from "@/theme";
 
 import { QuickStartGrid } from "./quick-start-grid";
+
+// Cells render artwork via StaccatoImage, which reads the session.
+jest.mock("@/lib/session", () => ({
+  useSession: () => ({ session: null }),
+}));
 
 const album: HomeAlbum = {
   id: "a1",

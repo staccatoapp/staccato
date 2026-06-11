@@ -5,6 +5,13 @@ import { StaccatoThemeProvider } from "@/theme";
 
 import { AlbumArt } from "./album-art";
 
+// AlbumArt renders authed artwork via StaccatoImage, which reads the session.
+jest.mock("@/lib/session", () => ({
+  useSession: () => ({
+    session: { serverUrl: "https://music.example.com", token: "tok" },
+  }),
+}));
+
 function renderArt(props: Partial<React.ComponentProps<typeof AlbumArt>>) {
   return render(
     <StaccatoThemeProvider>

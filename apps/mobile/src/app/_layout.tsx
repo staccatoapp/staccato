@@ -4,27 +4,51 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 
+import { SplashView } from "@/components/splash-view";
+import { SessionProvider, useSession } from "@/lib/session";
 import { StaccatoThemeProvider } from "@/theme";
 
-// Hold the native splash until the first JS frame so it never flashes white.
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   useEffect(() => {
-    SplashScreen.hideAsync();
+    SplashScreen.hideAsync().catch((err) =>
+      console.warn("failed to hide splash screen", err),
+    );
   }, []);
 
   return (
-    <StaccatoThemeProvider>
-      <StatusBar style="light" />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: Colors.bg },
-          // Screens own their entrance animation (stacScreenIn).
-          animation: "none",
-        }}
-      />
-    </StaccatoThemeProvider>
+    <SessionProvider>
+      <StaccatoThemeProvider>
+        <StatusBar style="light" />
+        <RootNavigator />
+      </StaccatoThemeProvider>
+    </SessionProvider>
+  );
+}
+
+function RootNavigator() {
+  const { session, isLoading } = useSession();
+
+  if (isLoading) {
+    return <SplashView />;
+  }
+
+  return (
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: Colors.bg },
+        // Screens own their entrance animation (stacScreenIn).
+        animation: "none",
+      }}
+    >
+      <Stack.Protected guard={!!session}>
+        <Stack.Screen name="(home)" />
+      </Stack.Protected>
+      <Stack.Protected guard={!session}>
+        <Stack.Screen name="(auth)" />
+      </Stack.Protected>
+    </Stack>
   );
 }

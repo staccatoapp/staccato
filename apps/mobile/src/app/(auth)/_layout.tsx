@@ -1,6 +1,10 @@
 import { Colors } from "@staccato/shared";
 import { Stack } from "expo-router";
 
+export const unstable_settings = {
+  initialRouteName: "connect",
+};
+
 export default function AuthLayout() {
   return (
     <Stack

@@ -18,6 +18,16 @@ jest.mock("expo-router", () => ({
 jest.mock("expo-device", () => ({ deviceName: "Test Phone" }));
 jest.mock("@/lib/auth-storage");
 
+const mockSignIn = jest.fn();
+jest.mock("@/lib/session", () => ({
+  useSession: () => ({
+    session: null,
+    isLoading: false,
+    signIn: mockSignIn,
+    signOut: jest.fn(),
+  }),
+}));
+
 const mockedGetServerUrl = jest.mocked(getStoredServerUrl);
 
 const ERROR_TEXT =
@@ -108,7 +118,10 @@ describe("SignInScreen", () => {
     act(() => {
       jest.advanceTimersByTime(750);
     });
-    expect(router.replace).toHaveBeenCalledWith("/(home)");
+    expect(mockSignIn).toHaveBeenCalledWith({
+      serverUrl: "https://music.home.arpa",
+      token: "raw-token",
+    });
     jest.useRealTimers();
   });
 

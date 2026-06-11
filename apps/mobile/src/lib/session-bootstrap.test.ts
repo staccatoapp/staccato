@@ -1,10 +1,10 @@
+import { ApiError, createApiClient } from "./api-client";
 import {
   clearStoredToken,
   getStoredServerUrl,
   getStoredToken,
 } from "./auth-storage";
-import { ApiError, createApiClient } from "./api-client";
-import { resolveStartRoute } from "./start-route";
+import { loadInitialSession } from "./session-bootstrap";
 
 jest.mock("./auth-storage");
 jest.mock("./api-client", () => {
@@ -25,41 +25,44 @@ function mockClient(get: jest.Mock) {
   });
 }
 
-describe("resolveStartRoute", () => {
+describe("loadInitialSession", () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it("goes to connect when no token is stored", async () => {
+  it("returns null when no token is stored", async () => {
     mockedGetToken.mockResolvedValue(null);
     mockedGetServerUrl.mockResolvedValue("https://music.example.com");
-    expect(await resolveStartRoute()).toBe("/(auth)/connect");
+    expect(await loadInitialSession()).toBeNull();
   });
 
-  it("goes to connect when no server url is stored", async () => {
+  it("returns null when no server url is stored", async () => {
     mockedGetToken.mockResolvedValue("tok");
     mockedGetServerUrl.mockResolvedValue(null);
-    expect(await resolveStartRoute()).toBe("/(auth)/connect");
+    expect(await loadInitialSession()).toBeNull();
   });
 
-  it("goes home when the stored token is accepted by the server", async () => {
+  it("returns the session when the stored token is accepted", async () => {
     mockedGetToken.mockResolvedValue("tok");
     mockedGetServerUrl.mockResolvedValue("https://music.example.com");
     mockClient(jest.fn().mockResolvedValue({ id: "u1" }));
-    expect(await resolveStartRoute()).toBe("/(home)");
+    expect(await loadInitialSession()).toEqual({
+      serverUrl: "https://music.example.com",
+      token: "tok",
+    });
   });
 
-  it("clears the token and goes to connect on a 401", async () => {
+  it("clears the token and returns null on a 401", async () => {
     mockedGetToken.mockResolvedValue("tok");
     mockedGetServerUrl.mockResolvedValue("https://music.example.com");
     mockClient(jest.fn().mockRejectedValue(new ApiError(401, "unauthorized")));
-    expect(await resolveStartRoute()).toBe("/(auth)/connect");
+    expect(await loadInitialSession()).toBeNull();
     expect(mockedClearToken).toHaveBeenCalled();
   });
 
-  it("keeps the token but goes to connect when the server is unreachable", async () => {
+  it("keeps the token but returns null when the server is unreachable", async () => {
     mockedGetToken.mockResolvedValue("tok");
     mockedGetServerUrl.mockResolvedValue("https://music.example.com");
     mockClient(jest.fn().mockRejectedValue(new Error("network down")));
-    expect(await resolveStartRoute()).toBe("/(auth)/connect");
+    expect(await loadInitialSession()).toBeNull();
     expect(mockedClearToken).not.toHaveBeenCalled();
   });
 });

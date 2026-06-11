@@ -5,10 +5,15 @@ import {
   type HomeAlbum,
   type HomeMix,
   type HomePlaylist,
-} from "@/lib/home-data";
+} from "@/lib/home-types";
 import { StaccatoThemeProvider } from "@/theme";
 
 import { Carousel, CarouselCard } from "./carousel";
+
+// Cards render artwork via StaccatoImage, which reads the session.
+jest.mock("@/lib/session", () => ({
+  useSession: () => ({ session: null }),
+}));
 
 const album: HomeAlbum = {
   id: "a1",

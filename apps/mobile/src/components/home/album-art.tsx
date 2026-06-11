@@ -1,8 +1,9 @@
 import { Gradients, type GradientKey } from "@staccato/shared";
-import { Image } from "expo-image";
 import { Music } from "lucide-react-native";
 import React from "react";
 import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+
+import { StaccatoImage } from "@/components/staccato-image";
 
 interface AlbumArtProps {
   /** Placeholder gradient shown until real artwork exists. */
@@ -33,6 +34,28 @@ export function AlbumArt({
 }: AlbumArtProps) {
   const [from, to] = Gradients[gradientKey];
 
+  // Gradient + glyph placeholder, shown until real artwork loads (and again if
+  // it fails). StaccatoImage owns fetching/auth; AlbumArt owns how it looks.
+  const placeholder = (
+    <View
+      style={[
+        StyleSheet.absoluteFill,
+        styles.glyphWrap,
+        {
+          experimental_backgroundImage: `linear-gradient(135deg, ${from}, ${to})`,
+        },
+      ]}
+    >
+      <View testID="album-art-glyph">
+        <Music
+          size={glyphSize ?? Math.round(size * 0.28)}
+          color="rgba(255,255,255,0.18)"
+          strokeWidth={1.6}
+        />
+      </View>
+    </View>
+  );
+
   return (
     <View
       testID="album-art"
@@ -42,32 +65,13 @@ export function AlbumArt({
         style,
       ]}
     >
-      {artUrl ? (
-        <Image
-          testID="album-art-image"
-          source={{ uri: artUrl }}
-          style={StyleSheet.absoluteFill}
-          contentFit="cover"
-        />
-      ) : (
-        <View
-          style={[
-            StyleSheet.absoluteFill,
-            styles.glyphWrap,
-            {
-              experimental_backgroundImage: `linear-gradient(135deg, ${from}, ${to})`,
-            },
-          ]}
-        >
-          <View testID="album-art-glyph">
-            <Music
-              size={glyphSize ?? Math.round(size * 0.28)}
-              color="rgba(255,255,255,0.18)"
-              strokeWidth={1.6}
-            />
-          </View>
-        </View>
-      )}
+      <StaccatoImage
+        testID="album-art-image"
+        uri={artUrl}
+        fallback={placeholder}
+        style={StyleSheet.absoluteFill}
+        contentFit="cover"
+      />
       <View
         pointerEvents="none"
         style={[StyleSheet.absoluteFill, styles.highlight]}

@@ -3,7 +3,7 @@ import { Play, Sparkles } from "lucide-react-native";
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { type HomeRecPlaylist } from "@/lib/home-data";
+import { type HomeRecPlaylist } from "@/lib/home-types";
 import { useTheme } from "@/theme";
 
 interface HeroRecProps {

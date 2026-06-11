@@ -19,6 +19,7 @@ import { Screen } from "@/components/ui/screen";
 import { TextField } from "@/components/ui/text-field";
 import { ApiError, createApiClient } from "@/lib/api-client";
 import { getStoredServerUrl, setStoredToken } from "@/lib/auth-storage";
+import { useSession } from "@/lib/session";
 import { useTheme } from "@/theme";
 
 type Phase = "idle" | "busy" | "err" | "ok";
@@ -31,6 +32,7 @@ const ERROR_MESSAGE =
 
 export default function SignInScreen() {
   const { colors, radius, spacing, typography } = useTheme();
+  const { signIn } = useSession();
   const reducedMotion = useReducedMotion();
   const [serverUrl, setServerUrl] = useState("");
   const [username, setUsername] = useState("");
@@ -92,7 +94,7 @@ export default function SignInScreen() {
       await setStoredToken(token);
       setPhase("ok");
       timers.current.push(
-        setTimeout(() => router.replace("/(home)"), OK_HOLD_MS),
+        setTimeout(() => signIn({ serverUrl, token }), OK_HOLD_MS),
       );
     } catch (err) {
       if (!(err instanceof ApiError) || err.status !== 401) {

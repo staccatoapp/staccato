@@ -1,7 +1,7 @@
 import React from "react";
 import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 
-import { type HomeAlbum, type HomePlaylist } from "@/lib/home-data";
+import { type HomeAlbum, type HomePlaylist } from "@/lib/home-types";
 import { AlbumArt } from "@/components/home/album-art";
 import { useTheme } from "@/theme";
 

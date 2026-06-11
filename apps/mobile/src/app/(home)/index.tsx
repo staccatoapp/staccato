@@ -2,17 +2,78 @@ import React from "react";
 import { ScrollView, StyleSheet } from "react-native";
 
 import { Carousel, HeroRec, QuickStartGrid } from "@/components/home";
-import { useHomeData } from "@/hooks/use-home-data";
+import { usePlaylists } from "@/hooks/use-playlists";
+import { useRecentlyPlayed } from "@/hooks/use-recently-played";
+import { useRecommendedPlaylists } from "@/hooks/use-recommended-playlists";
+import {
+  type HomeMix,
+  type HomePlaylist,
+  type HomeRecPlaylist,
+} from "@/lib/home-types";
 import { useTheme } from "@/theme";
+import { type GradientKey } from "@staccato/shared";
 
-/**
- * Editorial Home: hero recommendation (when one exists), quick-start grid,
- * then the Recently played / Made for you / Your playlists carousels.
- * Playback and detail navigation don't exist yet, so taps are not wired.
- */
+const GRADIENT_KEYS: GradientKey[] = [
+  "sunset",
+  "dusk",
+  "sea",
+  "amber",
+  "berry",
+  "ocean",
+  "rose",
+];
+
+function pickGradient(id: string): GradientKey {
+  const hash = id.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  return GRADIENT_KEYS[hash % GRADIENT_KEYS.length]!;
+}
+
+function deriveArtistSummary(tracks: { artistName: string | null }[]): string {
+  const names = [
+    ...new Set(
+      tracks.map((t) => t.artistName).filter((n): n is string => n !== null),
+    ),
+  ].slice(0, 3);
+  if (names.length === 0) return "Various Artists";
+  if (names.length === 1) return `Based on ${names[0]}`;
+  return `${names.slice(0, -1).join(", ")} & ${names[names.length - 1]}`;
+}
+
 export default function HomeScreen() {
   const { colors } = useTheme();
-  const { recPlaylist, recentlyPlayed, mixes, playlists } = useHomeData();
+  const { data: playlistsData } = usePlaylists();
+  const { data: recData } = useRecommendedPlaylists();
+  const recentlyPlayed = useRecentlyPlayed();
+
+  const playlists: HomePlaylist[] = (playlistsData?.items ?? []).map((p) => ({
+    id: p.id,
+    name: p.name,
+    trackCount: p.trackCount,
+    gradientKey: pickGradient(p.id),
+    artUrl: p.coverArtUrl ?? null,
+  }));
+
+  const recReady = recData?.status === "ready" ? recData.data : [];
+
+  const mixes: HomeMix[] = recReady.map((p) => ({
+    id: p.id,
+    name: p.name,
+    subtitle: p.description ?? "",
+    gradientKey: pickGradient(p.id),
+    artUrl: p.coverArtUrl ?? null,
+  }));
+
+  const firstRec = recReady[0];
+  const recPlaylist: HomeRecPlaylist | null = firstRec
+    ? {
+        id: firstRec.id,
+        name: firstRec.name,
+        trackCount: firstRec.trackCount,
+        artistSummary: deriveArtistSummary(firstRec.tracks),
+        gradientKey: pickGradient(firstRec.id),
+        artUrl: firstRec.coverArtUrl ?? null,
+      }
+    : null;
 
   const quickStartItems = [
     playlists[0],

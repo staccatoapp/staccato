@@ -5,7 +5,7 @@ import {
   type HomeAlbum,
   type HomeMix,
   type HomePlaylist,
-} from "@/lib/home-data";
+} from "@/lib/home-types";
 import { AlbumArt } from "@/components/home/album-art";
 import { useTheme } from "@/theme";
 

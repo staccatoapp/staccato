@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react-native";
 import React from "react";
 
-import { type HomeRecPlaylist } from "@/lib/home-data";
+import { type HomeRecPlaylist } from "@/lib/home-types";
 import { StaccatoThemeProvider } from "@/theme";
 
 import { HeroRec } from "./hero-rec";
