@@ -14,7 +14,8 @@ export interface HomePlaylist {
   name: string;
   trackCount: number;
   gradientKey: GradientKey;
-  artUrl: string | null;
+  /** Up to 4 dominant cover arts; 4 render as a mosaic, fewer as a single tile. */
+  artUrls: string[];
 }
 
 export interface HomeMix {

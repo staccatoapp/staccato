@@ -48,4 +48,24 @@ describe("AlbumArt", () => {
     expect(screen.getByTestId("album-art-image")).toBeOnTheScreen();
     expect(screen.queryByTestId("album-art-glyph")).not.toBeOnTheScreen();
   });
+
+  it("renders a 4-tile mosaic when given exactly 4 artUrls", () => {
+    renderArt({
+      artUrls: [
+        "https://example.com/1.jpg",
+        "https://example.com/2.jpg",
+        "https://example.com/3.jpg",
+        "https://example.com/4.jpg",
+      ],
+    });
+    expect(screen.getAllByTestId("album-art-image")).toHaveLength(4);
+    expect(screen.queryByTestId("album-art-glyph")).not.toBeOnTheScreen();
+  });
+
+  it("renders a single tile using the first art when fewer than 4 artUrls", () => {
+    renderArt({
+      artUrls: ["https://example.com/1.jpg", "https://example.com/2.jpg"],
+    });
+    expect(screen.getAllByTestId("album-art-image")).toHaveLength(1);
+  });
 });

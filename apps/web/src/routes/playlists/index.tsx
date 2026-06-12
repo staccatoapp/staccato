@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ListMusic, Plus } from "lucide-react";
+import { PlaylistArtwork } from "@/components/library/playlist-artwork";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -97,16 +98,11 @@ function PlaylistsPage() {
               params={{ playlistId: p.id }}
             >
               <div className="group cursor-pointer space-y-2">
-                <div className="aspect-square rounded-md overflow-hidden bg-muted flex items-center justify-center">
-                  {p.coverArtUrl ? (
-                    <img
-                      src={p.coverArtUrl}
-                      alt={p.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <ListMusic className="w-12 h-12 text-muted-foreground/30" />
-                  )}
+                <div className="aspect-square rounded-md overflow-hidden">
+                  <PlaylistArtwork
+                    coverArtUrls={p.coverArtUrls}
+                    name={p.name}
+                  />
                 </div>
                 <div>
                   <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">

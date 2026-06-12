@@ -40,6 +40,7 @@ import {
   markSuggestionStale,
 } from "../db/queries/playlist-suggestions-cache.js";
 import { serverConfig } from "../config/server-config.js";
+import { resolveAlbumCoverNow } from "../coverart/store.js";
 
 let userAId: string;
 let userBId: string;
@@ -143,6 +144,103 @@ describe("GET / — list scoping", () => {
     const { items } = res.json();
     expect(items).toHaveLength(1);
     expect(items[0].name).toBe("Alice's Playlist");
+  });
+});
+
+describe("GET / — cover art mosaic", () => {
+  let artistId: string;
+
+  beforeEach(() => {
+    artistId = seedArtist();
+    // Resolve each album to a stable, identifiable url so we can assert ranking.
+    vi.mocked(resolveAlbumCoverNow).mockImplementation(
+      (row) => `url-${row.albumId}`,
+    );
+  });
+
+  // Adds `count` tracks belonging to `albumId` to the playlist, in order.
+  async function addAlbumTracks(
+    app: Awaited<ReturnType<typeof buildApp>>,
+    albumId: string,
+    count: number,
+  ) {
+    const trackIds = Array.from({ length: count }, (_, i) =>
+      seedTrack(artistId, albumId, {
+        filePath: `/music/${albumId}-${i}.flac`,
+        trackNumber: i + 1,
+        title: `T-${albumId}-${i}`,
+      }),
+    );
+    await app.inject({
+      method: "POST",
+      url: `/${playlistId}/tracks`,
+      payload: { trackIds },
+    });
+  }
+
+  it("returns the top 4 cover arts ranked by track frequency", async () => {
+    const app = buildApp(playlistRoutes, userAId);
+    const a = seedAlbum(artistId, "Album A");
+    const b = seedAlbum(artistId, "Album B");
+    const c = seedAlbum(artistId, "Album C");
+    const d = seedAlbum(artistId, "Album D");
+    const e = seedAlbum(artistId, "Album E");
+    // Frequencies: A=3, B=2, C=2, D=1, E=1. B/C tie broken by first appearance.
+    await addAlbumTracks(app, a, 3);
+    await addAlbumTracks(app, b, 2);
+    await addAlbumTracks(app, c, 2);
+    await addAlbumTracks(app, d, 1);
+    await addAlbumTracks(app, e, 1);
+
+    const res = await app.inject({ method: "GET", url: "/" });
+    const item = res.json().items[0];
+    expect(item.coverArtUrls).toEqual([
+      `url-${a}`,
+      `url-${b}`,
+      `url-${c}`,
+      `url-${d}`,
+    ]);
+  });
+
+  it("returns a single cover when only one distinct album is present", async () => {
+    const app = buildApp(playlistRoutes, userAId);
+    const a = seedAlbum(artistId, "Solo Album");
+    await addAlbumTracks(app, a, 3);
+
+    const res = await app.inject({ method: "GET", url: "/" });
+    expect(res.json().items[0].coverArtUrls).toEqual([`url-${a}`]);
+  });
+
+  it("returns an empty array for a playlist with no tracks", async () => {
+    const app = buildApp(playlistRoutes, userAId);
+    const res = await app.inject({ method: "GET", url: "/" });
+    expect(res.json().items[0].coverArtUrls).toEqual([]);
+  });
+
+  it("skips cover-less albums and keeps filling up to 4", async () => {
+    const app = buildApp(playlistRoutes, userAId);
+    const a = seedAlbum(artistId, "Album A");
+    const b = seedAlbum(artistId, "Album B");
+    const c = seedAlbum(artistId, "Album C");
+    const d = seedAlbum(artistId, "Album D");
+    const e = seedAlbum(artistId, "Album E");
+    // A is the most-shared but has no resolvable cover, so it's skipped.
+    vi.mocked(resolveAlbumCoverNow).mockImplementation((row) =>
+      row.albumId === a ? null : `url-${row.albumId}`,
+    );
+    await addAlbumTracks(app, a, 4);
+    await addAlbumTracks(app, b, 3);
+    await addAlbumTracks(app, c, 2);
+    await addAlbumTracks(app, d, 1);
+    await addAlbumTracks(app, e, 1);
+
+    const res = await app.inject({ method: "GET", url: "/" });
+    expect(res.json().items[0].coverArtUrls).toEqual([
+      `url-${b}`,
+      `url-${c}`,
+      `url-${d}`,
+      `url-${e}`,
+    ]);
   });
 });
 

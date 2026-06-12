@@ -37,7 +37,7 @@ const playlist: HomePlaylist = {
   name: "Workout Fuel",
   trackCount: 31,
   gradientKey: "amber",
-  artUrl: null,
+  artUrls: [],
 };
 
 describe("Carousel", () => {

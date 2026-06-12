@@ -1,15 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import {
-  ChevronLeft,
-  Clock,
-  Download,
-  ListMusic,
-  Play,
-  Plus,
-  Trash2,
-} from "lucide-react";
+import { ChevronLeft, Clock, Download, Play, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -24,7 +16,9 @@ import {
   PlaybackSessionSchema,
   type PlaylistDetail,
   PlaylistDetailSchema,
+  topFrequentKeys,
 } from "@staccato/shared";
+import { PlaylistArtwork } from "@/components/library/playlist-artwork";
 import { formatTime } from "@/lib/music";
 import { usePreviewAudio } from "@/hooks/usePreviewAudio";
 import { usePlaylistSuggestions } from "@/hooks/usePlaylistSuggestions";
@@ -172,7 +166,12 @@ function PlaylistDetailPage() {
     0,
   );
   const orderedTrackIds = data.tracks.map((t) => t.trackId);
-  const coverArtUrl = data.tracks[0]?.coverArtUrl ?? null;
+  // Mirror the list endpoint's mosaic: top cover arts by how many tracks share
+  // each. tracks are position-ordered, so first appearance is the tiebreak.
+  const coverArtUrls = topFrequentKeys(
+    data.tracks.map((t) => t.coverArtUrl),
+    4,
+  );
 
   return (
     <div className="p-6">
@@ -184,16 +183,8 @@ function PlaylistDetailPage() {
       </Link>
 
       <div className="flex items-start gap-4 mb-6">
-        <div className="w-32 h-32 rounded-md bg-muted flex items-center justify-center shrink-0 overflow-hidden">
-          {coverArtUrl ? (
-            <img
-              src={coverArtUrl}
-              alt={data.name}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <ListMusic className="w-12 h-12 text-muted-foreground/30" />
-          )}
+        <div className="w-32 h-32 rounded-md shrink-0 overflow-hidden">
+          <PlaylistArtwork coverArtUrls={coverArtUrls} name={data.name} />
         </div>
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold mb-1">{data.name}</h1>

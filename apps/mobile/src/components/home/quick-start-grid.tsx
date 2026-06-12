@@ -40,7 +40,8 @@ export function QuickStartGrid({ items }: QuickStartGridProps) {
           >
             <AlbumArt
               gradientKey={item.gradientKey}
-              artUrl={item.artUrl}
+              artUrl={isAlbum ? item.artUrl : undefined}
+              artUrls={isAlbum ? undefined : item.artUrls}
               size={48}
               radius={radius.quickStartArt}
               glyphSize={18}

@@ -173,7 +173,7 @@ describe("PlaylistListItemSchema", () => {
     name: "My Playlist",
     description: null,
     trackCount: 5,
-    coverArtUrl: null,
+    coverArtUrls: [],
     updatedAt: null,
   };
 
@@ -191,7 +191,7 @@ describe("PlaylistListResponseSchema", () => {
           name: "Playlist",
           description: null,
           trackCount: 0,
-          coverArtUrl: null,
+          coverArtUrls: [],
           updatedAt: null,
         },
       ],

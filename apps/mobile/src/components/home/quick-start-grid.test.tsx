@@ -25,7 +25,7 @@ const playlist: HomePlaylist = {
   name: "Morning Chill",
   trackCount: 14,
   gradientKey: "sea",
-  artUrl: null,
+  artUrls: [],
 };
 
 function renderGrid(items: (HomeAlbum | HomePlaylist)[]) {

@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   parsePagination,
   RecommendedPlaylistTrackSchema,
+  topFrequentKeys,
   UpdatePlaylistRequestSchema,
   type RecommendedPlaylistTrack,
 } from "@staccato/shared";
@@ -69,18 +70,41 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
     const countByPlaylist = new Map(
       countRows.map((r) => [r.playlistId, r.trackCount]),
     );
-    const artByPlaylist = new Map<string, string | null>();
+
+    // Build a mosaic of up to 4 cover arts per playlist, ranked by how many
+    // tracks share each album's cover (most-shared first). artRows is one row
+    // per track, ordered by position, so first-seen order is the tiebreak.
+    type ArtRow = (typeof artRows)[number];
+    const rowsByPlaylist = new Map<string, ArtRow[]>();
     for (const row of artRows) {
-      if (!artByPlaylist.has(row.playlistId)) {
-        artByPlaylist.set(
-          row.playlistId,
-          resolveAlbumCoverNow({
-            albumId: row.albumId,
-            releaseGroupMbid: row.releaseGroupMbid,
-            coverArtUrl: row.coverArtUrl,
-          }),
-        );
+      const list = rowsByPlaylist.get(row.playlistId);
+      if (list) list.push(row);
+      else rowsByPlaylist.set(row.playlistId, [row]);
+    }
+
+    const coverArtUrlsByPlaylist = new Map<string, string[]>();
+    for (const [playlistId, rows] of rowsByPlaylist) {
+      const firstRowByAlbum = new Map<string, ArtRow>();
+      for (const row of rows) {
+        if (!firstRowByAlbum.has(row.albumId)) {
+          firstRowByAlbum.set(row.albumId, row);
+        }
       }
+      const rankedAlbumIds = topFrequentKeys(rows.map((r) => r.albumId));
+      const urls: string[] = [];
+      for (const albumId of rankedAlbumIds) {
+        const row = firstRowByAlbum.get(albumId)!;
+        const url = resolveAlbumCoverNow({
+          albumId: row.albumId,
+          releaseGroupMbid: row.releaseGroupMbid,
+          coverArtUrl: row.coverArtUrl,
+        });
+        // A cover-less album resolves to null and can't be rendered — skip it
+        // and keep walking the ranking until we have 4 renderable covers.
+        if (url) urls.push(url);
+        if (urls.length === 4) break;
+      }
+      coverArtUrlsByPlaylist.set(playlistId, urls);
     }
 
     return {
@@ -89,7 +113,7 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
         name: p.name,
         description: p.description,
         trackCount: countByPlaylist.get(p.id) ?? 0,
-        coverArtUrl: artByPlaylist.get(p.id) ?? null,
+        coverArtUrls: coverArtUrlsByPlaylist.get(p.id) ?? [],
         updatedAt: p.updatedAt?.toISOString() ?? null,
       })),
       total,

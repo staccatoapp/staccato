@@ -5,7 +5,8 @@ export const PlaylistListItemSchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
   trackCount: z.number(),
-  coverArtUrl: z.string().nullable(),
+  /** Up to 4 dominant cover arts (most-shared first) for a mosaic thumbnail. */
+  coverArtUrls: z.array(z.string()).max(4),
   updatedAt: z.string().nullable(),
 });
 export type PlaylistListItem = z.infer<typeof PlaylistListItemSchema>;

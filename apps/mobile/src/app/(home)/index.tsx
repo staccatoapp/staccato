@@ -50,7 +50,7 @@ export default function HomeScreen() {
     name: p.name,
     trackCount: p.trackCount,
     gradientKey: pickGradient(p.id),
-    artUrl: p.coverArtUrl ?? null,
+    artUrls: p.coverArtUrls,
   }));
 
   const recReady = recData?.status === "ready" ? recData.data : [];

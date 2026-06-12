@@ -93,7 +93,8 @@ export function CarouselCard({ item, onPress }: CarouselCardProps) {
     <Pressable onPress={onPress} style={styles.card}>
       <AlbumArt
         gradientKey={item.gradientKey}
-        artUrl={item.artUrl}
+        artUrl={"artUrls" in item ? undefined : item.artUrl}
+        artUrls={"artUrls" in item ? item.artUrls : undefined}
         size={CARD_WIDTH}
         radius={radius.carouselArt}
       />
