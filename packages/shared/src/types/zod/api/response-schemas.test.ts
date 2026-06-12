@@ -1,8 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { paginatedSchema } from "../../../pagination.js";
-import { AlbumListItemSchema } from "./albums.js";
-import { ArtistSchema, ArtistSearchItemSchema } from "./artists.js";
+import {
+  AlbumListItemSchema,
+  AlbumListResponseSchema,
+  AlbumSortSchema,
+} from "./albums.js";
+import {
+  ArtistListResponseSchema,
+  ArtistSchema,
+  ArtistSearchItemSchema,
+  ArtistSortSchema,
+} from "./artists.js";
 import {
   DownloadRequestSchema,
   LidarrOptionsSchema,
@@ -15,6 +24,7 @@ import {
   PlaylistDetailSchema,
   PlaylistListItemSchema,
   PlaylistListResponseSchema,
+  PlaylistSortSchema,
   PlaylistTrackSchema,
 } from "./playlists.js";
 import { recommendationsResponseSchema } from "./recommendations.js";
@@ -195,8 +205,80 @@ describe("PlaylistListResponseSchema", () => {
           updatedAt: null,
         },
       ],
+      total: 1,
     };
     expect(PlaylistListResponseSchema.parse(valid)).toEqual(valid);
+  });
+
+  it("rejects when total is missing", () => {
+    const invalid = { items: [] };
+    expect(() => PlaylistListResponseSchema.parse(invalid)).toThrow(z.ZodError);
+  });
+});
+
+describe("library list sort schemas", () => {
+  it("AlbumSortSchema accepts all four album sort keys", () => {
+    for (const key of ["createdAt", "title", "artist", "year"] as const) {
+      expect(AlbumSortSchema.parse(key)).toBe(key);
+    }
+  });
+
+  it("AlbumSortSchema rejects an unknown key", () => {
+    expect(() => AlbumSortSchema.parse("recent")).toThrow(z.ZodError);
+  });
+
+  it("ArtistSortSchema accepts createdAt and title only", () => {
+    expect(ArtistSortSchema.parse("createdAt")).toBe("createdAt");
+    expect(ArtistSortSchema.parse("title")).toBe("title");
+    expect(() => ArtistSortSchema.parse("artist")).toThrow(z.ZodError);
+    expect(() => ArtistSortSchema.parse("year")).toThrow(z.ZodError);
+  });
+
+  it("PlaylistSortSchema accepts createdAt and title only", () => {
+    expect(PlaylistSortSchema.parse("createdAt")).toBe("createdAt");
+    expect(PlaylistSortSchema.parse("title")).toBe("title");
+    expect(() => PlaylistSortSchema.parse("year")).toThrow(z.ZodError);
+  });
+});
+
+describe("AlbumListResponseSchema", () => {
+  it("parses a valid album list response", () => {
+    const valid = {
+      items: [
+        {
+          id: "al1",
+          title: "Album",
+          artistId: "ar1",
+          artistName: "Band",
+          artists: [ALBUM_ARTIST_CREDIT],
+          releaseYear: null,
+          coverArtUrl: null,
+          createdAt: null,
+          confidenceScore: null,
+          pendingTrackCount: 0,
+        },
+      ],
+      total: 1,
+    };
+    expect(AlbumListResponseSchema.parse(valid)).toEqual(valid);
+  });
+});
+
+describe("ArtistListResponseSchema", () => {
+  it("parses a valid artist list response", () => {
+    const valid = {
+      items: [
+        {
+          id: "ar1",
+          name: "Band",
+          imageUrl: null,
+          createdAt: null,
+          albumCount: 0,
+        },
+      ],
+      total: 1,
+    };
+    expect(ArtistListResponseSchema.parse(valid)).toEqual(valid);
   });
 });
 

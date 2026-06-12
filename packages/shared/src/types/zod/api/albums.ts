@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { paginatedSchema } from "../../../pagination.js";
 import {
   ExternalAlbumDetailSchema,
   ExternalAlbumTrackSchema,
@@ -202,3 +203,10 @@ export const AlbumListItemSchema = z.object({
   pendingTrackCount: z.number(),
 });
 export type AlbumListItem = z.infer<typeof AlbumListItemSchema>;
+
+/** Sort keys for the paged albums list. `createdAt` = most-recently-added first. */
+export const AlbumSortSchema = z.enum(["createdAt", "title", "artist", "year"]);
+export type AlbumSort = z.infer<typeof AlbumSortSchema>;
+
+export const AlbumListResponseSchema = paginatedSchema(AlbumListItemSchema);
+export type AlbumListResponse = z.infer<typeof AlbumListResponseSchema>;

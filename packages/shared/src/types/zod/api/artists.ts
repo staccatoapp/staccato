@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { paginatedSchema } from "../../../pagination.js";
 
 export const InLibraryDiscographyItemSchema = z.object({
   inLibrary: z.literal(true),
@@ -65,3 +66,10 @@ export const ArtistSchema = ArtistSearchItemSchema.extend({
   albumCount: z.number(),
 });
 export type Artist = z.infer<typeof ArtistSchema>;
+
+/** Sort keys for the paged artists list. `createdAt` = most-recently-added first. */
+export const ArtistSortSchema = z.enum(["createdAt", "title"]);
+export type ArtistSort = z.infer<typeof ArtistSortSchema>;
+
+export const ArtistListResponseSchema = paginatedSchema(ArtistSchema);
+export type ArtistListResponse = z.infer<typeof ArtistListResponseSchema>;

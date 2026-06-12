@@ -1,7 +1,11 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { sql } from "drizzle-orm";
-import { parsePagination } from "@staccato/shared";
+import {
+  AlbumSortSchema,
+  ArtistSortSchema,
+  parsePagination,
+} from "@staccato/shared";
 import {
   countArtists,
   getArtists,
@@ -25,11 +29,16 @@ import { resolveArtistImageNow } from "../artistimage/store.js";
 const libraryRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/artists", async (request) => {
     const query = z
-      .object({ limit: z.string().optional(), offset: z.string().optional() })
+      .object({
+        limit: z.string().optional(),
+        offset: z.string().optional(),
+        sort: z.string().optional(),
+      })
       .parse(request.query);
     const paginationOptions = parsePagination(query);
+    const sort = ArtistSortSchema.catch("createdAt").parse(query.sort);
 
-    const items = getArtists(paginationOptions);
+    const items = getArtists(paginationOptions, sort);
     const total = countArtists();
 
     return {
@@ -48,11 +57,16 @@ const libraryRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.get("/albums", async (request) => {
     const query = z
-      .object({ limit: z.string().optional(), offset: z.string().optional() })
+      .object({
+        limit: z.string().optional(),
+        offset: z.string().optional(),
+        sort: z.string().optional(),
+      })
       .parse(request.query);
     const paginationOptions = parsePagination(query);
+    const sort = AlbumSortSchema.catch("createdAt").parse(query.sort);
 
-    const items = getAlbumsWithArtistDetails(paginationOptions);
+    const items = getAlbumsWithArtistDetails(paginationOptions, sort);
     const total = countAlbums();
     const creditsByAlbum = listAlbumArtistsForAlbums(items.map((i) => i.id));
 

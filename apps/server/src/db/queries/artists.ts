@@ -2,6 +2,7 @@ import {
   and,
   asc,
   count,
+  desc,
   eq,
   isNotNull,
   isNull,
@@ -17,7 +18,7 @@ import { albums } from "../schema/albums.js";
 import { albumArtists } from "../schema/album-artists.js";
 import { tracks } from "../schema/tracks.js";
 import { SQLiteUpdateSetSource } from "drizzle-orm/sqlite-core";
-import { PaginationOptions } from "@staccato/shared";
+import { PaginationOptions, type ArtistSort } from "@staccato/shared";
 import { normalizeString } from "../../musicbrainz/client.js";
 
 export type ArtistRow = {
@@ -29,7 +30,10 @@ export type ArtistRow = {
   albumCount: number;
 };
 
-export function getArtists(paginationOptions: PaginationOptions): ArtistRow[] {
+export function getArtists(
+  paginationOptions: PaginationOptions,
+  sort: ArtistSort = "createdAt",
+): ArtistRow[] {
   // Pre-aggregate album counts in a single GROUP BY pass: UNION of both
   // ownership sources (legacy artist_id FK and primary album_artists credit)
   // deduplicates albums that appear via both paths before counting.
@@ -61,7 +65,12 @@ export function getArtists(paginationOptions: PaginationOptions): ArtistRow[] {
     })
     .from(artists)
     .leftJoin(albumCountSubq, eq(albumCountSubq.artistId, artists.id))
-    .orderBy(asc(sql`COALESCE(${artists.canonicalName}, ${artists.name})`))
+    .orderBy(
+      ...(sort === "title"
+        ? [asc(sql`COALESCE(${artists.canonicalName}, ${artists.name})`)]
+        : [desc(artists.createdAt)]),
+      asc(artists.id),
+    )
     .limit(paginationOptions.limit)
     .offset(paginationOptions.offset)
     .all();

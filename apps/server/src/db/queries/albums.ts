@@ -2,6 +2,7 @@ import {
   and,
   asc,
   count,
+  desc,
   eq,
   exists,
   isNull,
@@ -19,7 +20,7 @@ import { trackArtists } from "../schema/track-artists.js";
 import { albumArtists } from "../schema/album-artists.js";
 import { SQLiteUpdateSetSource } from "drizzle-orm/sqlite-core";
 import { RunResult } from "better-sqlite3";
-import { PaginationOptions } from "@staccato/shared";
+import { PaginationOptions, type AlbumSort } from "@staccato/shared";
 import { normalizeString } from "../../musicbrainz/client.js";
 
 export type AlbumWithArtistDetailsRow = {
@@ -175,8 +176,21 @@ function pendingTrackCountsSubquery() {
 
 export function getAlbumsWithArtistDetails(
   paginationOptions: PaginationOptions,
+  sort: AlbumSort = "createdAt",
 ): AlbumWithArtistDetailsRow[] {
   const sq = pendingTrackCountsSubquery();
+  const titleExpr = sql`COALESCE(${albums.canonicalTitle}, ${albums.title})`;
+  const artistExpr = sql`COALESCE(${artists.canonicalName}, ${artists.name})`;
+  // Each key carries its own direction (per the Library design's sorting
+  // rules); a stable id tiebreak keeps ordering deterministic across pages.
+  const orderBy =
+    sort === "title"
+      ? [asc(titleExpr)]
+      : sort === "artist"
+        ? [asc(artistExpr), asc(titleExpr)]
+        : sort === "year"
+          ? [desc(albums.releaseYear), asc(titleExpr)]
+          : [desc(albums.createdAt)];
   return db
     .select({
       id: albums.id,
@@ -194,10 +208,7 @@ export function getAlbumsWithArtistDetails(
     .from(albums)
     .innerJoin(artists, eq(albums.artistId, artists.id))
     .leftJoin(sq, eq(albums.id, sq.albumId))
-    .orderBy(
-      asc(sql`COALESCE(${artists.canonicalName}, ${artists.name})`),
-      asc(sql`COALESCE(${albums.canonicalTitle}, ${albums.title})`),
-    )
+    .orderBy(...orderBy, asc(albums.id))
     .limit(paginationOptions.limit)
     .offset(paginationOptions.offset)
     .all();

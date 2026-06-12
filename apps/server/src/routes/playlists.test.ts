@@ -53,6 +53,26 @@ beforeEach(() => {
   playlistId = seedPlaylist(userAId, "Alice's Playlist");
 });
 
+describe("GET / — sorting", () => {
+  it("sorts playlists by name ascending when sort=title", async () => {
+    seedPlaylist(userAId, "Zebra");
+    seedPlaylist(userAId, "Apple");
+    const app = buildApp(playlistRoutes, userAId);
+    const res = await app.inject({ method: "GET", url: "/?sort=title" });
+    expect(res.statusCode).toBe(200);
+    const names = res.json().items.map((p: { name: string }) => p.name);
+    // "Alice's Playlist" (seeded in beforeEach), "Apple", "Zebra"
+    expect(names).toEqual(["Alice's Playlist", "Apple", "Zebra"]);
+  });
+
+  it("falls back to recently-added (200) for an invalid sort", async () => {
+    const app = buildApp(playlistRoutes, userAId);
+    const res = await app.inject({ method: "GET", url: "/?sort=bogus" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().total).toBe(1);
+  });
+});
+
 describe("GET /:id — cross-user isolation", () => {
   it("returns 403 when requester is not the playlist owner", async () => {
     const app = buildApp(playlistRoutes, userBId);

@@ -56,6 +56,7 @@ const fixturePlaylistsData: PlaylistListResponse = {
       updatedAt: null,
     },
   ],
+  total: 3,
 };
 
 const fixtureRecData: RecommendedPlaylistsResponse = {

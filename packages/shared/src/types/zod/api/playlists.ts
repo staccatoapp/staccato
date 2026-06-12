@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { paginatedSchema } from "../../../pagination.js";
 
 export const PlaylistListItemSchema = z.object({
   id: z.string(),
@@ -11,10 +12,14 @@ export const PlaylistListItemSchema = z.object({
 });
 export type PlaylistListItem = z.infer<typeof PlaylistListItemSchema>;
 
-export const PlaylistListResponseSchema = z.object({
-  items: z.array(PlaylistListItemSchema),
-});
+export const PlaylistListResponseSchema = paginatedSchema(
+  PlaylistListItemSchema,
+);
 export type PlaylistListResponse = z.infer<typeof PlaylistListResponseSchema>;
+
+/** Sort keys for the paged playlists list. `createdAt` = most-recently-added first. */
+export const PlaylistSortSchema = z.enum(["createdAt", "title"]);
+export type PlaylistSort = z.infer<typeof PlaylistSortSchema>;
 
 export const PlaylistTrackSchema = z.object({
   entryId: z.string(),

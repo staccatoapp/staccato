@@ -115,12 +115,12 @@ describe("getArtists", () => {
     expect(c.albumCount).toBe(0);
   });
 
-  it("paginates results ordered alphabetically by name", () => {
+  it("paginates results ordered alphabetically by name when sort=title", () => {
     seedArtist("Zomby");
     seedArtist("Air");
     seedArtist("Massive Attack");
-    const page1 = getArtists({ limit: 2, offset: 0 });
-    const page2 = getArtists({ limit: 2, offset: 2 });
+    const page1 = getArtists({ limit: 2, offset: 0 }, "title");
+    const page2 = getArtists({ limit: 2, offset: 2 }, "title");
     expect(page1).toHaveLength(2);
     expect(page1[0]!.name).toBe("Air");
     expect(page1[1]!.name).toBe("Massive Attack");

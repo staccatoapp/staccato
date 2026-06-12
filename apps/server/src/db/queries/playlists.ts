@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { SQLiteUpdateSetSource } from "drizzle-orm/sqlite-core";
-import { PaginationOptions } from "@staccato/shared";
+import { PaginationOptions, type PlaylistSort } from "@staccato/shared";
 import { db } from "../client.js";
 import { playlists } from "../schema/playlists.js";
 import { playlistTracks } from "../schema/playlist-tracks.js";
@@ -31,12 +31,18 @@ export type PlaylistTrackRow = {
 export function getUserPlaylists(
   userId: string,
   paginationOptions?: PaginationOptions,
+  sort: PlaylistSort = "createdAt",
 ): PlaylistRow[] {
   const base = db
     .select()
     .from(playlists)
     .where(eq(playlists.userId, userId))
-    .orderBy(desc(playlists.updatedAt));
+    .orderBy(
+      ...(sort === "title"
+        ? [asc(playlists.name)]
+        : [desc(playlists.createdAt)]),
+      asc(playlists.id),
+    );
 
   if (paginationOptions) {
     return base

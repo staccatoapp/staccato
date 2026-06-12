@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import {
   parsePagination,
+  PlaylistSortSchema,
   RecommendedPlaylistTrackSchema,
   topFrequentKeys,
   UpdatePlaylistRequestSchema,
@@ -51,13 +52,20 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/", async (req, reply) => {
     const userId = req.userId;
     const parsedQuery = z
-      .object({ limit: z.string().optional(), offset: z.string().optional() })
+      .object({
+        limit: z.string().optional(),
+        offset: z.string().optional(),
+        sort: z.string().optional(),
+      })
       .safeParse(req.query);
     if (!parsedQuery.success)
       return reply.status(400).send({ error: "Invalid request" });
     const paginationOptions = parsePagination(parsedQuery.data);
+    const sort = PlaylistSortSchema.catch("createdAt").parse(
+      parsedQuery.data.sort,
+    );
 
-    const userPlaylists = getUserPlaylists(userId, paginationOptions);
+    const userPlaylists = getUserPlaylists(userId, paginationOptions, sort);
     const total = countUserPlaylists(userId);
 
     if (userPlaylists.length === 0) return { items: [], total };
