@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react-native";
+import { fireEvent, render, screen } from "@testing-library/react-native";
 import React from "react";
 import type { SyncedLyricsLine } from "@staccato/shared";
 
@@ -12,15 +12,20 @@ const LINES: SyncedLyricsLine[] = [
   { startingTime: 20, lyrics: "Well, who am I to keep you down?" },
 ];
 
-function renderLyrics(position: number) {
+function renderLyrics(position: number, onSeek?: jest.Mock) {
   render(
     <StaccatoThemeProvider>
-      <LyricsView lines={LINES} position={position} />
+      <LyricsView lines={LINES} position={position} onSeek={onSeek} />
     </StaccatoThemeProvider>,
   );
 }
 
 describe("LyricsView", () => {
+  it("renders a scroll view for user interaction", () => {
+    renderLyrics(0);
+    expect(screen.getByTestId("lyrics-scroll-view")).toBeTruthy();
+  });
+
   it("renders every lyric line", () => {
     renderLyrics(0);
     expect(screen.getByText("Now here you go again")).toBeTruthy();
@@ -42,5 +47,19 @@ describe("LyricsView", () => {
   it("renders instrumental gaps as invisible spacers", () => {
     renderLyrics(13);
     expect(screen.getByTestId("lyrics-line-2")).toHaveStyle({ opacity: 0 });
+  });
+
+  it("calls onSeek with the line's startingTime when a lyric line is pressed", () => {
+    const onSeek = jest.fn();
+    renderLyrics(0, onSeek);
+    fireEvent.press(screen.getByText("You say you want your freedom"));
+    expect(onSeek).toHaveBeenCalledWith(5);
+  });
+
+  it("does not call onSeek when an instrumental gap is pressed", () => {
+    const onSeek = jest.fn();
+    renderLyrics(0, onSeek);
+    fireEvent.press(screen.getByTestId("lyrics-line-2"));
+    expect(onSeek).not.toHaveBeenCalled();
   });
 });

@@ -1,16 +1,11 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { LinearGradient } from "expo-linear-gradient";
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
 import type { SyncedLyricsLine } from "@staccato/shared";
 
 import { getActiveLyricIndex } from "@/lib/playback";
-import { PLAYER_EASING } from "./player-easing";
+import { useLyricsScroll } from "./use-lyrics-scroll";
 
 const VIEWPORT_HEIGHT = 320;
 const LINE_HEIGHT = 44;
@@ -19,28 +14,15 @@ const FADE_RATIO = Math.round(VIEWPORT_HEIGHT * 0.14) / VIEWPORT_HEIGHT;
 interface LyricsViewProps {
   lines: SyncedLyricsLine[];
   position: number;
+  onSeek?: (seconds: number) => void;
 }
 
-/**
- * Synced lyrics: the latest line whose timestamp has passed is highlighted
- * and auto-centred in the viewport by translating the whole stack; other
- * lines dim with distance. Instrumental gaps are invisible spacers.
- */
-export function LyricsView({ lines, position }: LyricsViewProps) {
+export function LyricsView({ lines, position, onSeek }: LyricsViewProps) {
   const activeIndex = getActiveLyricIndex(lines, position);
   const [lineHeights, setLineHeights] = useState<number[]>([]);
 
-  const offsetY = useSharedValue(centeredOffset(activeIndex, lineHeights));
-  useEffect(() => {
-    offsetY.value = withTiming(centeredOffset(activeIndex, lineHeights), {
-      duration: 600,
-      easing: PLAYER_EASING,
-    });
-  }, [activeIndex, offsetY, lineHeights]);
-
-  const stackStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: offsetY.value }],
-  }));
+  const { scrollRef, onScrollBeginDrag, onScrollEndDrag, onMomentumScrollEnd, onScroll } =
+    useLyricsScroll({ activeIndex, lineHeights, viewportHeight: VIEWPORT_HEIGHT });
 
   const handleLineLayout = useCallback(
     (index: number, height: number) => {
@@ -66,7 +48,19 @@ export function LyricsView({ lines, position }: LyricsViewProps) {
           />
         }
       >
-        <Animated.View style={[styles.stack, stackStyle]}>
+        <ScrollView
+          ref={scrollRef}
+          testID="lyrics-scroll-view"
+          style={StyleSheet.absoluteFill}
+          contentContainerStyle={styles.contentContainer}
+          showsVerticalScrollIndicator={false}
+          scrollEventThrottle={16}
+          nestedScrollEnabled
+          onScroll={onScroll}
+          onScrollBeginDrag={onScrollBeginDrag}
+          onScrollEndDrag={onScrollEndDrag}
+          onMomentumScrollEnd={onMomentumScrollEnd}
+        >
           {lines.map((line, i) => {
             const isActive = i === activeIndex;
             const distance = Math.abs(i - activeIndex);
@@ -76,6 +70,16 @@ export function LyricsView({ lines, position }: LyricsViewProps) {
               : isActive
                 ? 1
                 : Math.max(0.32, 0.62 - distance * 0.06);
+            const content = (
+              <Text
+                style={[
+                  styles.lineText,
+                  { color: isActive ? "#fff" : "rgba(255,255,255,0.85)" },
+                ]}
+              >
+                {empty ? "·" : line.lyrics}
+              </Text>
+            );
             return (
               <View
                 key={`${line.startingTime}-${i}`}
@@ -83,30 +87,20 @@ export function LyricsView({ lines, position }: LyricsViewProps) {
                 style={[styles.line, { opacity }]}
                 onLayout={(e) => handleLineLayout(i, e.nativeEvent.layout.height)}
               >
-                <Text
-                  style={[
-                    styles.lineText,
-                    { color: isActive ? "#fff" : "rgba(255,255,255,0.85)" },
-                  ]}
-                >
-                  {empty ? "·" : line.lyrics}
-                </Text>
+                {!empty && onSeek ? (
+                  <Pressable onPress={() => onSeek(line.startingTime)}>
+                    {content}
+                  </Pressable>
+                ) : (
+                  content
+                )}
               </View>
             );
           })}
-        </Animated.View>
+        </ScrollView>
       </MaskedView>
     </View>
   );
-}
-
-function centeredOffset(activeIndex: number, heights: number[]): number {
-  let sumBefore = 0;
-  for (let i = 0; i < activeIndex; i++) {
-    sumBefore += heights[i] ?? LINE_HEIGHT;
-  }
-  const activeHeight = heights[activeIndex] ?? LINE_HEIGHT;
-  return VIEWPORT_HEIGHT / 2 - sumBefore - activeHeight / 2;
 }
 
 const styles = StyleSheet.create({
@@ -115,10 +109,8 @@ const styles = StyleSheet.create({
     width: "100%",
     overflow: "hidden",
   },
-  stack: {
-    position: "absolute",
-    left: 0,
-    right: 0,
+  contentContainer: {
+    paddingVertical: VIEWPORT_HEIGHT / 2,
   },
   line: {
     minHeight: LINE_HEIGHT,

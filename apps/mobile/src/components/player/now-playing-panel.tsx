@@ -153,7 +153,7 @@ export function NowPlayingPanel() {
           {/* Centre stage: art or lyrics */}
           <View style={styles.centerStage}>
             {showLyrics && syncedLyrics ? (
-              <LyricsView lines={syncedLyrics} position={position} />
+              <LyricsView lines={syncedLyrics} position={position} onSeek={seekTo} />
             ) : (
               <NowPlayingArt track={currentTrack} playing={isPlaying} />
             )}
