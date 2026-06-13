@@ -19,7 +19,12 @@ beforeEach(() => jest.clearAllMocks());
 
 describe("useApiClient", () => {
   it("builds a client from the active session", () => {
-    const client = { get: jest.fn(), post: jest.fn(), delete: jest.fn() };
+    const client = {
+      get: jest.fn(),
+      post: jest.fn(),
+      put: jest.fn(),
+      delete: jest.fn(),
+    };
     mockedCreateClient.mockReturnValue(client);
     mockUseSession.mockReturnValue({
       session: { serverUrl: "https://music.home.arpa", token: "tok" },
@@ -44,7 +49,12 @@ describe("useApiClient", () => {
   });
 
   it("reuses the same client across rerenders while the session is unchanged", () => {
-    const client = { get: jest.fn(), post: jest.fn(), delete: jest.fn() };
+    const client = {
+      get: jest.fn(),
+      post: jest.fn(),
+      put: jest.fn(),
+      delete: jest.fn(),
+    };
     mockedCreateClient.mockReturnValue(client);
     mockUseSession.mockReturnValue({
       session: { serverUrl: "https://music.home.arpa", token: "tok" },

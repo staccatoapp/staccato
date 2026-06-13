@@ -47,6 +47,7 @@ describe("useAuthedInfiniteList", () => {
     mockedCreateClient.mockReturnValue({
       get,
       post: jest.fn(),
+      put: jest.fn(),
       delete: jest.fn(),
     });
 
@@ -79,6 +80,7 @@ describe("useAuthedInfiniteList", () => {
     mockedCreateClient.mockReturnValue({
       get,
       post: jest.fn(),
+      put: jest.fn(),
       delete: jest.fn(),
     });
 

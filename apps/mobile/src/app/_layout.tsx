@@ -3,7 +3,9 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
+import { PlayerOverlayRoot } from "@/components/player-overlay";
 import { SplashView } from "@/components/splash-view";
 import { SessionProvider, useSession } from "@/lib/session";
 import { StaccatoThemeProvider } from "@/theme";
@@ -18,12 +20,17 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <SessionProvider>
-      <StaccatoThemeProvider>
-        <StatusBar style="light" />
-        <RootNavigator />
-      </StaccatoThemeProvider>
-    </SessionProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SessionProvider>
+        <StaccatoThemeProvider>
+          <StatusBar style="light" />
+          <RootNavigator />
+          {/* Mounted beside (not inside) the navigator so the mini player can
+              float over the native tab bar and Now Playing can cover it. */}
+          <PlayerOverlayRoot />
+        </StaccatoThemeProvider>
+      </SessionProvider>
+    </GestureHandlerRootView>
   );
 }
 

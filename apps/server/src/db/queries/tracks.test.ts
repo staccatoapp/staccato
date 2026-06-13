@@ -63,6 +63,16 @@ describe("getPlaybackTracksByIds", () => {
     expect(results.at(0)?.albumId).toBe(albumId);
   });
 
+  it("includes the album title for album-linked tracks", () => {
+    const artistId = seedArtist("Artist A");
+    const albumId = seedAlbum(artistId, "Rumours");
+    const trackId = seedTrack(artistId, albumId, { filePath: "/m/a5.flac" });
+
+    const results = getPlaybackTracksByIds([trackId]);
+
+    expect(results.at(0)?.albumTitle).toBe("Rumours");
+  });
+
   it("includes albumless tracks (null albumId) in the result", () => {
     const artistId = seedArtist("Artist A");
     const trackId = seedTrack(artistId, null, { filePath: "/m/a2.flac" });
@@ -72,6 +82,7 @@ describe("getPlaybackTracksByIds", () => {
     expect(results).toHaveLength(1);
     expect(results.at(0)?.id).toBe(trackId);
     expect(results.at(0)?.albumId).toBeNull();
+    expect(results.at(0)?.albumTitle).toBeNull();
     expect(results.at(0)?.releaseGroupMbid).toBeNull();
     expect(results.at(0)?.coverArtUrl).toBeNull();
   });

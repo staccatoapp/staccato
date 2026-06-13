@@ -130,6 +130,7 @@ describe("PlaybackTrackSchema", () => {
     trackNumber: null,
     discNumber: null,
     artistName: null,
+    albumTitle: null,
     coverArtUrl: null,
     durationSeconds: null,
     artists: [TRACK_ARTIST_CREDIT],
@@ -137,6 +138,18 @@ describe("PlaybackTrackSchema", () => {
 
   it("parses a valid playback track", () => {
     expect(PlaybackTrackSchema.parse(valid)).toEqual(valid);
+  });
+
+  it("parses a track with an album title", () => {
+    const withAlbum = { ...valid, albumTitle: "Rumours" };
+    expect(PlaybackTrackSchema.parse(withAlbum)).toEqual(withAlbum);
+  });
+
+  it("rejects when albumTitle is missing", () => {
+    const { albumTitle: _omitted, ...withoutAlbumTitle } = valid;
+    expect(() => PlaybackTrackSchema.parse(withoutAlbumTitle)).toThrow(
+      z.ZodError,
+    );
   });
 });
 
@@ -147,6 +160,7 @@ describe("PlaybackSessionSchema", () => {
     trackNumber: 1,
     discNumber: 1,
     artistName: "Artist",
+    albumTitle: null,
     coverArtUrl: null,
     durationSeconds: 180,
     artists: [],

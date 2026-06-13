@@ -1,10 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react-native";
 import React from "react";
-import { z } from "zod";
+import type { PlaybackSession } from "@staccato/shared";
 
 import { createApiClient } from "@/lib/api-client";
-import { useAuthedQuery } from "./use-authed-query";
+import { usePlaybackSession } from "./use-playback-session";
 
 jest.mock("@/lib/api-client", () => {
   const actual = jest.requireActual("@/lib/api-client");
@@ -17,7 +17,28 @@ jest.mock("@/lib/session", () => ({
 }));
 
 const mockedCreateClient = jest.mocked(createApiClient);
-const schema = z.object({ ok: z.boolean() });
+
+const SESSION: PlaybackSession = {
+  trackQueue: [
+    {
+      id: "t1",
+      title: "Dreams",
+      trackNumber: 2,
+      discNumber: 1,
+      artistName: "Fleetwood Mac",
+      albumTitle: "Rumours",
+      coverArtUrl: null,
+      durationSeconds: 254,
+      artists: [],
+    },
+  ],
+  currentTrackIndex: 0,
+  currentTrackPositionInSeconds: 0,
+  currentTrackAccumulatedPlayTimeInSeconds: 0,
+  currentTrackListenEventCreated: false,
+  // Not playing, so the hook's 5s refetch interval stays off during tests.
+  isPlaying: false,
+};
 
 let queryClient: QueryClient;
 
@@ -39,10 +60,9 @@ function wrapper({ children }: { children: React.ReactNode }) {
   );
 }
 
-describe("useAuthedQuery", () => {
-  it("fetches via the session client and scopes the key by server url", async () => {
-    const data = { ok: true };
-    const get = jest.fn().mockResolvedValue(data);
+describe("usePlaybackSession", () => {
+  it("fetches the playback session from the server", async () => {
+    const get = jest.fn().mockResolvedValue(SESSION);
     mockedCreateClient.mockReturnValue({
       get,
       post: jest.fn(),
@@ -50,17 +70,14 @@ describe("useAuthedQuery", () => {
       delete: jest.fn(),
     });
 
-    const { result } = renderHook(
-      () => useAuthedQuery(["thing"], "/api/thing", schema),
-      { wrapper },
-    );
+    const { result } = renderHook(() => usePlaybackSession(), { wrapper });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(get).toHaveBeenCalledWith("/api/thing", schema);
-    expect(result.current.data).toEqual(data);
-    expect(
-      queryClient.getQueryData(["thing", "https://music.home.arpa"]),
-    ).toEqual(data);
+    expect(get).toHaveBeenCalledWith(
+      "/api/playback/session",
+      expect.anything(),
+    );
+    expect(result.current.data).toEqual(SESSION);
   });
 
   it("stays disabled when there is no session", () => {
@@ -73,28 +90,7 @@ describe("useAuthedQuery", () => {
     });
     mockUseSession.mockReturnValue({ session: null });
 
-    const { result } = renderHook(
-      () => useAuthedQuery(["thing"], "/api/thing", schema),
-      { wrapper },
-    );
-
-    expect(result.current.fetchStatus).toBe("idle");
-    expect(get).not.toHaveBeenCalled();
-  });
-
-  it("respects a caller-provided enabled:false", () => {
-    const get = jest.fn();
-    mockedCreateClient.mockReturnValue({
-      get,
-      post: jest.fn(),
-      put: jest.fn(),
-      delete: jest.fn(),
-    });
-
-    const { result } = renderHook(
-      () => useAuthedQuery(["thing"], "/api/thing", schema, { enabled: false }),
-      { wrapper },
-    );
+    const { result } = renderHook(() => usePlaybackSession(), { wrapper });
 
     expect(result.current.fetchStatus).toBe("idle");
     expect(get).not.toHaveBeenCalled();

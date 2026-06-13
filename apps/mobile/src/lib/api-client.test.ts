@@ -75,4 +75,49 @@ describe("createApiClient", () => {
       ApiError,
     );
   });
+
+  it("PUTs a JSON body and parses the response with the schema", async () => {
+    const fetchMock = mockFetchOnce(200, { ok: true });
+    const client = createApiClient("https://music.example.com", "tok-123");
+    const result = await client.put(
+      "/api/playback/session/state",
+      { isPlaying: true },
+      PingSchema,
+    );
+
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe("https://music.example.com/api/playback/session/state");
+    expect(init.method).toBe("PUT");
+    expect(init.body).toBe(JSON.stringify({ isPlaying: true }));
+    expect((init.headers as Record<string, string>)["Content-Type"]).toBe(
+      "application/json",
+    );
+    expect((init.headers as Record<string, string>).Authorization).toBe(
+      "Bearer tok-123",
+    );
+    expect(result).toEqual({ ok: true });
+  });
+
+  it("throws ApiError with the status when a PUT fails", async () => {
+    mockFetchOnce(400, { error: "Invalid request" });
+    const client = createApiClient("https://music.example.com");
+    await expect(
+      client.put("/api/playback/session/state", {}, PingSchema),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("returns null for a 204 response when the schema allows null", async () => {
+    mockFetchOnce(204, undefined);
+    const client = createApiClient("https://music.example.com");
+    const result = await client.get("/api/thing", PingSchema.nullable());
+    expect(result).toBeNull();
+  });
+
+  it("throws ApiError for a 204 response when the schema does not allow null", async () => {
+    mockFetchOnce(204, undefined);
+    const client = createApiClient("https://music.example.com");
+    await expect(client.get("/api/thing", PingSchema)).rejects.toBeInstanceOf(
+      ApiError,
+    );
+  });
 });

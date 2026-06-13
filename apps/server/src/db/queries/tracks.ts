@@ -127,6 +127,7 @@ export type PlaybackTrackRow = {
   discNumber: number | null;
   artistName: string | null;
   albumId: string | null;
+  albumTitle: string | null;
   releaseGroupMbid: string | null;
   coverArtUrl: string | null;
   durationSeconds: number | null;
@@ -152,6 +153,7 @@ export function getPlaybackTracksByIds(ids: string[]): PlaybackTrackRow[] {
       discNumber: tracks.discNumber,
       artistName: resolvedArtistName,
       albumId: albums.id,
+      albumTitle: resolvedAlbumTitle,
       releaseGroupMbid: albums.releaseGroupMbid,
       coverArtUrl: albums.coverArtUrl,
       durationSeconds: tracks.durationSeconds,

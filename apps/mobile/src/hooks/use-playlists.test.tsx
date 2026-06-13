@@ -47,6 +47,7 @@ describe("usePlaylists", () => {
     mockedCreateClient.mockReturnValue({
       get,
       post: jest.fn(),
+      put: jest.fn(),
       delete: jest.fn(),
     });
 

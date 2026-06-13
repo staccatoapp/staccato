@@ -1,10 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react-native";
 import React from "react";
-import { z } from "zod";
+import type { TrackLyrics } from "@staccato/shared";
 
 import { createApiClient } from "@/lib/api-client";
-import { useAuthedQuery } from "./use-authed-query";
+import { useLyrics } from "./use-lyrics";
 
 jest.mock("@/lib/api-client", () => {
   const actual = jest.requireActual("@/lib/api-client");
@@ -17,7 +17,16 @@ jest.mock("@/lib/session", () => ({
 }));
 
 const mockedCreateClient = jest.mocked(createApiClient);
-const schema = z.object({ ok: z.boolean() });
+
+const LYRICS: TrackLyrics = {
+  trackId: "t1",
+  instrumental: false,
+  plainLyrics: null,
+  syncedLyrics: [
+    { startingTime: 0, lyrics: "First line" },
+    { startingTime: 5, lyrics: "Second line" },
+  ],
+};
 
 let queryClient: QueryClient;
 
@@ -39,10 +48,9 @@ function wrapper({ children }: { children: React.ReactNode }) {
   );
 }
 
-describe("useAuthedQuery", () => {
-  it("fetches via the session client and scopes the key by server url", async () => {
-    const data = { ok: true };
-    const get = jest.fn().mockResolvedValue(data);
+describe("useLyrics", () => {
+  it("fetches lyrics for the given track", async () => {
+    const get = jest.fn().mockResolvedValue(LYRICS);
     mockedCreateClient.mockReturnValue({
       get,
       post: jest.fn(),
@@ -50,40 +58,19 @@ describe("useAuthedQuery", () => {
       delete: jest.fn(),
     });
 
-    const { result } = renderHook(
-      () => useAuthedQuery(["thing"], "/api/thing", schema),
-      { wrapper },
-    );
+    const { result } = renderHook(() => useLyrics("t1"), { wrapper });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(get).toHaveBeenCalledWith("/api/thing", schema);
-    expect(result.current.data).toEqual(data);
-    expect(
-      queryClient.getQueryData(["thing", "https://music.home.arpa"]),
-    ).toEqual(data);
-  });
-
-  it("stays disabled when there is no session", () => {
-    const get = jest.fn();
-    mockedCreateClient.mockReturnValue({
-      get,
-      post: jest.fn(),
-      put: jest.fn(),
-      delete: jest.fn(),
-    });
-    mockUseSession.mockReturnValue({ session: null });
-
-    const { result } = renderHook(
-      () => useAuthedQuery(["thing"], "/api/thing", schema),
-      { wrapper },
+    expect(get).toHaveBeenCalledWith(
+      "/api/playback/lyrics?trackId=t1",
+      expect.anything(),
     );
-
-    expect(result.current.fetchStatus).toBe("idle");
-    expect(get).not.toHaveBeenCalled();
+    expect(result.current.data).toEqual(LYRICS);
   });
 
-  it("respects a caller-provided enabled:false", () => {
-    const get = jest.fn();
+  it("resolves null when the server has no lyrics (204)", async () => {
+    // The api client maps a 204 to null when the schema allows it.
+    const get = jest.fn().mockResolvedValue(null);
     mockedCreateClient.mockReturnValue({
       get,
       post: jest.fn(),
@@ -91,10 +78,22 @@ describe("useAuthedQuery", () => {
       delete: jest.fn(),
     });
 
-    const { result } = renderHook(
-      () => useAuthedQuery(["thing"], "/api/thing", schema, { enabled: false }),
-      { wrapper },
-    );
+    const { result } = renderHook(() => useLyrics("t1"), { wrapper });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toBeNull();
+  });
+
+  it("stays disabled without a track id", () => {
+    const get = jest.fn();
+    mockedCreateClient.mockReturnValue({
+      get,
+      post: jest.fn(),
+      put: jest.fn(),
+      delete: jest.fn(),
+    });
+
+    const { result } = renderHook(() => useLyrics(undefined), { wrapper });
 
     expect(result.current.fetchStatus).toBe("idle");
     expect(get).not.toHaveBeenCalled();

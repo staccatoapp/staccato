@@ -7,6 +7,7 @@ export const PlaybackTrackSchema = z.object({
   trackNumber: z.number().nullable(),
   discNumber: z.number().nullable(),
   artistName: z.string().nullable(),
+  albumTitle: z.string().nullable(),
   coverArtUrl: z.string().nullable(),
   durationSeconds: z.number().nullable(),
   artists: z.array(TrackArtistCreditSchema),

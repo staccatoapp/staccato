@@ -15,6 +15,7 @@ export class ApiError extends Error {
 export interface ApiClient {
   get<T>(path: string, schema: z.ZodType<T>): Promise<T>;
   post<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T>;
+  put<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T>;
   delete(path: string): Promise<void>;
 }
 
@@ -52,7 +53,8 @@ async function parseResponse<T>(
   if (!res.ok) {
     throw new ApiError(res.status, `request to ${path} failed (${res.status})`);
   }
-  const json: unknown = await res.json();
+  // 204 has no body; the schema decides whether "no content" is acceptable.
+  const json: unknown = res.status === 204 ? null : await res.json();
   const parsed = schema.safeParse(json);
   if (!parsed.success) {
     console.warn("api response failed validation", {
@@ -82,6 +84,17 @@ export function createApiClient(baseUrl: string, token?: string): ApiClient {
     ): Promise<T> {
       const res = await request(baseUrl, token, path, {
         method: "POST",
+        body: JSON.stringify(body),
+      });
+      return parseResponse(res, schema, path);
+    },
+    async put<T>(
+      path: string,
+      body: unknown,
+      schema: z.ZodType<T>,
+    ): Promise<T> {
+      const res = await request(baseUrl, token, path, {
+        method: "PUT",
         body: JSON.stringify(body),
       });
       return parseResponse(res, schema, path);
