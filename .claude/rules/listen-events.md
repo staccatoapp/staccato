@@ -46,12 +46,7 @@ The web client owns play-time accounting, not the server. `player-bar.tsx` polls
 `PUT /api/playback/session/state` every ~5 seconds, sending
 `currentTrackAccumulatedPlayTimeInSeconds` — an accumulator that `seek-bar.tsx` advances only on
 genuine `timeupdate` deltas while playing, so scrubbing and pausing never inflate it. The server
-records a listen when `!currentTrackListenEventCreated && isPlaying && accumulatedPlayTime >
-Math.min(240, (durationSeconds ?? 480) / 2)` — the ListenBrainz "half the track, or four
-minutes, whichever is less" rule. The `currentTrackListenEventCreated` flag on the
-`playback_session` row is the dedup gate: the server sets it `true` the moment a listen fires so
-a track is only counted once per play, and the client resets it to `false` on every track change
-(skip / next / previous / track-end) to re-arm the gate for the new track.
+records a listen when `!current.currentTrackListenEventCreated && isPlaying && shouldRecordListen(accumulatedSeconds, durationSeconds)`. `shouldRecordListen` is exported from `scrobbling/dispatch.ts` and encapsulates the ListenBrainz rule: `accumulatedSeconds > Math.min(240, (durationSeconds ?? 480) / 2)` — half the track or four minutes, whichever is less; unknown duration assumes 8 minutes (threshold = 240 s). The `currentTrackListenEventCreated` flag on the `playback_session` row is the dedup gate: once the server sets it `true`, it must not be overwritten by a concurrent client poll carrying a stale `false` — the expression persisting it is `listenEventCreated || (currentTrackListenEventCreated ?? false)`. The client resets the flag to `false` on every track change (skip / next / previous / track-end) to re-arm the gate for the new track.
 
 ## Scrobbling: Pluggable Targets
 

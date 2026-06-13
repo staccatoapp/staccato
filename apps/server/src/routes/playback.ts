@@ -15,7 +15,7 @@ import {
   groupCreditsByTrack,
   listTrackArtistsForTracks,
 } from "../db/queries/track-artists.js";
-import { recordListen } from "../scrobbling/dispatch.js";
+import { recordListen, shouldRecordListen } from "../scrobbling/dispatch.js";
 import {
   getLyricsByTrackId,
   getTrackMetaForLyrics,
@@ -111,13 +111,13 @@ const playbackRoutes: FastifyPluginAsync = async (fastify) => {
 
     let listenEventCreated = current.currentTrackListenEventCreated;
 
-    // only scrobble if listened to more than half the track or 4 mins as per
-    // listenbrainz docs. should probably pull this out at some point
     if (
       !current.currentTrackListenEventCreated &&
       isPlaying &&
-      currentTrackAccumulatedPlayTimeInSeconds >
-        Math.min(240, (currentTrackDurationSeconds ?? 480) / 2)
+      shouldRecordListen(
+        currentTrackAccumulatedPlayTimeInSeconds,
+        currentTrackDurationSeconds,
+      )
     ) {
       if (currentTrackId) {
         recordListen(userId, currentTrackId, req.log).catch(() => {
@@ -137,8 +137,10 @@ const playbackRoutes: FastifyPluginAsync = async (fastify) => {
       currentTrackIndex,
       currentTrackPositionInSeconds,
       currentTrackAccumulatedPlayTimeInSeconds,
+      // Once the server sets the flag true, it must not be overwritten by a
+      // concurrent client poll that races in with the old false value.
       currentTrackListenEventCreated:
-        currentTrackListenEventCreated ?? listenEventCreated,
+        listenEventCreated || (currentTrackListenEventCreated ?? false),
     });
 
     return buildSessionResponse(session);
