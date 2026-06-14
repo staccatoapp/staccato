@@ -160,6 +160,25 @@ recommended recording can transition into the library at any time (a completed d
 scan, a manual import), and the UI's "play now" vs. "request download" affordance must reflect the
 truth at request time.
 
+### Song-level fallback
+
+This pass is the **source-agnostic** seam (every source flows through it), so it also carries a
+song-level fallback for a recording-granularity mismatch the inhouse `selectWinner` fix cannot reach:
+a source may resolve a song to a _different MusicBrainz recording_ than the one the importer committed
+(the importer matches by AcoustID; ListenBrainz trusts its own MBID and never name-searches, so
+`selectWinner` never runs for it). When the exact recording-MBID lookup misses and the recommendation
+carries an `artistMbid`, the pass matches on `(artistMbid, normalized title)` against the library via
+`getLibraryTracksByArtistMbids`, which returns **both** the raw tag title and the MusicBrainz
+canonical title — they routinely disagree (e.g. raw "3005" vs canonical "V. 3005", where a name
+search only surfaces "V. 3005", scores ~0.69, and is rejected by the importer-nucleus threshold,
+which is why `selectWinner` alone misses this) — so each library track is indexed under both. The
+match is deliberately conservative — **exact** normalized title plus `artistMbid` — so remixes/live
+cuts ("3005 (Friction Remix)") do not collide, and on a hit it flips only `inLibrary` (+ `localTrackId`
+for playlists); the displayed album/cover are left as the source resolved them (play uses
+`localTrackId`). It complements the inhouse resolution fix rather than replacing it: `selectWinner`
+converges owned songs onto the library recording at resolution time and sharpens not-owned display,
+while this is the universal safety net.
+
 ## Serving
 
 The route (`routes/recommendations.ts`) is mounted under the protected `/api/recommendations`
@@ -195,18 +214,139 @@ shared upgrades to Zod v4.
 ## In-house recommendations (Last.fm)
 
 Alongside the ListenBrainz sources, an in-house engine generates personalised themed virtual
-playlists from the user's own listening history, backed by a rate-limited Last.fm read client
-(`apps/server/src/lastfm/client.ts`). It plugs into the same pipeline as a `RecommendationSource` of
-kind `playlists` (`inhouse/source.ts`, `id` `"inhouse"`), so it needs no bespoke refresher or route:
-`fetch` runs profile → applicable generators → resolution and zod-validates the result. Eligibility
-reads the **server-global** Last.fm `apiKey` from `serverConfig` (not a per-user credential), because
-public Last.fm reads need only the application key. Four generators ship (Genre Mix, More From
-Artists You Love, Something New, Decade Mix), each emitting 0 or 1 mix per refresh. The shared
-resolution pass (`inhouse/resolution/resolve.ts`) name-resolves every `(artist, title)` candidate by
-scored mirror search (the flaky Last.fm candidate MBID is deliberately not trusted), picks an
-owned-first winner via `selectWinner` at `RECS_RESOLUTION_THRESHOLD` (~0.70), then batch-enriches the
-non-local remainder via MusicBrainz and cover art. See the `recommendations` rule
-(`.claude/rules/recommendations.md`) for the full profile/candidate/generator detail.
+playlists from the user's own listening history. It plugs into the same pipeline as a
+`RecommendationSource` of kind `playlists` (`inhouse/source.ts`, `id` `"inhouse"`, refresh 24h,
+empty-retry 1h), so it needs no bespoke refresher or route: `fetch` runs profile → applicable
+generators → resolution and zod-validates the result. Eligibility reads the **server-global** Last.fm
+`apiKey` from `serverConfig` (not a per-user credential), because public Last.fm reads need only the
+application key; the admin registers their own Last.fm account, so the usage cap is per-instance and
+Staccato never bundles a shared key. Because the key is config-file-only today, adding or changing it
+needs a restart (boot `reconcileUserRows` seeds the rows); the runtime config-change fan-out is
+deferred, as are a true MusicBrainz first-release-date decade axis, an album "Deep Cuts" generator
+(the `AlbumAffinity` gate metric is computed but unused), and the admin write-route. The once-planned
+persistent `lastfm_resolution` cache was **dropped** (decision F1, YAGNI): live yield proved
+name-resolution reliable, so revisit only if throttling is actually observed.
+
+It lives under `apps/server/src/recommendations/inhouse/` (the `profile/`, `candidates/`,
+`generators/`, and `resolution/` layers plus `source.ts`), with the Last.fm read client under
+`apps/server/src/lastfm/`.
+
+### The Last.fm read client
+
+`lastfm/client.ts` is a rate-limited read client mirroring the MusicBrainz client's `p-queue`
+pattern. Last.fm publishes no hard limit (only a "reasonable usage" cap), so the client defaults to
+~5 req/s per key with no bursting, tunable via `STACCATO_SERVER_LASTFM_*` env vars. On an HTTP 429 or
+Last.fm error-code 29 it pauses all outbound calls for a cooldown window — growing exponentially per
+consecutive hit and honouring `Retry-After` — via a generic, instance-based backoff gate
+(`lib/rate-limit.ts`, `createRateLimitGate`) reusable by any external client. It reads the
+application `api_key` from `serverConfig.get().lastfm.apiKey`. The methods it exposes:
+
+| Method                                 | Last.fm call          | Notes                                                                                          |
+| -------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------- |
+| `getTopTags` (track/album/artist)      | `*.getTopTags`        | Genre signal for the blend.                                                                    |
+| `getPopularity`                        | —                     | Drops entries with no artist name.                                                             |
+| `getSimilarTags` / `getSimilarArtists` | `*.getSimilar`        | Adjacency seeds for Something New.                                                             |
+| `getTopTracksForTag`                   | `tag.getTopTracks`    | Tag-radio candidates.                                                                          |
+| `getTopTracksForArtist`                | `artist.getTopTracks` | Addresses by artist MBID when known, else by name.                                             |
+| `getSimilarTracks`                     | `track.getSimilar`    | SP3 seed; neighbours carry a 0..1 `matchScore`, order preserved; drops entries with no artist. |
+
+Each method addresses the entity by MBID when present and falls back to artist+name otherwise, and
+parses Last.fm's loosely-typed JSON defensively. Two shared (no `user_id`) durable cache tables back
+it — `lastfm_tags` and `lastfm_popularity`, each keyed by `(entityType, entityKey)` where `entityKey`
+is the MBID or a normalised `artist|title` name key, with a `fetchedAt` epoch-ms TTL. The
+cache-through helper `lastfm/tag-cache.ts` (`getTagsCached`, 30-day TTL) sits between the client and
+`db/queries/lastfm-cache.ts`.
+
+### Taste profile
+
+The profile layer turns listening history into a taste profile. `getListenAggregatesForUser`
+(`db/queries/listening-history.ts`) is the first reader of `listening_history`: it aggregates rows
+per track (play count, max listened-at in ms) joined with track/artist/album metadata. Pure modules
+compute the signal: `genre-blend.ts` blends Last.fm tags across track/album/artist levels weighted by
+level specificity (track strongest, artist weakest — no hard artist fallback), drops sub-threshold
+noise, and returns a normalised genre vector or null; `weighting.ts` applies play-count × exponential
+recency decay; `heard.ts` builds an MBID-keyed heard-index (`isHeard`/`playCount`/`lastPlayed`).
+
+A pluggable **signal-extractor** registry (`profile/extractors/registry.ts`, mirroring the source
+registry) is the future-metrics seam; v1 ships one extractor, `listening-history`, producing
+genre/artist/album/decade affinity plus an adjacency set (neighbours via `getSimilar`, excluding
+existing top affinities). `build-profile.ts` (`buildTasteProfile`) runs every eligible extractor and
+merges their partials into a `TasteProfile`. **The profile is a plain internal typed object
+recomputed on demand — it never crosses an app boundary and is not persisted** (only the `lastfm_*`
+caches persist).
+
+Every affinity extends a shared `Affinity` base carrying two numbers with distinct jobs:
+
+- **`weight`** — a normalised relative share that drives **ordering only**. A thin history still
+  shows high weight, so weight can never gate.
+- **`effectiveRecentTracks`** — the recency-decayed sum over DISTINCT contributing tracks (breadth +
+  currency in one absolute number). This is the **gate**: a single repeated track can't mint a mix,
+  and an abandoned entity fades out.
+
+The `listening-history` extractor accumulates `effectiveRecentTracks` for genre, artist, decade, and
+album affinities alike (album's is computed for uniformity but consumed by no generator yet).
+
+### Generators and ordering
+
+A generator (`inhouse/generators/`) owns taste→candidates+ordering and stays free of MusicBrainz
+deps: it implements `isApplicable(profile)` plus `generate(profile, ctx)` returning unresolved
+`PlaylistSpec`s, and self-registers into a registry (`registerGenerator`/`listRegisteredGenerators`,
+mirroring the source/extractor registries) by import side-effect in `generators/index.ts`. The
+candidate-sourcing service (`inhouse/candidates/service.ts`) is the seam handed to generators so they
+never touch the raw client; its `popularTracksForTag` and `topTracksForArtist(artist, mbid?)`
+normalise client calls into ordered `Candidate`s whose `popularityRank` is the response index.
+
+Four generators ship, each gating on `effectiveRecentTracks` and emitting **0 or 1** combined mix:
+
+| Generator                  | File                   | Id                        | Heard policy | Source                                                    |
+| -------------------------- | ---------------------- | ------------------------- | ------------ | --------------------------------------------------------- |
+| Genre Mix                  | `genre-mix.ts`         | `inhouse:genre:<slug>`    | down-weight  | dominant genre's Last.fm top tracks (radio feel)          |
+| More From Artists You Love | `more-from-artists.ts` | `inhouse:artists`         | exclude      | top recent artists' top tracks, weight-proportional       |
+| Something New              | `something-new.ts`     | `inhouse:something-new`   | exclude      | round-robin over adjacency tags + artists                 |
+| Decade Mix                 | `decade-mix.ts`        | `inhouse:decade:<decade>` | down-weight  | dominant decade's `"<decade>s"` tag (noisy — watch yield) |
+
+The namespaced ids avoid colliding with ListenBrainz playlist UUIDs at the route's dedupe. Ordering
+is centralised in `generators/blend.ts` (`blendCandidates`): it dedupes by `(artist|title)` keeping
+the lowest rank, applies the heard policy (`exclude` drops heard, `downweight` sinks heard behind
+unheard; MBID-less candidates count as unheard), interleaves per-generator sources via a stride sort
+key (`(i+1)/weight` — equal weights give round-robin, differing weights give a weight-proportional
+share of the head), and caps to a target.
+
+### Resolution and owned-first winner selection
+
+The shared resolution pass (`inhouse/resolution/resolve.ts`) turns all generators' specs into
+`RecommendedPlaylist`s in one batched pass mirroring `listenbrainz-playlists.ts`. It exports
+`resolveCandidates` (the batched name-resolve → owned-first `selectWinner` → batched library + MB
+enrichment core, reused by SP3) and the shared key `candidateNameKey`.
+
+It name-resolves **every** candidate by `(artist, title)` through `resolveRecordingByName` (the
+evidence-free importer-nucleus core extracted from `library/candidates/fromSearch.ts`) scored with
+`scoreCandidates`, then picks a winner per `(artist, title)` via `selectWinner`, accepted only at
+`RECS_RESOLUTION_THRESHOLD` (~0.70 — below the importer's 0.85 because Last.fm candidates lack
+duration/AcoustID and we favour yield). **The Last.fm candidate MBID is deliberately not trusted**
+(decision E4, superseding the original trust-the-mbid policy after live testing): a large share are
+non-MusicBrainz version-3 UUIDs or stale/merged ids that 404, and even resolving ones can point at
+the wrong recording — so the scored mirror search is the reliable signal and also yields a canonical
+MBID that sharpens in-library detection.
+
+Because Last.fm candidates have no duration, same-title recordings tie on score, so `selectWinner`
+breaks ties by a strict priority:
+
+1. **A recording already in the local library** — the only reliable ownership signal (a song may be
+   owned via an album OR a compilation, so release type can't stand in for ownership).
+2. **The most canonical release** (clean Official Album over compilation/DJ-mix, via a `releaseRank`
+   mirroring the importer's `pickCanonicalRelease`) — strictly below ownership, so it never overrides
+   a real library hit and only decides display quality for not-owned discovery tracks.
+3. **Score, then search order.**
+
+This converges an owned song onto the same recording the importer committed (via AcoustID), fixing
+the false "not in library" the old take-the-top-search-hit tiebreak produced when MusicBrainz ranked
+a compilation cut first. To feed step 1, it runs **one** batched `getTracksByMusicbrainzIds` over the
+full candidate superset (every search hit, not just winners), reused both for the ownership tiebreak
+and to short-circuit enrichment for owned winners. It then batch-enriches the non-local remainder via
+`lookupRecording` plus per-release-group cover art, assembles each spec preserving order minus drops
+(an all-dropped playlist is not served), and logs a per-playlist `resolved X of Y` summary so yield
+is observable.
 
 ### Playlist track-suggestions (SP3)
 
