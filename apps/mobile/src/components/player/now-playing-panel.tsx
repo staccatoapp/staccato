@@ -19,9 +19,11 @@ import { Gradients } from "@staccato/shared";
 import type { PlaybackTrack } from "@staccato/shared";
 
 import { StaccatoImage } from "@/components/staccato-image";
+import { useDevices } from "@/hooks/use-devices";
 import { useLyrics } from "@/hooks/use-lyrics";
 import { pickGradient } from "@/lib/gradient";
 import { usePlayback } from "@/providers/playback-provider";
+import { DeviceSwitcherSheet } from "./device-switcher-sheet";
 import { LyricsView } from "./lyrics-view";
 import { NowPlayingBackground } from "./now-playing-background";
 import { PANEL_SLIDE_MS, PLAYER_EASING } from "./player-easing";
@@ -54,6 +56,8 @@ export function NowPlayingPanel() {
 
   const [view, setView] = useState<"player" | "lyrics">("player");
   const [queueOpen, setQueueOpen] = useState(false);
+  const [deviceSheetOpen, setDeviceSheetOpen] = useState(false);
+  const { activeDeviceName } = useDevices();
 
   const lyricsQuery = useLyrics(currentTrack?.id);
   const syncedLyrics = lyricsQuery.data?.syncedLyrics ?? null;
@@ -153,7 +157,11 @@ export function NowPlayingPanel() {
           {/* Centre stage: art or lyrics */}
           <View style={styles.centerStage}>
             {showLyrics && syncedLyrics ? (
-              <LyricsView lines={syncedLyrics} position={position} onSeek={seekTo} />
+              <LyricsView
+                lines={syncedLyrics}
+                position={position}
+                onSeek={seekTo}
+              />
             ) : (
               <NowPlayingArt track={currentTrack} playing={isPlaying} />
             )}
@@ -199,11 +207,18 @@ export function NowPlayingPanel() {
               setView((v) => (v === "lyrics" ? "player" : "lyrics"))
             }
             onOpenQueue={() => setQueueOpen(true)}
+            onOpenDeviceSwitcher={() => setDeviceSheetOpen(true)}
+            activeDeviceName={activeDeviceName}
           />
         </View>
       </GestureDetector>
 
       <QueueSheet open={queueOpen} onClose={() => setQueueOpen(false)} />
+      <DeviceSwitcherSheet
+        open={deviceSheetOpen}
+        onClose={() => setDeviceSheetOpen(false)}
+        isPlaying={isPlaying}
+      />
     </Animated.View>
   );
 }

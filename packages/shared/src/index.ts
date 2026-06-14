@@ -34,5 +34,9 @@ export * from "./lib/server-url.js";
 
 export * from "./lib/cover-art.js";
 
+export * from "./playback/protocol.js";
+export * from "./playback/transitions.js";
+export * from "./playback/controller.js";
+
 export * from "./theme/colors.js";
 export * from "./theme/gradients.js";

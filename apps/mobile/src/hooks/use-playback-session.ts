@@ -6,16 +6,14 @@ export const PLAYBACK_SESSION_KEY = ["playback-session"];
 
 /**
  * The shared server-side playback session (queue + position + play state).
- * Polls every 5s while playing so cross-client changes (e.g. from the web
- * player) are picked up, mirroring the web player-bar behaviour.
+ * Fetched once on mount as a fast first paint; subsequent updates arrive over
+ * the playback WebSocket (see {@link usePlaybackSocket}), which writes straight
+ * into this query's cache. No polling — the socket is the live channel.
  */
 export function usePlaybackSession() {
   return useAuthedQuery(
     PLAYBACK_SESSION_KEY,
     "/api/playback/session",
     PlaybackSessionSchema,
-    {
-      refetchInterval: (query) => (query.state.data?.isPlaying ? 5000 : false),
-    },
   );
 }

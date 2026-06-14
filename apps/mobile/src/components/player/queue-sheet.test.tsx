@@ -42,6 +42,7 @@ const SESSION: PlaybackSession = {
   currentTrackAccumulatedPlayTimeInSeconds: 0,
   currentTrackListenEventCreated: false,
   isPlaying: true,
+  activeDeviceId: null,
 };
 
 function renderSheet(overrides: Record<string, unknown> = {}) {

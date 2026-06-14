@@ -34,7 +34,11 @@ import { startSuggestionsRefresher } from "./recommendations/playlist-suggestion
 import adminRoutes from "./routes/admin/index.js";
 import { ZodError } from "zod";
 
-const app = Fastify({ loggerInstance: logger });
+// trustProxy: Staccato is self-hosted, typically behind a reverse proxy. This
+// makes Fastify derive req.host/req.ip/req.protocol from X-Forwarded-* headers
+// so the CSWSH origin check (isCrossOriginWebSocket) compares the browser Origin
+// against the external host the proxy forwarded, not the internal upstream Host.
+const app = Fastify({ loggerInstance: logger, trustProxy: true });
 
 app.register(sessionPlugin);
 

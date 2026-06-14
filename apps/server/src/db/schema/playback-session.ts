@@ -36,4 +36,16 @@ export const playbackSession = sqliteTable("playback_session", {
   )
     .notNull()
     .default(false),
+  // Staccato Connect: the device currently allowed to emit audio. Nullable —
+  // null means no device has claimed the session; the next client to connect
+  // auto-claims. References an in-memory device id (mobile = auth_tokens.id,
+  // web = a client-generated id), so there is no FK constraint.
+  activeDeviceId: text("active_device_id"),
+  // Server wall-clock (unix ms) when the last authoritative state-report was
+  // accepted. Lets passive devices dead-reckon position and orders reports.
+  playbackUpdatedAtMs: integer("playback_updated_at_ms").notNull().default(0),
+  // Monotonic per-active-session report counter. The active device numbers its
+  // reports; the server drops any report whose seq is not greater than this, and
+  // resets it to 0 whenever activeDeviceId changes (a new owner restarts from 1).
+  stateSeq: integer("state_seq").notNull().default(0),
 });

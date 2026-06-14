@@ -1,12 +1,6 @@
 import type { SyncedLyricsLine } from "@staccato/shared";
 
-import {
-  computePlayDelta,
-  formatPlayerTime,
-  getActiveLyricIndex,
-  getNextTrackState,
-  getPrevTrackState,
-} from "./playback";
+import { formatPlayerTime, getActiveLyricIndex } from "./playback";
 
 describe("formatPlayerTime", () => {
   it("formats zero", () => {
@@ -56,83 +50,5 @@ describe("getActiveLyricIndex", () => {
 
   it("returns 0 for an empty array", () => {
     expect(getActiveLyricIndex([], 10)).toBe(0);
-  });
-});
-
-describe("computePlayDelta", () => {
-  it("returns the elapsed delta during normal playback", () => {
-    expect(computePlayDelta(10, 10.5)).toBeCloseTo(0.5);
-  });
-
-  it("returns 0 when time moved backwards (seek back)", () => {
-    expect(computePlayDelta(30, 10)).toBe(0);
-  });
-
-  it("returns 0 for a jump too large to be playback (seek forward)", () => {
-    expect(computePlayDelta(10, 60)).toBe(0);
-  });
-
-  it("returns 0 when there is no previous sample", () => {
-    expect(computePlayDelta(null, 10)).toBe(0);
-  });
-});
-
-describe("getNextTrackState", () => {
-  it("advances to the next track", () => {
-    expect(getNextTrackState(0, 3)).toEqual({
-      isPlaying: true,
-      currentTrackIndex: 1,
-      currentTrackPositionInSeconds: 0,
-      currentTrackAccumulatedPlayTimeInSeconds: 0,
-      currentTrackListenEventCreated: false,
-    });
-  });
-
-  it("stays on the last track and stops playing", () => {
-    expect(getNextTrackState(2, 3)).toEqual({
-      isPlaying: false,
-      currentTrackIndex: 2,
-      currentTrackPositionInSeconds: 0,
-      currentTrackAccumulatedPlayTimeInSeconds: 0,
-      currentTrackListenEventCreated: false,
-    });
-  });
-});
-
-describe("getPrevTrackState", () => {
-  it("restarts the current track when more than 3 seconds in", () => {
-    expect(getPrevTrackState(1, 4, true, 30)).toEqual({
-      isPlaying: true,
-      currentTrackIndex: 1,
-      currentTrackPositionInSeconds: 0,
-      currentTrackAccumulatedPlayTimeInSeconds: 0,
-      currentTrackListenEventCreated: false,
-    });
-  });
-
-  it("goes to the previous track when 3 seconds or less in", () => {
-    expect(getPrevTrackState(1, 2, true, 30)).toEqual({
-      isPlaying: true,
-      currentTrackIndex: 0,
-      currentTrackPositionInSeconds: 0,
-      currentTrackAccumulatedPlayTimeInSeconds: 0,
-      currentTrackListenEventCreated: false,
-    });
-  });
-
-  it("restarts the first track but keeps its accumulated play time", () => {
-    // Matches web semantics: re-playing the same track is one continuous
-    // listen, so the accumulator survives the restart.
-    expect(getPrevTrackState(0, 2, false, 30)).toEqual({
-      isPlaying: false,
-      currentTrackIndex: 0,
-      currentTrackPositionInSeconds: 0,
-      currentTrackAccumulatedPlayTimeInSeconds: 30,
-      currentTrackListenEventCreated: false,
-    });
-  });
-
-  it("preserves the play/pause state", () => {
-    expect(getPrevTrackState(1, 10, false, 30).isPlaying).toBe(false);
   });
 });

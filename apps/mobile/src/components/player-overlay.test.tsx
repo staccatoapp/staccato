@@ -20,6 +20,18 @@ jest.mock("@/hooks/use-lyrics", () => ({
   useLyrics: () => ({ data: null }),
 }));
 
+jest.mock("@/hooks/use-devices", () => ({
+  useDevices: () => ({
+    devices: [],
+    activeDevice: null,
+    activeDeviceName: "This iPhone",
+  }),
+}));
+
+jest.mock("./player/device-switcher-sheet", () => ({
+  DeviceSwitcherSheet: () => null,
+}));
+
 const TRACK: PlaybackTrack = {
   id: "t1",
   title: "Dreams",

@@ -80,13 +80,13 @@ describe("createApiClient", () => {
     const fetchMock = mockFetchOnce(200, { ok: true });
     const client = createApiClient("https://music.example.com", "tok-123");
     const result = await client.put(
-      "/api/playback/session/state",
+      "/api/playback/devices/active",
       { isPlaying: true },
       PingSchema,
     );
 
     const [url, init] = fetchMock.mock.calls[0]!;
-    expect(url).toBe("https://music.example.com/api/playback/session/state");
+    expect(url).toBe("https://music.example.com/api/playback/devices/active");
     expect(init.method).toBe("PUT");
     expect(init.body).toBe(JSON.stringify({ isPlaying: true }));
     expect((init.headers as Record<string, string>)["Content-Type"]).toBe(
@@ -102,7 +102,7 @@ describe("createApiClient", () => {
     mockFetchOnce(400, { error: "Invalid request" });
     const client = createApiClient("https://music.example.com");
     await expect(
-      client.put("/api/playback/session/state", {}, PingSchema),
+      client.put("/api/playback/devices/active", {}, PingSchema),
     ).rejects.toMatchObject({ status: 400 });
   });
 

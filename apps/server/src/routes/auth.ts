@@ -100,7 +100,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const token = randomBytes(32).toString("base64url");
-    createAuthToken({
+    const tokenRow = createAuthToken({
       userId: user.id,
       tokenHash: hashAuthToken(token),
       deviceName: deviceName ?? null,
@@ -112,6 +112,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     return reply.code(201).send(
       TokenResponseSchema.parse({
         token,
+        tokenId: tokenRow.id,
         user: {
           id: user.id,
           username: user.username,

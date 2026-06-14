@@ -18,6 +18,13 @@ interface AuthedMutationOptions<TData, TVariables> {
     old: TData | undefined,
     variables: TVariables,
   ) => TData | undefined;
+  /**
+   * Whether to invalidate (refetch) the key once the mutation settles. Defaults
+   * to true. Set false for state that is kept fresh by a live channel (e.g. the
+   * playback WebSocket already pushes the authoritative session into the cache),
+   * where a settle-time refetch would only race that push.
+   */
+  invalidateOnSettled?: boolean;
 }
 
 /**
@@ -66,6 +73,7 @@ export function useAuthedMutation<TData, TVariables = void>(
         }
       },
       onSettled: () => {
+        if (options?.invalidateOnSettled === false) return;
         queryClient.invalidateQueries({ queryKey: namespacedKey }).catch(() => {
           /* refetch failures surface via the query itself */
         });

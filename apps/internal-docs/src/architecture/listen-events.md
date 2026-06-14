@@ -27,23 +27,30 @@ target:
 
 ## When a listen is recorded
 
-Play-time accounting lives in the **web client**, not the server. The server is told how much of
-the current track has genuinely been listened to and applies the threshold rule.
+Play-time accounting lives on the **active client device**, not the server. The server is told how
+much of the current track has genuinely been listened to and applies the threshold rule.
 
-- `apps/web/src/components/layout/seek-bar.tsx` advances an accumulator on each `timeupdate`
-  event from the `<audio>` element, adding only the natural play delta while audio is playing and
-  not seeking. Scrubbing and pausing therefore never inflate it — it measures real listening time.
-- `apps/web/src/components/layout/player-bar.tsx` polls `PUT /api/playback/session/state` roughly
-  every 5 seconds, sending `currentTrackAccumulatedPlayTimeInSeconds` (plus `isPlaying`,
-  `currentTrackIndex`, etc.). On a track change (skip, next, previous, or track-end) it sends
-  `currentTrackListenEventCreated: false` to re-arm the gate for the new track.
+- The shared `PlaybackController` (`packages/shared/src/playback/controller.ts`) advances an
+  accumulator on each heartbeat by `computePlayDelta(lastPosition, currentPosition)`, adding only
+  the natural play delta while audio is playing — a backwards move or a jump larger than a tick is
+  treated as a seek and contributes nothing. Scrubbing and pausing therefore never inflate it; it
+  measures real listening time. Both the web (`<audio>`) and mobile (`expo-audio`) players feed the
+  same controller through a thin `PlayerAdapter`.
+- The shared controller on the **active
+  device** reports its state on a heartbeat over the playback WebSocket as a `state-report`
+  message carrying `accumulatedPlayTimeSeconds` (plus `isPlaying`, `currentTrackIndex`, a monotonic
+  `seq`, etc.). On a track change (skip, next, previous, or track-end) it sends
+  `currentTrackListenEventCreated: false` to re-arm the gate for the new track. There is no REST
+  `PUT /session/state` anymore — state writes are WebSocket-only (see the Real-Time Playback
+  Channel section of the server-architecture notes).
 
-The server records a listen in `PUT /session/state` when all three conditions hold:
+The server records a listen in `applyStateReport` (the `state-report` handler in
+`apps/server/src/routes/playback.ts`) when all three conditions hold:
 
 ```ts
 !current.currentTrackListenEventCreated &&
-  isPlaying &&
-  currentTrackAccumulatedPlayTimeInSeconds >
+  report.isPlaying &&
+  report.accumulatedPlayTimeSeconds >
     Math.min(240, (currentTrackDurationSeconds ?? 480) / 2);
 ```
 
@@ -74,8 +81,8 @@ awaited (`.catch()` swallows the rejection; failures are logged inside). The ste
 settings), submission, log)` → `markScrobble(..., "delivered")`; on throw, log at `error` and
    `markScrobble(..., "failed", String(err))`.
 
-Because the call is fire-and-forget, a slow or failing target never blocks or delays the
-`PUT /session/state` response.
+Because the call is fire-and-forget, a slow or failing target never blocks or delays handling of
+the active device's `state-report`.
 
 ### Pluggable scrobble targets
 

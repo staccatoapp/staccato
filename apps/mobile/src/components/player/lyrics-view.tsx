@@ -21,20 +21,26 @@ export function LyricsView({ lines, position, onSeek }: LyricsViewProps) {
   const activeIndex = getActiveLyricIndex(lines, position);
   const [lineHeights, setLineHeights] = useState<number[]>([]);
 
-  const { scrollRef, onScrollBeginDrag, onScrollEndDrag, onMomentumScrollEnd, onScroll } =
-    useLyricsScroll({ activeIndex, lineHeights, viewportHeight: VIEWPORT_HEIGHT });
+  const {
+    scrollRef,
+    onScrollBeginDrag,
+    onScrollEndDrag,
+    onMomentumScrollEnd,
+    onScroll,
+  } = useLyricsScroll({
+    activeIndex,
+    lineHeights,
+    viewportHeight: VIEWPORT_HEIGHT,
+  });
 
-  const handleLineLayout = useCallback(
-    (index: number, height: number) => {
-      setLineHeights((prev) => {
-        if (prev[index] === height) return prev;
-        const next = [...prev];
-        next[index] = height;
-        return next;
-      });
-    },
-    [],
-  );
+  const handleLineLayout = useCallback((index: number, height: number) => {
+    setLineHeights((prev) => {
+      if (prev[index] === height) return prev;
+      const next = [...prev];
+      next[index] = height;
+      return next;
+    });
+  }, []);
 
   return (
     <View testID="lyrics-view" style={styles.viewport}>
@@ -85,7 +91,9 @@ export function LyricsView({ lines, position, onSeek }: LyricsViewProps) {
                 key={`${line.startingTime}-${i}`}
                 testID={`lyrics-line-${i}`}
                 style={[styles.line, { opacity }]}
-                onLayout={(e) => handleLineLayout(i, e.nativeEvent.layout.height)}
+                onLayout={(e) =>
+                  handleLineLayout(i, e.nativeEvent.layout.height)
+                }
               >
                 {!empty && onSeek ? (
                   <Pressable onPress={() => onSeek(line.startingTime)}>

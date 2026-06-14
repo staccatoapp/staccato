@@ -7,25 +7,30 @@ interface UtilityPillsProps {
   lyricsActive: boolean;
   onToggleLyrics: () => void;
   onOpenQueue: () => void;
+  onOpenDeviceSwitcher: () => void;
+  /** Name of the device currently emitting audio (shown on the output pill). */
+  activeDeviceName: string;
 }
 
 /**
- * Bottom utility strip: output route (stub) · Lyrics toggle · Up Next.
- * The output pill is a visual stub until route picking exists.
+ * Bottom utility strip: output device (Staccato Connect) · Lyrics toggle · Up
+ * Next. Tapping the output pill opens the device switcher.
  */
 export function UtilityPills({
   lyricsAvailable,
   lyricsActive,
   onToggleLyrics,
   onOpenQueue,
+  onOpenDeviceSwitcher,
+  activeDeviceName,
 }: UtilityPillsProps) {
   return (
     <View style={styles.row}>
       <Pill
         testID="pill-output"
         icon={<Cast size={14} color={PILL_IDLE_TEXT} strokeWidth={2} />}
-        label="iPhone"
-        disabled
+        label={activeDeviceName}
+        onPress={onOpenDeviceSwitcher}
       />
       <Pill
         testID="pill-lyrics"

@@ -23,6 +23,15 @@ export function findAuthTokenByHash(
     .get();
 }
 
+export function findAuthTokenById(id: string): AuthTokenRow | undefined {
+  return db
+    .select()
+    .from(authTokens)
+    .where(eq(authTokens.id, id))
+    .limit(1)
+    .get();
+}
+
 export function updateAuthTokenLastUsed(id: string): void {
   db.update(authTokens)
     .set({ lastUsedAt: new Date() })

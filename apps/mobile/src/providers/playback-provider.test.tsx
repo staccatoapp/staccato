@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react-native";
 import React from "react";
-import type { PlaybackSession } from "@staccato/shared";
+import type { PlaybackSession, ServerMessage } from "@staccato/shared";
 
 import { createApiClient, type ApiClient } from "@/lib/api-client";
 import { PlaybackProvider, usePlayback } from "./playback-provider";
@@ -14,6 +14,18 @@ jest.mock("@/lib/api-client", () => {
 const mockUseSession = jest.fn();
 jest.mock("@/lib/session", () => ({
   useSession: () => mockUseSession(),
+}));
+
+// Capture the controller's onServerMessage callback + a send spy so tests can
+// drive the provider exactly as the live socket would.
+const mockSend = jest.fn();
+const mockHolder: { onMessage?: (m: ServerMessage) => void } = {};
+jest.mock("@/hooks/use-playback-socket", () => ({
+  usePlaybackSocket: (onMessage: (m: ServerMessage) => void) => {
+    mockHolder.onMessage = onMessage;
+    return { send: mockSend };
+  },
+  DEVICES_KEY: ["devices"],
 }));
 
 const mockPlayer = {
@@ -54,6 +66,8 @@ jest.mock("expo-audio", () => ({
 
 const mockedCreateClient = jest.mocked(createApiClient);
 
+const THIS_DEVICE = "this-device";
+
 const track = (id: string, title: string) => ({
   id,
   title,
@@ -77,19 +91,14 @@ const SESSION: PlaybackSession = {
   currentTrackAccumulatedPlayTimeInSeconds: 10,
   currentTrackListenEventCreated: false,
   isPlaying: false,
+  activeDeviceId: THIS_DEVICE,
 };
 
 let queryClient: QueryClient;
 let get: jest.Mock;
-let put: jest.Mock;
 
 function clientWith(): ApiClient {
-  return {
-    get,
-    post: jest.fn(),
-    put,
-    delete: jest.fn(),
-  };
+  return { get, post: jest.fn(), put: jest.fn(), delete: jest.fn() };
 }
 
 beforeEach(() => {
@@ -97,17 +106,14 @@ beforeEach(() => {
   mockPlayer.currentTime = 0;
   mockPlayer.seekTo.mockResolvedValue(undefined);
   mockUseStatus.mockReturnValue(defaultStatus);
+  mockHolder.onMessage = undefined;
   queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false, gcTime: Infinity },
-      mutations: { retry: false, gcTime: 0 },
-    },
+    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
   });
   mockUseSession.mockReturnValue({
     session: { serverUrl: "https://music.home.arpa", token: "tok" },
   });
   get = jest.fn().mockResolvedValue(SESSION);
-  put = jest.fn().mockResolvedValue(SESSION);
   mockedCreateClient.mockReturnValue(clientWith());
 });
 
@@ -121,15 +127,29 @@ function wrapper({ children }: { children: React.ReactNode }) {
   );
 }
 
-async function renderPlayback() {
+/** Render, wait for the first-paint session, then connect + push a snapshot. */
+async function renderActive(sessionOverrides: Partial<PlaybackSession> = {}) {
+  const session = { ...SESSION, ...sessionOverrides };
+  get.mockResolvedValue(session);
   const utils = renderHook(() => usePlayback(), { wrapper });
   await waitFor(() => expect(utils.result.current.currentTrack).not.toBeNull());
+  act(() => {
+    mockHolder.onMessage?.({
+      type: "connected",
+      data: { deviceId: THIS_DEVICE },
+    });
+    mockHolder.onMessage?.({
+      type: "session-updated",
+      data: session,
+      serverTimeMs: 1000,
+    });
+  });
   return utils;
 }
 
-describe("PlaybackProvider", () => {
-  it("loads the current track into the player with auth headers and restores position", async () => {
-    await renderPlayback();
+describe("PlaybackProvider (active device)", () => {
+  it("loads the current track with auth headers and restores position", async () => {
+    await renderActive();
 
     expect(mockPlayer.replace).toHaveBeenCalledWith({
       uri: "https://music.home.arpa/api/tracks/t2/stream",
@@ -140,201 +160,156 @@ describe("PlaybackProvider", () => {
   });
 
   it("starts playback when the session says it is playing", async () => {
-    get.mockResolvedValue({ ...SESSION, isPlaying: true });
-    put.mockResolvedValue({ ...SESSION, isPlaying: true });
-
-    await renderPlayback();
-
+    await renderActive({ isPlaying: true });
     await waitFor(() => expect(mockPlayer.play).toHaveBeenCalled());
   });
 
   it("sets lock-screen metadata for the current track", async () => {
-    await renderPlayback();
-
-    expect(mockPlayer.setActiveForLockScreen).toHaveBeenCalledWith(
-      true,
-      expect.objectContaining({
-        title: "Dreams",
-        artist: "Fleetwood Mac",
-        albumTitle: "Rumours",
-      }),
+    await renderActive();
+    await waitFor(() =>
+      expect(mockPlayer.setActiveForLockScreen).toHaveBeenCalledWith(
+        true,
+        expect.objectContaining({
+          title: "Dreams",
+          artist: "Fleetwood Mac",
+          albumTitle: "Rumours",
+        }),
+      ),
     );
   });
 
-  it("togglePlay PUTs the flipped play state", async () => {
-    const { result } = await renderPlayback();
+  it("disarms the lock screen when the device hands off and becomes passive", async () => {
+    await renderActive();
+    await waitFor(() =>
+      expect(mockPlayer.setActiveForLockScreen).toHaveBeenCalledWith(
+        true,
+        expect.anything(),
+      ),
+    );
+    mockPlayer.setActiveForLockScreen.mockClear();
+
+    act(() => {
+      mockHolder.onMessage?.({
+        type: "session-updated",
+        data: { ...SESSION, activeDeviceId: "other-device" },
+        serverTimeMs: 2000,
+      });
+    });
+
+    await waitFor(() =>
+      expect(mockPlayer.setActiveForLockScreen).toHaveBeenCalledWith(false),
+    );
+  });
+
+  it("togglePlay applies locally and reports the live position", async () => {
+    const { result } = await renderActive();
     mockPlayer.currentTime = 50;
 
     act(() => result.current.togglePlay());
 
-    await waitFor(() =>
-      expect(put).toHaveBeenCalledWith(
-        "/api/playback/session/state",
-        expect.objectContaining({
-          isPlaying: true,
-          currentTrackIndex: 1,
-          currentTrackPositionInSeconds: 50,
-        }),
-        expect.anything(),
-      ),
-    );
+    expect(mockPlayer.play).toHaveBeenCalled();
+    expect(mockSend).toHaveBeenCalledWith({
+      type: "state-report",
+      data: expect.objectContaining({
+        isPlaying: true,
+        currentTrackIndex: 1,
+        positionSeconds: 50,
+      }),
+    });
   });
 
-  it("next advances to the following track with reset accounting", async () => {
-    const { result } = await renderPlayback();
+  it("next advances and reports the following track", async () => {
+    const { result } = await renderActive();
 
     act(() => result.current.next());
 
-    await waitFor(() =>
-      expect(put).toHaveBeenCalledWith(
-        "/api/playback/session/state",
-        expect.objectContaining({
-          currentTrackIndex: 2,
-          currentTrackPositionInSeconds: 0,
-          currentTrackAccumulatedPlayTimeInSeconds: 0,
-          currentTrackListenEventCreated: false,
-        }),
-        expect.anything(),
-      ),
+    expect(mockPlayer.replace).toHaveBeenCalledWith(
+      expect.objectContaining({
+        uri: "https://music.home.arpa/api/tracks/t3/stream",
+      }),
     );
-  });
-
-  it("prev within 3 seconds goes to the previous track", async () => {
-    const { result } = await renderPlayback();
-    mockPlayer.currentTime = 2;
-
-    act(() => result.current.prev());
-
-    await waitFor(() =>
-      expect(put).toHaveBeenCalledWith(
-        "/api/playback/session/state",
-        expect.objectContaining({ currentTrackIndex: 0 }),
-        expect.anything(),
-      ),
-    );
-  });
-
-  it("prev past 3 seconds restarts the current track", async () => {
-    const { result } = await renderPlayback();
-    mockPlayer.currentTime = 30;
-
-    act(() => result.current.prev());
-
-    expect(mockPlayer.seekTo).toHaveBeenCalledWith(0);
-    await waitFor(() =>
-      expect(put).toHaveBeenCalledWith(
-        "/api/playback/session/state",
-        expect.objectContaining({
-          currentTrackIndex: 1,
-          currentTrackPositionInSeconds: 0,
-        }),
-        expect.anything(),
-      ),
-    );
-  });
-
-  it("seekTo seeks the player and PUTs the new position", async () => {
-    const { result } = await renderPlayback();
-
-    act(() => result.current.seekTo(120));
-
-    expect(mockPlayer.seekTo).toHaveBeenCalledWith(120);
-    await waitFor(() =>
-      expect(put).toHaveBeenCalledWith(
-        "/api/playback/session/state",
-        expect.objectContaining({ currentTrackPositionInSeconds: 120 }),
-        expect.anything(),
-      ),
-    );
-  });
-
-  it("jumpToIndex starts the chosen track from the top", async () => {
-    const { result } = await renderPlayback();
-
-    act(() => result.current.jumpToIndex(2));
-
-    await waitFor(() =>
-      expect(put).toHaveBeenCalledWith(
-        "/api/playback/session/state",
-        expect.objectContaining({
-          isPlaying: true,
-          currentTrackIndex: 2,
-          currentTrackPositionInSeconds: 0,
-          currentTrackAccumulatedPlayTimeInSeconds: 0,
-          currentTrackListenEventCreated: false,
-        }),
-        expect.anything(),
-      ),
-    );
+    expect(mockSend).toHaveBeenCalledWith({
+      type: "state-report",
+      data: expect.objectContaining({
+        currentTrackIndex: 2,
+        positionSeconds: 0,
+      }),
+    });
   });
 
   it("advances the queue when the track finishes", async () => {
-    const { rerender } = await renderPlayback();
+    const { rerender } = await renderActive();
 
-    mockUseStatus.mockReturnValue({
-      ...defaultStatus,
-      playing: false,
-      didJustFinish: true,
-    });
+    mockUseStatus.mockReturnValue({ ...defaultStatus, didJustFinish: true });
     rerender({});
 
     await waitFor(() =>
-      expect(put).toHaveBeenCalledWith(
-        "/api/playback/session/state",
-        expect.objectContaining({
-          isPlaying: true,
-          currentTrackIndex: 2,
-          currentTrackListenEventCreated: false,
-        }),
-        expect.anything(),
-      ),
+      expect(mockSend).toHaveBeenCalledWith({
+        type: "state-report",
+        data: expect.objectContaining({ currentTrackIndex: 2 }),
+      }),
     );
   });
+});
 
-  it("accumulates play time only for genuine playback deltas", async () => {
-    const { result, rerender } = await renderPlayback();
+describe("PlaybackProvider (passive device)", () => {
+  async function renderPassive(overrides: Partial<PlaybackSession> = {}) {
+    const session = {
+      ...SESSION,
+      activeDeviceId: "other-device",
+      ...overrides,
+    };
+    get.mockResolvedValue(session);
+    const utils = renderHook(() => usePlayback(), { wrapper });
+    await waitFor(() =>
+      expect(utils.result.current.currentTrack).not.toBeNull(),
+    );
+    act(() => {
+      mockHolder.onMessage?.({
+        type: "connected",
+        data: { deviceId: THIS_DEVICE },
+      });
+      mockHolder.onMessage?.({
+        type: "session-updated",
+        data: session,
+        serverTimeMs: 1000,
+      });
+    });
+    return utils;
+  }
 
-    // Genuine ticks: 42 → 43 → 44 (accumulated 10 + 2 = 12), then a seek
-    // jump to 200 that must not count.
-    mockUseStatus.mockReturnValue({
-      ...defaultStatus,
-      playing: true,
-      currentTime: 43,
-    });
-    rerender({});
-    mockUseStatus.mockReturnValue({
-      ...defaultStatus,
-      playing: true,
-      currentTime: 44,
-    });
-    rerender({});
-    mockUseStatus.mockReturnValue({
-      ...defaultStatus,
-      playing: true,
-      currentTime: 200,
-    });
-    rerender({});
+  it("never loads the source or plays while passive", async () => {
+    await renderPassive({ isPlaying: true });
+    expect(mockPlayer.replace).not.toHaveBeenCalled();
+    expect(mockPlayer.play).not.toHaveBeenCalled();
+  });
 
-    mockPlayer.currentTime = 200;
+  it("relays transport commands instead of writing state", async () => {
+    const { result } = await renderPassive();
+
     act(() => result.current.togglePlay());
 
-    await waitFor(() =>
-      expect(put).toHaveBeenCalledWith(
-        "/api/playback/session/state",
-        expect.objectContaining({
-          currentTrackAccumulatedPlayTimeInSeconds: 12,
-        }),
-        expect.anything(),
-      ),
-    );
+    expect(mockSend).toHaveBeenCalledWith({
+      type: "command",
+      data: { kind: "setPlaying", value: true },
+    });
   });
 
-  it("exposes a null track and no-op actions when there is no playback session yet", () => {
+  it("shows the session position, not its silent player's", async () => {
+    const { result } = await renderPassive({
+      isPlaying: true,
+      currentTrackPositionInSeconds: 30,
+    });
+    expect(result.current.position).toBeGreaterThanOrEqual(30);
+    expect(result.current.position).toBeLessThan(35);
+  });
+});
+
+describe("PlaybackProvider", () => {
+  it("exposes a null track and no-op actions with an empty queue", async () => {
     get.mockResolvedValue({ ...SESSION, trackQueue: [], currentTrackIndex: 0 });
-
     const { result } = renderHook(() => usePlayback(), { wrapper });
-
     expect(result.current.currentTrack).toBeNull();
-    expect(() => result.current.togglePlay()).not.toThrow();
+    act(() => expect(() => result.current.togglePlay()).not.toThrow());
   });
 });

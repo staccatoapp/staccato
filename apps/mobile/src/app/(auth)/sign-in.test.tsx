@@ -86,6 +86,7 @@ describe("SignInScreen", () => {
     jest.useFakeTimers();
     const fetchMock = mockTokenFetch(201, {
       token: "raw-token",
+      tokenId: "tok-1",
       user: {
         id: "u1",
         username: "chris",

@@ -25,6 +25,20 @@ jest.mock("@/lib/session", () => ({
   }),
 }));
 
+jest.mock("@/hooks/use-devices", () => ({
+  useDevices: () => ({
+    devices: [],
+    activeDevice: null,
+    activeDeviceName: "This iPhone",
+  }),
+}));
+
+// The device switcher has its own test; stub it here so this suite doesn't need
+// a QueryClient for its internal mutation hook.
+jest.mock("./device-switcher-sheet", () => ({
+  DeviceSwitcherSheet: () => null,
+}));
+
 function track(id: string, title: string): PlaybackTrack {
   return {
     id,
@@ -46,6 +60,7 @@ const SESSION: PlaybackSession = {
   currentTrackAccumulatedPlayTimeInSeconds: 0,
   currentTrackListenEventCreated: false,
   isPlaying: true,
+  activeDeviceId: null,
 };
 
 const LYRICS: TrackLyrics = {

@@ -12,6 +12,8 @@ function renderPills(
     lyricsActive: false,
     onToggleLyrics: jest.fn(),
     onOpenQueue: jest.fn(),
+    onOpenDeviceSwitcher: jest.fn(),
+    activeDeviceName: "This iPhone",
     ...props,
   };
   render(
@@ -25,14 +27,15 @@ function renderPills(
 describe("UtilityPills", () => {
   it("renders the three labeled pills", () => {
     renderPills();
-    expect(screen.getByText("iPhone")).toBeTruthy();
+    expect(screen.getByText("This iPhone")).toBeTruthy();
     expect(screen.getByText("Lyrics")).toBeTruthy();
     expect(screen.getByText("Up Next")).toBeTruthy();
   });
 
-  it("keeps the output pill as a disabled stub", () => {
-    renderPills();
-    expect(screen.getByTestId("pill-output")).toBeDisabled();
+  it("opens the device switcher from the output pill", () => {
+    const props = renderPills();
+    fireEvent.press(screen.getByTestId("pill-output"));
+    expect(props.onOpenDeviceSwitcher).toHaveBeenCalled();
   });
 
   it("toggles lyrics from the lyrics pill", () => {

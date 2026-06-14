@@ -270,6 +270,8 @@ describe("POST /token", () => {
     const body = res.json();
     expect(typeof body.token).toBe("string");
     expect(body.token.length).toBeGreaterThanOrEqual(40);
+    // tokenId is returned so mobile can use it as its stable Connect device id.
+    expect(body.tokenId).toBe("token-1");
     expect(body.user).toMatchObject({
       id: "user-1",
       username: "admin",

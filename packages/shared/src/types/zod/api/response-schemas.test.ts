@@ -31,6 +31,7 @@ import { recommendationsResponseSchema } from "./recommendations.js";
 import { ScanProgressSchema, TrackStatusCountsSchema } from "./scan.js";
 import { ServerSettingsSchema } from "./settings.js";
 import { TrackListItemSchema, TrackSearchResultSchema } from "./tracks.js";
+import { TokenResponseSchema } from "./token.js";
 
 const TRACK_ARTIST_CREDIT = {
   artistId: "a1",
@@ -174,6 +175,7 @@ describe("PlaybackSessionSchema", () => {
       currentTrackAccumulatedPlayTimeInSeconds: 10,
       currentTrackListenEventCreated: false,
       isPlaying: true,
+      activeDeviceId: null,
     };
     expect(PlaybackSessionSchema.parse(valid)).toEqual(valid);
   });
@@ -349,6 +351,33 @@ describe("ScanProgressSchema", () => {
       counts: { pending: 0, resolving: 0, resolved: 8, failed: 1 },
     };
     expect(ScanProgressSchema.parse(valid)).toEqual(valid);
+  });
+});
+
+describe("TokenResponseSchema", () => {
+  const user = {
+    id: "u1",
+    username: "ada",
+    isAdmin: false,
+    onboardingComplete: true,
+  };
+
+  it("parses a token response that omits the unused tokenId field", () => {
+    // No client reads tokenId (the server identifies mobile WS devices via
+    // req.tokenId), so it must be optional — a client built against a server that
+    // doesn't send it must still sign in rather than throw a ZodError (SC-8).
+    const result = TokenResponseSchema.parse({ token: "raw-token", user });
+    expect(result.token).toBe("raw-token");
+    expect(result.tokenId).toBeUndefined();
+  });
+
+  it("still accepts a token response that includes tokenId", () => {
+    const result = TokenResponseSchema.parse({
+      token: "raw-token",
+      tokenId: "tok-1",
+      user,
+    });
+    expect(result.tokenId).toBe("tok-1");
   });
 });
 

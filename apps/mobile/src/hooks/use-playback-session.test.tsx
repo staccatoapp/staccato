@@ -36,8 +36,8 @@ const SESSION: PlaybackSession = {
   currentTrackPositionInSeconds: 0,
   currentTrackAccumulatedPlayTimeInSeconds: 0,
   currentTrackListenEventCreated: false,
-  // Not playing, so the hook's 5s refetch interval stays off during tests.
   isPlaying: false,
+  activeDeviceId: null,
 };
 
 let queryClient: QueryClient;

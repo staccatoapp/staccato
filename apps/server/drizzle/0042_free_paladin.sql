@@ -1,0 +1,1 @@
+ALTER TABLE `playback_session` ADD `active_device_id` text;
