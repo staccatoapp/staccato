@@ -32,7 +32,9 @@ populated by import side-effect in `sources/index.ts`. The core never names a pr
 from a `UserSettingsRow` and builds its own typed `Ctx`, so a new provider needs no refresher/boot/route change; `fetch`
 must zod-validate its payload before returning. Two ListenBrainz sources (`id` `"listenbrainz"`): `cf-tracks` (6h,
 empty-retry 1h) and `playlists` (24h); both short-circuit library-owned recordings via `getTracksByMusicbrainzIds`, then
-enrich the remainder (`lookupRecording`, cover art, plus a 30s `resolvePreview` for `cf-tracks`).
+enrich the remainder (`lookupRecording`, cover art). Preview clips are **not** resolved at refresh — `previewUrl` is no
+longer on the payload; clients stream previews on demand via the self-healing preview proxy (see [[preview]]), keyed by
+`recordingMbid` + `artistName` + `title`.
 
 ## In-house Last.fm engine
 

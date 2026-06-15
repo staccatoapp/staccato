@@ -11,7 +11,6 @@ import {
   MB_PRIORITY,
   type MBRecordingDetail,
 } from "../../musicbrainz/client.js";
-import { resolvePreview } from "../../preview/index.js";
 import type {
   RecommendationSource,
   RecommendationSourceContext,
@@ -54,17 +53,13 @@ export const listenbrainzCfTracksSource: RecommendationSource<
 
     const enrichments = await Promise.all(
       [...recMap.values()].map(async (rec) => {
-        const [preview, coverArtUrl] = await Promise.all([
-          resolvePreview(rec.recordingMbid, rec.artistName ?? "", rec.title),
-          rec.releaseGroupMbid
-            ? ensureCoverOnDisk(rec.releaseGroupMbid, MB_PRIORITY.BACKGROUND)
-            : Promise.resolve<string | null>(null),
-        ]);
-        return {
-          mbid: rec.recordingMbid,
-          previewUrl: preview.previewUrl,
-          coverArtUrl,
-        };
+        const coverArtUrl = rec.releaseGroupMbid
+          ? await ensureCoverOnDisk(
+              rec.releaseGroupMbid,
+              MB_PRIORITY.BACKGROUND,
+            )
+          : null;
+        return { mbid: rec.recordingMbid, coverArtUrl };
       }),
     );
     const enrichMap = new Map(enrichments.map((e) => [e.mbid, e]));
@@ -81,7 +76,6 @@ export const listenbrainzCfTracksSource: RecommendationSource<
             albumTitle: local.albumTitle,
             releaseGroupMbid: local.releaseGroupMbid,
             coverArtUrl: local.coverArtUrl,
-            previewUrl: null,
             durationMs: local.durationMs,
             inLibrary: true,
             // Re-resolved live by refreshTracksInLibrary on every serve.
@@ -99,7 +93,6 @@ export const listenbrainzCfTracksSource: RecommendationSource<
           albumTitle: rec.releaseName,
           releaseGroupMbid: rec.releaseGroupMbid,
           coverArtUrl: enr?.coverArtUrl ?? null,
-          previewUrl: enr?.previewUrl ?? null,
           durationMs: rec.durationMs,
           inLibrary: false,
           localTrackId: null,

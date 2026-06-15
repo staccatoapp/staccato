@@ -551,7 +551,6 @@ describe("RecommendedTrackSchema", () => {
     albumTitle: null,
     releaseGroupMbid: null,
     coverArtUrl: null,
-    previewUrl: null,
     durationMs: null,
     inLibrary: false,
   };

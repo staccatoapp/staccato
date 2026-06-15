@@ -19,9 +19,9 @@ interface RecTrackRowProps {
 
 /**
  * A recommended-track row: thin adapter over the shared {@link TrackRow} that
- * maps a {@link RecommendedTrack} (inline previewUrl, owned-track play) onto it,
- * with a trailing duration (in library) or Lidarr request button (not in
- * library, when the album can be requested).
+ * maps a {@link RecommendedTrack} onto it (preview streamed through the server
+ * proxy, owned-track play), with a trailing duration (in library) or Lidarr
+ * request button (not in library, when the album can be requested).
  */
 export function RecTrackRow({
   track,
@@ -68,10 +68,7 @@ export function RecTrackRow({
         coverArtUrl: track.coverArtUrl,
         inLibrary: track.inLibrary,
         localTrackId: track.localTrackId,
-        // Recommended tracks carry the preview url inline (resolved server-side
-        // at refresh time); just hand it back.
-        resolvePreviewUrl: () => Promise.resolve(track.previewUrl),
-        previewable: track.previewUrl != null,
+        artistName: track.artistName ?? "",
       }}
       trailing={trailing}
     />

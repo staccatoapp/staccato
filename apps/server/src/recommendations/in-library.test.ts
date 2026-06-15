@@ -37,7 +37,6 @@ function track(over: Partial<RecommendedTrack> = {}): RecommendedTrack {
     albumTitle: "Album",
     releaseGroupMbid: "rg-1",
     coverArtUrl: null,
-    previewUrl: null,
     durationMs: 200_000,
     inLibrary: false,
     localTrackId: null,

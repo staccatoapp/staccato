@@ -16,6 +16,7 @@ jest.mock("@/providers/preview-provider", () => ({
     previewingId: null,
     previewLoadingId: null,
     previewProgress: 0,
+    isPreviewUnavailable: () => false,
     togglePreview: jest.fn(),
   }),
 }));

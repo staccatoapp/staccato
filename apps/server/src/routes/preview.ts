@@ -38,40 +38,10 @@ async function guardedFetch(
 }
 
 const previewRoutes: FastifyPluginAsync = async (fastify) => {
-  // Lazily resolve a 30s preview URL for a recording (used by search results,
-  // which carry no inline previewUrl). Returns the absolute Deezer/iTunes URL
-  // the client plays directly — same contract as recommended tracks' inline
-  // previewUrl — or null when none is available.
-  fastify.get("/:recordingMbid", async (req, reply) => {
-    const { recordingMbid } = z
-      .object({ recordingMbid: z.string() })
-      .parse(req.params);
-    const parsedQuery = z
-      .object({ artistName: z.string(), trackTitle: z.string() })
-      .safeParse(req.query);
-    if (!parsedQuery.success) {
-      req.log.warn(
-        { err: parsedQuery.error, recordingMbid },
-        "GET /:recordingMbid: missing artistName/trackTitle",
-      );
-      return reply.status(400).send({ error: "Invalid request" });
-    }
-    const { artistName, trackTitle } = parsedQuery.data;
-
-    const { previewUrl } = await resolvePreview(
-      recordingMbid,
-      artistName,
-      trackTitle,
-    );
-    if (!previewUrl) {
-      req.log.debug(
-        { recordingMbid, artistName, trackTitle },
-        "no preview available for recording",
-      );
-    }
-    return { previewUrl };
-  });
-
+  // Stream a 30s preview clip for a recording through the server, resolving the
+  // upstream Deezer/iTunes URL on demand. Clients play this endpoint directly
+  // (never a raw CDN URL) so a stale, time-limited upstream token is detected
+  // here — on a non-OK upstream the cache entry is evicted and re-resolved.
   fastify.get("/:recordingMbid/stream", async (req, reply) => {
     const { recordingMbid } = z
       .object({ recordingMbid: z.string() })
@@ -130,6 +100,7 @@ const previewRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(502).send({ error: "Preview fetch failed" });
     }
 
+    // Fast-path rejection on a trusted declared length, before we read the body.
     const declaredLength = Number(upstream.headers.get("content-length"));
     if (Number.isFinite(declaredLength) && declaredLength > MAX_PREVIEW_BYTES) {
       req.log.warn(
@@ -143,13 +114,49 @@ const previewRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(502).send({ error: "Preview fetch failed" });
     }
 
-    reply.header("Content-Type", "audio/mpeg");
-    if (Number.isFinite(declaredLength) && declaredLength > 0) {
-      reply.header("Content-Length", declaredLength);
+    // Buffer the whole clip (small, capped at 10 MB) so we can serve it
+    // range-aware. Native players (expo-audio → AVPlayer/ExoPlayer) need byte-
+    // range support to build a seekable timeline and report progressing
+    // currentTime — without it the preview plays but its progress bar is pinned
+    // at 0. Mirrors the range-aware track stream route (routes/tracks.ts).
+    const buf = Buffer.from(await upstream.arrayBuffer());
+    if (buf.length > MAX_PREVIEW_BYTES) {
+      req.log.warn(
+        { recordingMbid, bytes: buf.length, maxBytes: MAX_PREVIEW_BYTES },
+        "preview body exceeds size limit",
+      );
+      return reply.status(502).send({ error: "Preview fetch failed" });
     }
+
+    const total = buf.length;
+    reply.header("Accept-Ranges", "bytes");
+    reply.header("Content-Type", "audio/mpeg");
     reply.header("Cache-Control", "public, max-age=3600");
 
-    return reply.send(upstream.body);
+    const rangeHeader = req.headers.range;
+    if (rangeHeader) {
+      const [startStr, endStr] = rangeHeader.replace(/bytes=/, "").split("-");
+      const start = parseInt(startStr ?? "0", 10);
+      const end = endStr ? parseInt(endStr, 10) : total - 1;
+
+      // Reject an unsatisfiable or malformed range per RFC 7233. Reset the
+      // content type (set to audio/mpeg above) so Fastify serialises the JSON
+      // error body instead of rejecting an object under audio/mpeg.
+      if (!Number.isFinite(start) || start > end || start >= total) {
+        reply.header("Content-Range", `bytes */${total}`);
+        reply.type("application/json");
+        return reply.status(416).send({ error: "Range not satisfiable" });
+      }
+
+      const clampedEnd = Math.min(end, total - 1);
+      reply.status(206);
+      reply.header("Content-Range", `bytes ${start}-${clampedEnd}/${total}`);
+      reply.header("Content-Length", clampedEnd - start + 1);
+      return reply.send(buf.subarray(start, clampedEnd + 1));
+    }
+
+    reply.header("Content-Length", total);
+    return reply.send(buf);
   });
 };
 

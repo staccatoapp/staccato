@@ -28,8 +28,7 @@ function makeTrack(over: Partial<TrackRowTrack> = {}): TrackRowTrack {
     coverArtUrl: null,
     inLibrary: false,
     localTrackId: null,
-    resolvePreviewUrl: jest.fn().mockResolvedValue("https://preview/clip.mp3"),
-    previewable: true,
+    artistName: "Fleetwood Mac",
     ...over,
   };
 }
@@ -43,6 +42,7 @@ function setProviders(
     previewingId: string | null;
     previewLoadingId: string | null;
     previewProgress: number;
+    isPreviewUnavailable: (id: string) => boolean;
   }> = {},
   playback: Partial<{
     currentTrack: { id: string } | null;
@@ -53,6 +53,7 @@ function setProviders(
     previewingId: preview.previewingId ?? null,
     previewLoadingId: preview.previewLoadingId ?? null,
     previewProgress: preview.previewProgress ?? 0,
+    isPreviewUnavailable: preview.isPreviewUnavailable ?? (() => false),
     togglePreview,
   });
   mockUsePlayback.mockReturnValue({
@@ -96,20 +97,21 @@ describe("TrackRow", () => {
     expect(playTracks).not.toHaveBeenCalled();
   });
 
-  it("previews an external track on tap, passing the lazy resolver", () => {
-    const track = makeTrack({ inLibrary: false, previewable: true });
-    renderRow(track);
+  it("previews an external track on tap via the server proxy", () => {
+    renderRow(makeTrack({ inLibrary: false }));
     fireEvent.press(screen.getByLabelText("Play"));
     expect(togglePreview).toHaveBeenCalledWith(
       "rec-1",
-      track.resolvePreviewUrl,
+      "Fleetwood Mac",
+      "Dreams",
     );
   });
 
-  it("renders no play affordance for a non-previewable, non-library track", () => {
-    renderRow(makeTrack({ inLibrary: false, previewable: false }));
+  it("shows a disabled preview-off glyph for an unavailable external track", () => {
+    setProviders({ isPreviewUnavailable: (id) => id === "rec-1" });
+    renderRow(makeTrack({ inLibrary: false }));
+    expect(screen.getByLabelText("Preview unavailable")).toBeTruthy();
     expect(screen.queryByLabelText("Play")).toBeNull();
-    expect(screen.queryByLabelText("Stop")).toBeNull();
   });
 
   it("shows the stop affordance while previewing", () => {

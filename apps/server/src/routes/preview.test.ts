@@ -42,18 +42,26 @@ function makeStream() {
   });
 }
 
+// The proxy buffers the upstream body (await upstream.arrayBuffer()) before
+// serving it range-aware, so the mock exposes both a body stream and the same
+// bytes via arrayBuffer(). `bytes` overrides the buffered payload for the
+// actual-size cap test; it defaults to the 10-byte "audio-data" sample.
 function makeResponse(
   overrides: {
     ok?: boolean;
     status?: number;
     headers?: Record<string, string>;
     body?: ReadableStream | null;
+    bytes?: Uint8Array;
   } = {},
 ) {
+  const bytes = overrides.bytes ?? new TextEncoder().encode("audio-data");
   return {
     ok: overrides.ok ?? true,
     status: overrides.status ?? 200,
     body: overrides.body !== undefined ? overrides.body : makeStream(),
+    arrayBuffer: async () =>
+      bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
     headers: {
       get: (key: string) => overrides.headers?.[key.toLowerCase()] ?? null,
     },
@@ -73,7 +81,7 @@ describe("GET /:recordingMbid/stream — preview SSRF guard", () => {
     expect(res.statusCode).toBe(404);
   });
 
-  it("streams audio on a valid https URL from a public host", async () => {
+  it("streams audio range-aware on a valid https URL from a public host", async () => {
     vi.mocked(resolvePreview).mockResolvedValue(
       deezerPreview("https://cdn.deezer.com/preview/abc.mp3"),
     );
@@ -89,6 +97,45 @@ describe("GET /:recordingMbid/stream — preview SSRF guard", () => {
     const res = await app.inject({ method: "GET", url: BASE_URL });
     expect(res.statusCode).toBe(200);
     expect(res.headers["content-type"]).toMatch(/audio\/mpeg/);
+    // Advertise range support so the native player builds a seekable timeline.
+    expect(res.headers["accept-ranges"]).toBe("bytes");
+    // Content-Length reflects the actual buffered bytes, not the upstream header.
+    expect(res.headers["content-length"]).toBe("10");
+    vi.unstubAllGlobals();
+  });
+
+  it("serves partial content (206) for a Range request", async () => {
+    vi.mocked(resolvePreview).mockResolvedValue(
+      deezerPreview("https://cdn.deezer.com/preview/abc.mp3"),
+    );
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(makeResponse()));
+    const app = buildApp(previewRoutes);
+    const res = await app.inject({
+      method: "GET",
+      url: BASE_URL,
+      headers: { range: "bytes=0-3" },
+    });
+    expect(res.statusCode).toBe(206);
+    expect(res.headers["content-range"]).toBe("bytes 0-3/10");
+    expect(res.headers["content-length"]).toBe("4");
+    expect(res.headers["accept-ranges"]).toBe("bytes");
+    expect(res.body).toBe("audi");
+    vi.unstubAllGlobals();
+  });
+
+  it("returns 416 for an unsatisfiable Range request", async () => {
+    vi.mocked(resolvePreview).mockResolvedValue(
+      deezerPreview("https://cdn.deezer.com/preview/abc.mp3"),
+    );
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(makeResponse()));
+    const app = buildApp(previewRoutes);
+    const res = await app.inject({
+      method: "GET",
+      url: BASE_URL,
+      headers: { range: "bytes=50-60" },
+    });
+    expect(res.statusCode).toBe(416);
+    expect(res.headers["content-range"]).toBe("bytes */10");
     vi.unstubAllGlobals();
   });
 
@@ -194,57 +241,37 @@ describe("GET /:recordingMbid/stream — preview SSRF guard", () => {
     vi.unstubAllGlobals();
   });
 
-  it("does not forward Content-Length when absent", async () => {
+  it("sets Content-Length to the actual buffered size even when upstream omits it", async () => {
     vi.mocked(resolvePreview).mockResolvedValue(
       deezerPreview("https://cdn.deezer.com/preview/abc.mp3"),
     );
+    // makeResponse() omits the content-length header but the body is 10 bytes.
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(makeResponse()));
 
     const app = buildApp(previewRoutes);
     const res = await app.inject({ method: "GET", url: BASE_URL });
 
     expect(res.statusCode).toBe(200);
-    expect(res.headers["content-length"]).toBeUndefined();
+    expect(res.headers["content-length"]).toBe("10");
     vi.unstubAllGlobals();
   });
-});
 
-describe("GET /:recordingMbid — lazy preview URL resolution", () => {
-  const RESOLVE_URL = "/mbid-abc-123?artistName=Artist&trackTitle=Track";
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("returns the resolved preview URL as JSON", async () => {
+  it("returns 502 when the buffered body exceeds 10 MB despite no declared length", async () => {
     vi.mocked(resolvePreview).mockResolvedValue(
-      deezerPreview("https://cdn.deezer.com/preview/abc.mp3"),
+      deezerPreview("https://cdn.deezer.com/preview/lying.mp3"),
     );
-    const app = buildApp(previewRoutes);
-    const res = await app.inject({ method: "GET", url: RESOLVE_URL });
-    expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({
-      previewUrl: "https://cdn.deezer.com/preview/abc.mp3",
-    });
-    expect(vi.mocked(resolvePreview)).toHaveBeenCalledWith(
-      "mbid-abc-123",
-      "Artist",
-      "Track",
+    // No content-length header, so the early fast-path check can't catch it;
+    // the actual-bytes cap must reject after buffering.
+    const oversize = new Uint8Array(11 * 1024 * 1024);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(makeResponse({ bytes: oversize })),
     );
-  });
 
-  it("returns previewUrl null when none resolves", async () => {
-    vi.mocked(resolvePreview).mockResolvedValue(noPreview);
     const app = buildApp(previewRoutes);
-    const res = await app.inject({ method: "GET", url: RESOLVE_URL });
-    expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ previewUrl: null });
-  });
+    const res = await app.inject({ method: "GET", url: BASE_URL });
 
-  it("400s when artistName/trackTitle query params are missing", async () => {
-    const app = buildApp(previewRoutes);
-    const res = await app.inject({ method: "GET", url: "/mbid-abc-123" });
-    expect(res.statusCode).toBe(400);
-    expect(vi.mocked(resolvePreview)).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(502);
+    vi.unstubAllGlobals();
   });
 });

@@ -9,7 +9,6 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AlbumArt } from "@/components/home/album-art";
 import { StaccatoImage } from "@/components/staccato-image";
-import { useResolvePreview } from "@/hooks/use-resolve-preview";
 import { pickGradient } from "@/lib/gradient";
 import { formatPlayerTime } from "@/lib/playback";
 import { useTheme } from "@/theme";
@@ -35,7 +34,6 @@ export function SearchResultsView({
   onRequestDownload,
 }: SearchResultsViewProps) {
   const { colors, typography } = useTheme();
-  const resolvePreview = useResolvePreview();
   const { recordings, releases, artists, topResult } = results;
 
   const empty =
@@ -78,10 +76,7 @@ export function SearchResultsView({
                 coverArtUrl: r.coverArtUrl,
                 inLibrary: r.inLibrary,
                 localTrackId: r.localTrackId,
-                // Search results have no inline preview url — resolve on tap.
-                resolvePreviewUrl: () =>
-                  resolvePreview(r.recordingMbid, r.artistName, r.title),
-                previewable: true,
+                artistName: r.artistName,
               }}
               trailing={
                 r.durationMs != null ? (

@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 
+import { PlayOff } from "@/components/icons/play-off";
 import { AlbumArt } from "@/components/home/album-art";
 import { pickGradient } from "@/lib/gradient";
 import { usePlayback } from "@/providers/playback-provider";
@@ -24,13 +25,8 @@ export interface TrackRowTrack {
   inLibrary: boolean;
   /** Local DB track id when owned — enables full-track playback. */
   localTrackId: string | null;
-  /** Resolves the 30s preview url (inline for recs, lazy lookup for search). */
-  resolvePreviewUrl: () => Promise<string | null>;
-  /**
-   * Whether a preview is known to exist. Recommended tracks know up front
-   * (previewUrl != null); search rows pass true and resolve lazily on tap.
-   */
-  previewable: boolean;
+  /** Artist name, passed to the preview proxy when previewing an external track. */
+  artistName: string;
 }
 
 interface TrackRowProps {
@@ -46,24 +42,32 @@ interface TrackRowProps {
 /**
  * A track row shared by Explore's recommended list and search results. The
  * artwork doubles as a play affordance: tapping an owned track plays it in full
- * via the playback session; tapping an external track plays a 30-second
- * preview. Owned/previewable rows show a play overlay (and a progress bar while
- * previewing); rows with neither show plain, non-interactive artwork.
+ * via the playback session; tapping an external track streams a 30-second
+ * preview through the server proxy. External rows are previewable optimistically
+ * (the play overlay shows up front, with a progress bar while previewing); a
+ * track whose preview turns out not to exist shows a disabled "preview off"
+ * glyph. An owned track with no local id falls back to plain artwork.
  */
 export function TrackRow({ track, index, divider, trailing }: TrackRowProps) {
   const { colors, typography } = useTheme();
-  const { previewingId, previewLoadingId, previewProgress, togglePreview } =
-    usePreview();
+  const {
+    previewingId,
+    previewLoadingId,
+    previewProgress,
+    isPreviewUnavailable,
+    togglePreview,
+  } = usePreview();
   const { currentTrack, isPlaying, playTracks, togglePlay } = usePlayback();
 
   const { recordingMbid, localTrackId, inLibrary } = track;
   const isPreviewing = previewingId === recordingMbid;
   const isLoading = previewLoadingId === recordingMbid;
+  const unavailable = !inLibrary && isPreviewUnavailable(recordingMbid);
   const isCurrent =
     inLibrary && localTrackId != null && currentTrack?.id === localTrackId;
   const isPlayingThis = isCurrent && isPlaying;
 
-  const showAffordance = inLibrary ? localTrackId != null : track.previewable;
+  const showAffordance = inLibrary ? localTrackId != null : true;
   const active = isPreviewing || isPlayingThis;
 
   const onPress = () => {
@@ -72,7 +76,7 @@ export function TrackRow({ track, index, divider, trailing }: TrackRowProps) {
       else playTracks([localTrackId], 0);
       return;
     }
-    togglePreview(recordingMbid, track.resolvePreviewUrl);
+    togglePreview(recordingMbid, track.artistName, track.title);
   };
 
   return (
@@ -88,7 +92,30 @@ export function TrackRow({ track, index, divider, trailing }: TrackRowProps) {
         </Text>
       ) : null}
 
-      {showAffordance ? (
+      {showAffordance && unavailable ? (
+        <View
+          accessibilityRole="image"
+          accessibilityLabel="Preview unavailable"
+          style={styles.art}
+        >
+          <AlbumArt
+            gradientKey={pickGradient(recordingMbid)}
+            artUrl={track.coverArtUrl}
+            size={ART}
+            radius={6}
+            glyphSize={18}
+          />
+          <View
+            style={[
+              StyleSheet.absoluteFill,
+              styles.artOverlay,
+              { backgroundColor: "rgba(0,0,0,0.45)" },
+            ]}
+          >
+            <PlayOff size={15} color="rgba(255,255,255,0.7)" />
+          </View>
+        </View>
+      ) : showAffordance ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={active ? "Stop" : "Play"}

@@ -8,7 +8,6 @@ export const RecommendedTrackSchema = z.object({
   albumTitle: z.string().nullable(),
   releaseGroupMbid: z.string().nullable(),
   coverArtUrl: z.string().nullable(),
-  previewUrl: z.string().nullable(),
   durationMs: z.number().nullable(),
   inLibrary: z.boolean(),
   // Local DB track id when owned (for /api/tracks/{id}/stream playback);

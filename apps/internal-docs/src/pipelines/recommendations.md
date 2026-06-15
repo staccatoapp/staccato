@@ -89,8 +89,11 @@ Two sources exist today, both with `id` `"listenbrainz"`:
 Both follow the same shape: pull MBIDs from ListenBrainz, call `getTracksByMusicbrainzIds` to
 short-circuit any recording already in the local library (those need no MusicBrainz lookup or
 enrichment), then for the remainder fan out `lookupRecording` (at `MB_PRIORITY.BACKGROUND`) and
-batch the asset enrichment — `ensureCoverOnDisk` for cover art, and for `cf-tracks` also
-`resolvePreview` for the 30-second preview clip. Local matches are emitted with `inLibrary: true`
+batch the asset enrichment — `ensureCoverOnDisk` for cover art. Preview clips are **not** resolved
+here: Deezer/iTunes preview URLs are time-limited, so baking them into the cached payload shipped
+stale (expired) URLs to clients. The payload carries no `previewUrl`; clients stream previews on
+demand through the preview proxy (`GET /api/preview/:mbid/stream`), which re-resolves and self-heals
+stale URLs. Local matches are emitted with `inLibrary: true`
 and their canonical local metadata; non-local matches carry the fetched MB metadata and
 `inLibrary: false`. The final array is parsed with `RecommendedTrackSchema` /
 `RecommendedPlaylistSchema` before being returned (and thus cached).

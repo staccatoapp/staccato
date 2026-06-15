@@ -32,7 +32,6 @@ function makeTrack(
     albumTitle: "Rumours",
     releaseGroupMbid: "rg-1",
     coverArtUrl: null,
-    previewUrl: "https://preview.example/clip.mp3",
     durationMs: 254000,
     inLibrary: true,
     localTrackId: "lt-1",
@@ -60,6 +59,7 @@ beforeEach(() => {
     previewingId: null,
     previewLoadingId: null,
     previewProgress: 0,
+    isPreviewUnavailable: () => false,
     togglePreview: jest.fn(),
   });
   mockUsePlayback.mockReturnValue({
