@@ -329,6 +329,33 @@ describe("PlaybackProvider", () => {
     );
   });
 
+  it("playTracks replaces the queue and starts playback via /session/play", async () => {
+    const { result } = await renderPlayback();
+
+    act(() => result.current.playTracks(["lt-1"], 0));
+
+    await waitFor(() =>
+      expect(put).toHaveBeenCalledWith(
+        "/api/playback/session/play",
+        { trackIds: ["lt-1"], startIndex: 0 },
+        expect.anything(),
+      ),
+    );
+  });
+
+  it("playTracks is a no-op for an empty track list", async () => {
+    const { result } = await renderPlayback();
+    put.mockClear();
+
+    act(() => result.current.playTracks([], 0));
+
+    expect(put).not.toHaveBeenCalledWith(
+      "/api/playback/session/play",
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
   it("exposes a null track and no-op actions when there is no playback session yet", () => {
     get.mockResolvedValue({ ...SESSION, trackQueue: [], currentTrackIndex: 0 });
 

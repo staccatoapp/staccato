@@ -1,7 +1,7 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { searchExternalUnified, MB_PRIORITY } from "../musicbrainz/client.js";
-import { getLocalTrackMbidsByMbids } from "../db/queries/tracks.js";
+import { getTracksByMusicbrainzIds } from "../db/queries/tracks.js";
 import { resolveExternalCoverNow } from "../coverart/store.js";
 import { ensureArtistImageOnDisk } from "../artistimage/store.js";
 import { logger } from "../logger.js";
@@ -58,26 +58,31 @@ const searchRoutes: FastifyPluginAsync = async (fastify) => {
     );
     if (!results) return EMPTY;
 
-    // Tracks: mark in-library and attach cover art (recordings now carry their
-    // best release's release-group, the Cover Art Archive key).
-    const localMbids = new Set(
-      getLocalTrackMbidsByMbids(results.recordings.map((r) => r.recordingMbid)),
+    // Tracks: mark in-library, surface the local trackId (so owned tracks can be
+    // played in full), and attach cover art (recordings now carry their best
+    // release's release-group, the Cover Art Archive key).
+    const localMap = getTracksByMusicbrainzIds(
+      results.recordings.map((r) => r.recordingMbid),
     );
-    const recordings = results.recordings.map((r) => ({
-      recordingMbid: r.recordingMbid,
-      title: r.title,
-      artistName: r.artistName,
-      artistMbid: r.artistMbid,
-      releaseName: r.releaseName,
-      releaseMbid: r.releaseMbid,
-      releaseYear: r.releaseYear,
-      durationMs: r.durationMs,
-      inLibrary: localMbids.has(r.recordingMbid),
-      coverArtUrl: r.releaseGroupMbid
-        ? resolveExternalCoverNow(r.releaseGroupMbid, MB_PRIORITY.INTERACTIVE)
-        : null,
-      listenCount: r.listenCount,
-    }));
+    const recordings = results.recordings.map((r) => {
+      const local = localMap.get(r.recordingMbid);
+      return {
+        recordingMbid: r.recordingMbid,
+        title: r.title,
+        artistName: r.artistName,
+        artistMbid: r.artistMbid,
+        releaseName: r.releaseName,
+        releaseMbid: r.releaseMbid,
+        releaseYear: r.releaseYear,
+        durationMs: r.durationMs,
+        inLibrary: local != null,
+        localTrackId: local?.trackId ?? null,
+        coverArtUrl: r.releaseGroupMbid
+          ? resolveExternalCoverNow(r.releaseGroupMbid, MB_PRIORITY.INTERACTIVE)
+          : null,
+        listenCount: r.listenCount,
+      };
+    });
 
     const artists = await attachArtistImagesByMbid(results.artists);
     const releases = attachCoverArtByReleaseGroup(results.releases);

@@ -12,6 +12,7 @@ const mockPlayer = {
 
 const mockStatus = {
   playing: false,
+  isLoaded: true,
   currentTime: 0,
   duration: 30,
   didJustFinish: false,
@@ -32,6 +33,8 @@ function wrapper({ children }: { children: React.ReactNode }) {
   return <PreviewProvider>{children}</PreviewProvider>;
 }
 
+const url = "https://preview.example/clip.mp3";
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockUsePlayback.mockReturnValue({
@@ -41,37 +44,36 @@ beforeEach(() => {
 });
 
 describe("PreviewProvider", () => {
-  it("starts a preview and pauses main playback", () => {
+  it("resolves the url, loads + plays the clip, and pauses main playback", async () => {
     const { result } = renderHook(() => usePreview(), { wrapper });
-    act(() => {
-      result.current.togglePreview("rec-1", "https://preview.example/clip.mp3");
+    await act(async () => {
+      result.current.togglePreview("rec-1", async () => url);
     });
     expect(mockTogglePlay).toHaveBeenCalledTimes(1);
-    expect(mockPlayer.replace).toHaveBeenCalledWith({
-      uri: "https://preview.example/clip.mp3",
-    });
+    expect(mockPlayer.replace).toHaveBeenCalledWith({ uri: url });
     expect(mockPlayer.play).toHaveBeenCalled();
     expect(result.current.previewingId).toBe("rec-1");
   });
 
-  it("stops when the same track is toggled again", () => {
+  it("stops when the same track is toggled again", async () => {
     const { result } = renderHook(() => usePreview(), { wrapper });
-    act(() => {
-      result.current.togglePreview("rec-1", "https://preview.example/clip.mp3");
+    await act(async () => {
+      result.current.togglePreview("rec-1", async () => url);
     });
-    act(() => {
-      result.current.togglePreview("rec-1", "https://preview.example/clip.mp3");
+    await act(async () => {
+      result.current.togglePreview("rec-1", async () => url);
     });
     expect(mockPlayer.pause).toHaveBeenCalled();
     expect(result.current.previewingId).toBeNull();
   });
 
-  it("ignores a track with no preview url", () => {
+  it("ignores a track whose preview url resolves to null", async () => {
     const { result } = renderHook(() => usePreview(), { wrapper });
-    act(() => {
-      result.current.togglePreview("rec-2", null);
+    await act(async () => {
+      result.current.togglePreview("rec-2", async () => null);
     });
     expect(mockPlayer.replace).not.toHaveBeenCalled();
     expect(result.current.previewingId).toBeNull();
+    expect(result.current.previewLoadingId).toBeNull();
   });
 });

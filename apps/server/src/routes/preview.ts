@@ -38,6 +38,40 @@ async function guardedFetch(
 }
 
 const previewRoutes: FastifyPluginAsync = async (fastify) => {
+  // Lazily resolve a 30s preview URL for a recording (used by search results,
+  // which carry no inline previewUrl). Returns the absolute Deezer/iTunes URL
+  // the client plays directly — same contract as recommended tracks' inline
+  // previewUrl — or null when none is available.
+  fastify.get("/:recordingMbid", async (req, reply) => {
+    const { recordingMbid } = z
+      .object({ recordingMbid: z.string() })
+      .parse(req.params);
+    const parsedQuery = z
+      .object({ artistName: z.string(), trackTitle: z.string() })
+      .safeParse(req.query);
+    if (!parsedQuery.success) {
+      req.log.warn(
+        { err: parsedQuery.error, recordingMbid },
+        "GET /:recordingMbid: missing artistName/trackTitle",
+      );
+      return reply.status(400).send({ error: "Invalid request" });
+    }
+    const { artistName, trackTitle } = parsedQuery.data;
+
+    const { previewUrl } = await resolvePreview(
+      recordingMbid,
+      artistName,
+      trackTitle,
+    );
+    if (!previewUrl) {
+      req.log.debug(
+        { recordingMbid, artistName, trackTitle },
+        "no preview available for recording",
+      );
+    }
+    return { previewUrl };
+  });
+
   fastify.get("/:recordingMbid/stream", async (req, reply) => {
     const { recordingMbid } = z
       .object({ recordingMbid: z.string() })

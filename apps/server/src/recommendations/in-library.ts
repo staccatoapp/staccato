@@ -5,7 +5,6 @@ import type {
 } from "@staccato/shared";
 import {
   getLibraryTracksByArtistMbids,
-  getLocalTrackMbidsByMbids,
   getTracksByMusicbrainzIds,
 } from "../db/queries/tracks.js";
 import { normalizeString } from "../musicbrainz/normalize.js";
@@ -62,20 +61,24 @@ export function refreshTracksInLibrary(
   tracks: RecommendedTrack[],
 ): RecommendedTrack[] {
   if (tracks.length === 0) return tracks;
-  const localSet = new Set(
-    getLocalTrackMbidsByMbids(tracks.map((t) => t.recordingMbid)),
+  // Use the detail lookup (not the MBID-set lookup) so we can also surface the
+  // local trackId — the mobile/web clients need it to play an owned track.
+  const localMap = getTracksByMusicbrainzIds(
+    tracks.map((t) => t.recordingMbid),
   );
   // Song-level fallback only for the tracks the exact MBID match missed.
   const unmatched = tracks.filter(
-    (t) => !localSet.has(t.recordingMbid) && t.artistMbid,
+    (t) => !localMap.has(t.recordingMbid) && t.artistMbid,
   );
   const songIndex = buildSongIndex(unmatched);
   return tracks.map((t) => {
-    if (localSet.has(t.recordingMbid)) return { ...t, inLibrary: true };
-    if (t.artistMbid && songIndex.has(songKey(t.artistMbid, t.title))) {
-      return { ...t, inLibrary: true };
+    const local = localMap.get(t.recordingMbid);
+    if (local) return { ...t, inLibrary: true, localTrackId: local.trackId };
+    if (t.artistMbid) {
+      const trackId = songIndex.get(songKey(t.artistMbid, t.title));
+      if (trackId) return { ...t, inLibrary: true, localTrackId: trackId };
     }
-    return { ...t, inLibrary: false };
+    return { ...t, inLibrary: false, localTrackId: null };
   });
 }
 

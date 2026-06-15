@@ -76,8 +76,10 @@ change) and kicks a `tick()`. SP3 mirrors this with `resetInflightSuggestionsOnB
 
 ## In-library matching (live)
 
-`in-library.ts` re-resolves `inLibrary` (and `localTrackId` for playlists) on **every serve** — never cached, since a
-track can become local anytime. This source-agnostic pass also carries a **song-level fallback** `selectWinner` can't
+`in-library.ts` re-resolves `inLibrary` and `localTrackId` on **every serve** — never cached, since a
+track can become local anytime. `refreshTracksInLibrary` (flat tracks) now resolves `localTrackId` via
+`getTracksByMusicbrainzIds` too (not just the playlist passes), so Explore can play an owned recommended/search
+track in full. This source-agnostic pass also carries a **song-level fallback** `selectWinner` can't
 reach (a source may resolve to a different recording than the importer's AcoustID match; ListenBrainz never
 name-searches): when the exact MBID lookup misses and the recommendation has an `artistMbid`, it matches on **exact**
 `(artistMbid, normalized title)` via `getLibraryTracksByArtistMbids` (indexed under both raw-tag and MB-canonical

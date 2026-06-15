@@ -11,6 +11,24 @@ jest.mock("@/lib/session", () => ({
   }),
 }));
 
+jest.mock("@/providers/preview-provider", () => ({
+  usePreview: () => ({
+    previewingId: null,
+    previewLoadingId: null,
+    previewProgress: 0,
+    togglePreview: jest.fn(),
+  }),
+}));
+
+jest.mock("@/providers/playback-provider", () => ({
+  usePlayback: () => ({
+    currentTrack: null,
+    isPlaying: false,
+    playTracks: jest.fn(),
+    togglePlay: jest.fn(),
+  }),
+}));
+
 const RESULTS: ExternalSearchResults = {
   recordings: [
     {
@@ -23,6 +41,7 @@ const RESULTS: ExternalSearchResults = {
       releaseYear: 1977,
       durationMs: 254000,
       inLibrary: false,
+      localTrackId: null,
       coverArtUrl: null,
       listenCount: 100,
     },

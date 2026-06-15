@@ -208,3 +208,43 @@ describe("GET /:recordingMbid/stream — preview SSRF guard", () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe("GET /:recordingMbid — lazy preview URL resolution", () => {
+  const RESOLVE_URL = "/mbid-abc-123?artistName=Artist&trackTitle=Track";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns the resolved preview URL as JSON", async () => {
+    vi.mocked(resolvePreview).mockResolvedValue(
+      deezerPreview("https://cdn.deezer.com/preview/abc.mp3"),
+    );
+    const app = buildApp(previewRoutes);
+    const res = await app.inject({ method: "GET", url: RESOLVE_URL });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      previewUrl: "https://cdn.deezer.com/preview/abc.mp3",
+    });
+    expect(vi.mocked(resolvePreview)).toHaveBeenCalledWith(
+      "mbid-abc-123",
+      "Artist",
+      "Track",
+    );
+  });
+
+  it("returns previewUrl null when none resolves", async () => {
+    vi.mocked(resolvePreview).mockResolvedValue(noPreview);
+    const app = buildApp(previewRoutes);
+    const res = await app.inject({ method: "GET", url: RESOLVE_URL });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ previewUrl: null });
+  });
+
+  it("400s when artistName/trackTitle query params are missing", async () => {
+    const app = buildApp(previewRoutes);
+    const res = await app.inject({ method: "GET", url: "/mbid-abc-123" });
+    expect(res.statusCode).toBe(400);
+    expect(vi.mocked(resolvePreview)).not.toHaveBeenCalled();
+  });
+});

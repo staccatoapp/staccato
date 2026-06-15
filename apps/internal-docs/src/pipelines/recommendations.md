@@ -153,9 +153,11 @@ force-refreshes the affected rows.
 ## In-library matching
 
 `in-library.ts` re-resolves library membership on every serve rather than trusting the cached
-payload. `refreshTracksInLibrary` looks up `getLocalTrackMbidsByMbids` and rewrites each track's
-`inLibrary`; `refreshPlaylistsInLibrary` looks up `getTracksByMusicbrainzIds` and rewrites both
-`inLibrary` and `localTrackId` per playlist track. The reason is correctness, not performance: a
+payload. `refreshTracksInLibrary` (flat tracks) and `refreshPlaylistsInLibrary` (playlist tracks)
+both look up `getTracksByMusicbrainzIds` and rewrite `inLibrary` **and** `localTrackId` per track —
+flat recommended tracks gained `localTrackId` so Explore can play an owned track in full via
+`PUT /api/playback/session/play` (the cached payload stores `localTrackId: null`; it is filled live
+here). The reason is correctness, not performance: a
 recommended recording can transition into the library at any time (a completed download, a library
 scan, a manual import), and the UI's "play now" vs. "request download" affordance must reflect the
 truth at request time.
@@ -173,8 +175,8 @@ canonical title — they routinely disagree (e.g. raw "3005" vs canonical "V. 30
 search only surfaces "V. 3005", scores ~0.69, and is rejected by the importer-nucleus threshold,
 which is why `selectWinner` alone misses this) — so each library track is indexed under both. The
 match is deliberately conservative — **exact** normalized title plus `artistMbid` — so remixes/live
-cuts ("3005 (Friction Remix)") do not collide, and on a hit it flips only `inLibrary` (+ `localTrackId`
-for playlists); the displayed album/cover are left as the source resolved them (play uses
+cuts ("3005 (Friction Remix)") do not collide, and on a hit it flips only `inLibrary` and
+`localTrackId`; the displayed album/cover are left as the source resolved them (play uses
 `localTrackId`). It complements the inhouse resolution fix rather than replacing it: `selectWinner`
 converges owned songs onto the library recording at resolution time and sharpens not-owned display,
 while this is the universal safety net.

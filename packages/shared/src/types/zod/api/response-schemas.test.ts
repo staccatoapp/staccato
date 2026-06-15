@@ -27,7 +27,10 @@ import {
   PlaylistSortSchema,
   PlaylistTrackSchema,
 } from "./playlists.js";
-import { recommendationsResponseSchema } from "./recommendations.js";
+import {
+  RecommendedTrackSchema,
+  recommendationsResponseSchema,
+} from "./recommendations.js";
 import { ScanProgressSchema, TrackStatusCountsSchema } from "./scan.js";
 import { ServerSettingsSchema } from "./settings.js";
 import { TrackListItemSchema, TrackSearchResultSchema } from "./tracks.js";
@@ -536,5 +539,33 @@ describe("recommendationsResponseSchema", () => {
 
   it("rejects an unknown status", () => {
     expect(() => schema.parse({ status: "unknown" })).toThrow(z.ZodError);
+  });
+});
+
+describe("RecommendedTrackSchema", () => {
+  const base = {
+    recordingMbid: "mbid-1",
+    title: "Song",
+    artistName: "Artist",
+    artistMbid: null,
+    albumTitle: null,
+    releaseGroupMbid: null,
+    coverArtUrl: null,
+    previewUrl: null,
+    durationMs: null,
+    inLibrary: false,
+  };
+
+  it("defaults localTrackId to null when absent (pre-field cache payloads)", () => {
+    // Cache rows written before localTrackId existed omit the field entirely;
+    // they must still parse (the value is re-resolved live on serve anyway).
+    expect(RecommendedTrackSchema.parse(base).localTrackId).toBeNull();
+  });
+
+  it("preserves an explicit localTrackId", () => {
+    expect(
+      RecommendedTrackSchema.parse({ ...base, localTrackId: "lt-1" })
+        .localTrackId,
+    ).toBe("lt-1");
   });
 });

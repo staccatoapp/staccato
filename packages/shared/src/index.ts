@@ -16,6 +16,7 @@ export * from "./types/zod/api/playlists.js";
 export * from "./types/zod/api/scan.js";
 export * from "./types/zod/api/library.js";
 export * from "./types/zod/api/lyrics.js";
+export * from "./types/zod/api/preview.js";
 
 export * from "./types/zod/metadata/recording.js";
 export * from "./types/zod/metadata/release.js";

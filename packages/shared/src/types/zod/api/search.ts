@@ -11,6 +11,9 @@ export const ExternalRecordingSchema = z.object({
   releaseYear: z.number().nullable(),
   durationMs: z.number().nullable(),
   inLibrary: z.boolean(),
+  // Local DB track id when owned (drives full-track playback from search);
+  // null when not in library. Previews resolve lazily on tap (no field here).
+  localTrackId: z.string().nullable(),
   coverArtUrl: z.string().nullable(),
   // Global ListenBrainz listen count — drives ranking and optional display.
   listenCount: z.number().nullable(),

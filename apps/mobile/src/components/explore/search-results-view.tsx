@@ -1,6 +1,5 @@
 import type {
   ExternalArtistResult,
-  ExternalRecording,
   ExternalReleaseResult,
   ExternalSearchResults,
 } from "@staccato/shared";
@@ -10,11 +9,13 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AlbumArt } from "@/components/home/album-art";
 import { StaccatoImage } from "@/components/staccato-image";
+import { useResolvePreview } from "@/hooks/use-resolve-preview";
 import { pickGradient } from "@/lib/gradient";
 import { formatPlayerTime } from "@/lib/playback";
 import { useTheme } from "@/theme";
 
 import { subjectFromRelease, type LidarrSubject } from "./lidarr-sheet";
+import { TrackRow } from "./track-row";
 
 const ART = 44;
 
@@ -25,15 +26,16 @@ interface SearchResultsViewProps {
 
 /**
  * Web-style unified search results: an optional top-result card, then grouped
- * Tracks / Albums / Artists sections. Recordings carry no release-group or
- * preview url, so they render without a request or preview affordance; albums
- * that resolve to a release-group can be requested via Lidarr.
+ * Tracks / Albums / Artists sections. Track rows play an owned track in full or
+ * a lazily-resolved 30s preview (shared {@link TrackRow}); albums that resolve
+ * to a release-group can be requested via Lidarr.
  */
 export function SearchResultsView({
   results,
   onRequestDownload,
 }: SearchResultsViewProps) {
   const { colors, typography } = useTheme();
+  const resolvePreview = useResolvePreview();
   const { recordings, releases, artists, topResult } = results;
 
   const empty =
@@ -64,10 +66,38 @@ export function SearchResultsView({
       {recordings.length > 0 ? (
         <Section title="Tracks">
           {recordings.map((r, i) => (
-            <RecordingRow
+            <TrackRow
               key={r.recordingMbid}
-              recording={r}
-              isLast={i === recordings.length - 1}
+              divider={i !== recordings.length - 1}
+              track={{
+                recordingMbid: r.recordingMbid,
+                title: r.title,
+                subtitle: [r.artistName, r.releaseName]
+                  .filter(Boolean)
+                  .join(" · "),
+                coverArtUrl: r.coverArtUrl,
+                inLibrary: r.inLibrary,
+                localTrackId: r.localTrackId,
+                // Search results have no inline preview url — resolve on tap.
+                resolvePreviewUrl: () =>
+                  resolvePreview(r.recordingMbid, r.artistName, r.title),
+                previewable: true,
+              }}
+              trailing={
+                r.durationMs != null ? (
+                  <Text
+                    style={[
+                      styles.duration,
+                      {
+                        color: colors.fgMuted,
+                        fontFamily: typography.fontFamily,
+                      },
+                    ]}
+                  >
+                    {formatPlayerTime(Math.round(r.durationMs / 1000))}
+                  </Text>
+                ) : undefined
+              }
             />
           ))}
         </Section>
@@ -269,46 +299,6 @@ function Row({
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
       ) : null}
     </View>
-  );
-}
-
-function RecordingRow({
-  recording,
-  isLast,
-}: {
-  recording: ExternalRecording;
-  isLast: boolean;
-}) {
-  const { colors, typography } = useTheme();
-  return (
-    <Row
-      isLast={isLast}
-      art={
-        <AlbumArt
-          gradientKey={pickGradient(recording.recordingMbid)}
-          artUrl={recording.coverArtUrl}
-          size={ART}
-          radius={6}
-          glyphSize={18}
-        />
-      }
-      title={recording.title}
-      subtitle={[recording.artistName, recording.releaseName]
-        .filter(Boolean)
-        .join(" · ")}
-      trailing={
-        recording.durationMs != null ? (
-          <Text
-            style={[
-              styles.duration,
-              { color: colors.fgMuted, fontFamily: typography.fontFamily },
-            ]}
-          >
-            {formatPlayerTime(Math.round(recording.durationMs / 1000))}
-          </Text>
-        ) : undefined
-      }
-    />
   );
 }
 

@@ -84,6 +84,8 @@ export const listenbrainzCfTracksSource: RecommendationSource<
             previewUrl: null,
             durationMs: local.durationMs,
             inLibrary: true,
+            // Re-resolved live by refreshTracksInLibrary on every serve.
+            localTrackId: null,
           };
         }
         const rec = recMap.get(mbid);
@@ -100,6 +102,7 @@ export const listenbrainzCfTracksSource: RecommendationSource<
           previewUrl: enr?.previewUrl ?? null,
           durationMs: rec.durationMs,
           inLibrary: false,
+          localTrackId: null,
         };
       })
       .filter((t): t is RecommendedTrack => t !== null);

@@ -11,6 +11,11 @@ export const RecommendedTrackSchema = z.object({
   previewUrl: z.string().nullable(),
   durationMs: z.number().nullable(),
   inLibrary: z.boolean(),
+  // Local DB track id when owned (for /api/tracks/{id}/stream playback);
+  // re-resolved live on every serve, never cached, so the stored value is
+  // irrelevant. Defaults to null so cache payloads written before this field
+  // existed still parse (they're then filled in by the live in-library pass).
+  localTrackId: z.string().nullable().default(null),
 });
 
 export const RecommendedPlaylistTrackSchema = z.object({

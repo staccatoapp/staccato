@@ -10,6 +10,11 @@ jest.mock("@/providers/preview-provider", () => ({
   usePreview: () => mockUsePreview(),
 }));
 
+const mockUsePlayback = jest.fn();
+jest.mock("@/providers/playback-provider", () => ({
+  usePlayback: () => mockUsePlayback(),
+}));
+
 jest.mock("@/lib/session", () => ({
   useSession: () => ({
     session: { serverUrl: "https://music.home.arpa", token: "tok" },
@@ -30,24 +35,12 @@ function makeTrack(
     previewUrl: "https://preview.example/clip.mp3",
     durationMs: 254000,
     inLibrary: true,
+    localTrackId: "lt-1",
     ...overrides,
   };
 }
 
-function renderRow(
-  track: RecommendedTrack,
-  preview: Partial<{
-    previewingId: string | null;
-    previewProgress: number;
-    togglePreview: jest.Mock;
-  }> = {},
-) {
-  const togglePreview = preview.togglePreview ?? jest.fn();
-  mockUsePreview.mockReturnValue({
-    previewingId: preview.previewingId ?? null,
-    previewProgress: preview.previewProgress ?? 0,
-    togglePreview,
-  });
+function renderRow(track: RecommendedTrack) {
   const onRequestDownload = jest.fn();
   render(
     <StaccatoThemeProvider>
@@ -58,10 +51,24 @@ function renderRow(
       />
     </StaccatoThemeProvider>,
   );
-  return { togglePreview, onRequestDownload };
+  return { onRequestDownload };
 }
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockUsePreview.mockReturnValue({
+    previewingId: null,
+    previewLoadingId: null,
+    previewProgress: 0,
+    togglePreview: jest.fn(),
+  });
+  mockUsePlayback.mockReturnValue({
+    currentTrack: null,
+    isPlaying: false,
+    playTracks: jest.fn(),
+    togglePlay: jest.fn(),
+  });
+});
 
 describe("RecTrackRow", () => {
   it("shows the duration and no request button for an in-library track", () => {
@@ -71,7 +78,9 @@ describe("RecTrackRow", () => {
   });
 
   it("shows the Lidarr request button for a requestable non-library track", () => {
-    const { onRequestDownload } = renderRow(makeTrack({ inLibrary: false }));
+    const { onRequestDownload } = renderRow(
+      makeTrack({ inLibrary: false, localTrackId: null }),
+    );
     expect(screen.getByText("Fleetwood Mac · Not in library")).toBeTruthy();
     fireEvent.press(screen.getByLabelText("Request Dreams via Lidarr"));
     expect(onRequestDownload).toHaveBeenCalledWith(
@@ -86,21 +95,13 @@ describe("RecTrackRow", () => {
   });
 
   it("hides the request button when the track can't be requested", () => {
-    renderRow(makeTrack({ inLibrary: false, releaseGroupMbid: null }));
-    expect(screen.queryByLabelText("Request Dreams via Lidarr")).toBeNull();
-  });
-
-  it("toggles a preview when the artwork is pressed", () => {
-    const { togglePreview } = renderRow(makeTrack());
-    fireEvent.press(screen.getByLabelText("Play preview"));
-    expect(togglePreview).toHaveBeenCalledWith(
-      "rec-1",
-      "https://preview.example/clip.mp3",
+    renderRow(
+      makeTrack({
+        inLibrary: false,
+        localTrackId: null,
+        releaseGroupMbid: null,
+      }),
     );
-  });
-
-  it("shows the stop affordance while previewing", () => {
-    renderRow(makeTrack(), { previewingId: "rec-1" });
-    expect(screen.getByLabelText("Stop preview")).toBeTruthy();
+    expect(screen.queryByLabelText("Request Dreams via Lidarr")).toBeNull();
   });
 });

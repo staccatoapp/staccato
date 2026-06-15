@@ -60,6 +60,7 @@ const validTrack: RecommendedTrack = {
   previewUrl: null,
   durationMs: null,
   inLibrary: false,
+  localTrackId: null,
 };
 
 describe("GET /tracks — recommendation cache validation", () => {

@@ -54,6 +54,8 @@ interface PlaybackContextValue {
   prev: () => void;
   seekTo: (seconds: number) => void;
   jumpToIndex: (index: number) => void;
+  /** Replace the queue with the given tracks and start playing at startIndex. */
+  playTracks: (trackIds: string[], startIndex: number) => void;
 }
 
 const PlaybackContext = createContext<PlaybackContextValue | null>(null);
@@ -99,6 +101,17 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     { optimisticUpdate: (old, vars) => (old ? { ...old, ...vars } : old) },
   );
   const mutateState = stateMutation.mutate;
+
+  // Start a brand-new queue (used by Explore to play an owned track in full).
+  // The server filters/translates the queue, so we rely on the post-settle
+  // refetch rather than an optimistic write.
+  const playMutation = useAuthedMutation<
+    PlaybackSession,
+    { trackIds: string[]; startIndex: number }
+  >(PLAYBACK_SESSION_KEY, (client, vars) =>
+    client.put("/api/playback/session/play", vars, PlaybackSessionSchema),
+  );
+  const mutatePlay = playMutation.mutate;
 
   // Audio mode: background playback with lock-screen controls requires
   // interruptionMode "doNotMix".
@@ -328,6 +341,14 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     [playbackSession, mutateState],
   );
 
+  const playTracks = useCallback(
+    (trackIds: string[], startIndex: number) => {
+      if (trackIds.length === 0) return;
+      mutatePlay({ trackIds, startIndex });
+    },
+    [mutatePlay],
+  );
+
   const value = useMemo<PlaybackContextValue>(
     () => ({
       session: playbackSession,
@@ -342,6 +363,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
       prev,
       seekTo,
       jumpToIndex,
+      playTracks,
     }),
     [
       playbackSession,
@@ -354,6 +376,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
       prev,
       seekTo,
       jumpToIndex,
+      playTracks,
     ],
   );
 
