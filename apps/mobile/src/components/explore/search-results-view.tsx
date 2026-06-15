@@ -3,6 +3,7 @@ import type {
   ExternalReleaseResult,
   ExternalSearchResults,
 } from "@staccato/shared";
+import { router } from "expo-router";
 import { CloudDownload, Mic } from "lucide-react-native";
 import React, { type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -142,6 +143,7 @@ function TopResult({
   let title = "";
   let subtitle = "";
   let trailing: ReactNode = null;
+  let onPress: (() => void) | undefined;
 
   if (topResult.type === "recording") {
     const rec = results.recordings.find(
@@ -175,6 +177,7 @@ function TopResult({
     subtitle = [rel.artistName, rel.releaseType, rel.releaseYear]
       .filter((v) => v != null && v !== "")
       .join(" · ");
+    onPress = openReleaseAlbum(rel.releaseGroupMbid);
     const subject = subjectFromRelease(rel);
     if (subject)
       trailing = (
@@ -199,27 +202,34 @@ function TopResult({
         Top result
       </Text>
       <View style={[styles.topCard, { backgroundColor: colors.bgRaised }]}>
-        {art}
-        <View style={styles.topText}>
-          <Text
-            numberOfLines={1}
-            style={[
-              styles.topTitle,
-              { color: colors.fg, fontFamily: typography.fontFamily },
-            ]}
-          >
-            {title}
-          </Text>
-          <Text
-            numberOfLines={1}
-            style={[
-              styles.topSubtitle,
-              { color: colors.fgMuted, fontFamily: typography.fontFamily },
-            ]}
-          >
-            {subtitle}
-          </Text>
-        </View>
+        <Pressable
+          accessibilityRole={onPress ? "button" : undefined}
+          onPress={onPress}
+          disabled={!onPress}
+          style={styles.topMain}
+        >
+          {art}
+          <View style={styles.topText}>
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.topTitle,
+                { color: colors.fg, fontFamily: typography.fontFamily },
+              ]}
+            >
+              {title}
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.topSubtitle,
+                { color: colors.fgMuted, fontFamily: typography.fontFamily },
+              ]}
+            >
+              {subtitle}
+            </Text>
+          </View>
+        </Pressable>
         {trailing}
       </View>
     </View>
@@ -252,6 +262,7 @@ function Row({
   trailing,
   titleColor,
   isLast,
+  onPress,
 }: {
   art: ReactNode;
   title: string;
@@ -259,42 +270,63 @@ function Row({
   trailing?: ReactNode;
   titleColor?: string;
   isLast: boolean;
+  /** When set, art + text become a tap target; the trailing slot stays its own. */
+  onPress?: () => void;
 }) {
   const { colors, typography } = useTheme();
   return (
     <View style={styles.row}>
-      {art}
-      <View style={styles.rowText}>
-        <Text
-          numberOfLines={1}
-          style={[
-            styles.rowTitle,
-            {
-              color: titleColor ?? colors.fg,
-              fontFamily: typography.fontFamily,
-            },
-          ]}
-        >
-          {title}
-        </Text>
-        {subtitle ? (
+      <Pressable
+        accessibilityRole={onPress ? "button" : undefined}
+        onPress={onPress}
+        disabled={!onPress}
+        style={styles.rowMain}
+      >
+        {art}
+        <View style={styles.rowText}>
           <Text
             numberOfLines={1}
             style={[
-              styles.rowSubtitle,
-              { color: colors.fgMuted, fontFamily: typography.fontFamily },
+              styles.rowTitle,
+              {
+                color: titleColor ?? colors.fg,
+                fontFamily: typography.fontFamily,
+              },
             ]}
           >
-            {subtitle}
+            {title}
           </Text>
-        ) : null}
-      </View>
+          {subtitle ? (
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.rowSubtitle,
+                { color: colors.fgMuted, fontFamily: typography.fontFamily },
+              ]}
+            >
+              {subtitle}
+            </Text>
+          ) : null}
+        </View>
+      </Pressable>
       {trailing}
       {!isLast ? (
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
       ) : null}
     </View>
   );
+}
+
+/** Navigate to album detail by release-group MBID, or null when unavailable. */
+function openReleaseAlbum(
+  releaseGroupMbid: string | null,
+): (() => void) | undefined {
+  if (!releaseGroupMbid) return undefined;
+  return () =>
+    router.push({
+      pathname: "/(home)/explore/album/[albumKey]",
+      params: { albumKey: releaseGroupMbid },
+    });
 }
 
 function ReleaseRow({
@@ -310,6 +342,7 @@ function ReleaseRow({
   return (
     <Row
       isLast={isLast}
+      onPress={openReleaseAlbum(release.releaseGroupMbid)}
       art={
         <AlbumArt
           gradientKey={pickGradient(release.releaseMbid)}
@@ -432,6 +465,13 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
   },
+  topMain: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    minWidth: 0,
+  },
   topText: {
     flex: 1,
     minWidth: 0,
@@ -468,6 +508,13 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 8,
     paddingHorizontal: 12,
+  },
+  rowMain: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    minWidth: 0,
   },
   rowText: {
     flex: 1,

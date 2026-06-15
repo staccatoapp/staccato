@@ -37,6 +37,13 @@ interface TrackRowProps {
   divider?: boolean;
   /** Trailing slot — duration text or a Lidarr request button. */
   trailing?: ReactNode;
+  /**
+   * Album queue context. When provided for an owned row, tapping plays the whole
+   * album starting at this track (queue = `queueTrackIds`, start = `queueIndex`)
+   * instead of the single track. Explore/search callers omit these.
+   */
+  queueTrackIds?: string[];
+  queueIndex?: number;
 }
 
 /**
@@ -48,7 +55,14 @@ interface TrackRowProps {
  * track whose preview turns out not to exist shows a disabled "preview off"
  * glyph. An owned track with no local id falls back to plain artwork.
  */
-export function TrackRow({ track, index, divider, trailing }: TrackRowProps) {
+export function TrackRow({
+  track,
+  index,
+  divider,
+  trailing,
+  queueTrackIds,
+  queueIndex,
+}: TrackRowProps) {
   const { colors, typography } = useTheme();
   const {
     previewingId,
@@ -73,7 +87,14 @@ export function TrackRow({ track, index, divider, trailing }: TrackRowProps) {
   const onPress = () => {
     if (inLibrary && localTrackId != null) {
       if (isCurrent) togglePlay();
-      else playTracks([localTrackId], 0);
+      else if (
+        queueTrackIds &&
+        queueTrackIds.length > 0 &&
+        queueIndex != null
+      ) {
+        // Album context: queue the whole album, starting at this track.
+        playTracks(queueTrackIds, queueIndex);
+      } else playTracks([localTrackId], 0);
       return;
     }
     togglePreview(recordingMbid, track.artistName, track.title);

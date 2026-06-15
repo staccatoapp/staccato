@@ -1,4 +1,8 @@
-import type { ExternalReleaseResult, RecommendedTrack } from "@staccato/shared";
+import type {
+  ExternalReleaseResult,
+  RecommendedTrack,
+  UnifiedAlbumDetail,
+} from "@staccato/shared";
 import { Info } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
@@ -70,6 +74,28 @@ export function subjectFromRelease(
     albumTitle: release.title,
     coverArtUrl: release.coverArtUrl,
     title: release.title,
+  };
+}
+
+/**
+ * Build a subject from an album-detail payload, or null if not requestable.
+ * Only external (MusicBrainz-only) albums carry the `artistMbid` the request
+ * needs — local albums omit it, so they return null.
+ */
+export function subjectFromAlbumDetail(
+  detail: UnifiedAlbumDetail,
+): LidarrSubject | null {
+  if (detail.source !== "external") return null;
+  const { releaseGroupMbid, artistMbid, artistName, title, coverArtUrl } =
+    detail.album;
+  if (!releaseGroupMbid || !artistMbid) return null;
+  return {
+    releaseGroupMbid,
+    artistMbid,
+    artistName,
+    albumTitle: title,
+    coverArtUrl,
+    title,
   };
 }
 

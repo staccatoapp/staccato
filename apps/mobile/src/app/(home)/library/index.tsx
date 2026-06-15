@@ -3,6 +3,7 @@ import {
   type Artist,
   type PlaylistListItem,
 } from "@staccato/shared";
+import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   FlatList,
@@ -102,8 +103,19 @@ export default function LibraryScreen() {
     AlbumListItem | Artist | PlaylistListItem
   > = ({ item }) => {
     if (tab === "albums") {
-      // TODO: open album detail once the mobile detail screen exists.
-      return <AlbumCell album={item as AlbumListItem} size={columnWidth} />;
+      const album = item as AlbumListItem;
+      return (
+        <AlbumCell
+          album={album}
+          size={columnWidth}
+          onPress={() =>
+            router.push({
+              pathname: "/(home)/library/album/[albumKey]",
+              params: { albumKey: album.id },
+            })
+          }
+        />
+      );
     }
     if (tab === "artists") {
       // TODO: open artist detail once the mobile detail screen exists.

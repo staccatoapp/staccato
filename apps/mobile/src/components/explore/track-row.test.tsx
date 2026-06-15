@@ -89,6 +89,21 @@ describe("TrackRow", () => {
     expect(togglePreview).not.toHaveBeenCalled();
   });
 
+  it("queues the whole album when album queue context is provided", () => {
+    setProviders();
+    render(
+      <StaccatoThemeProvider>
+        <TrackRow
+          track={makeTrack({ inLibrary: true, localTrackId: "lt-2" })}
+          queueTrackIds={["lt-1", "lt-2", "lt-3"]}
+          queueIndex={1}
+        />
+      </StaccatoThemeProvider>,
+    );
+    fireEvent.press(screen.getByLabelText("Play"));
+    expect(playTracks).toHaveBeenCalledWith(["lt-1", "lt-2", "lt-3"], 1);
+  });
+
   it("toggles pause when the owned track is already the current track", () => {
     setProviders({}, { currentTrack: { id: "lt-1" }, isPlaying: true });
     renderRow(makeTrack({ inLibrary: true, localTrackId: "lt-1" }));

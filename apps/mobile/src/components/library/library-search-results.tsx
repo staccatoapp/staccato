@@ -2,6 +2,7 @@ import {
   type LibrarySearchResults as LibrarySearchResultsData,
   type PlaylistListItem,
 } from "@staccato/shared";
+import { router } from "expo-router";
 import { ChevronRight } from "lucide-react-native";
 import React, { type ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
@@ -236,6 +237,12 @@ export function LibrarySearchResults({
                 .filter((v) => v != null && v !== "")
                 .join(" · ")}
               trailing={chevron}
+              onPress={() =>
+                router.push({
+                  pathname: "/(home)/library/album/[albumKey]",
+                  params: { albumKey: a.id },
+                })
+              }
             />
           ))}
         </Section>
