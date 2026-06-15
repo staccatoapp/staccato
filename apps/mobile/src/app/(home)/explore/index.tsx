@@ -16,10 +16,12 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useExternalSearch } from "@/hooks/use-external-search";
 import { useRecommendedPlaylists } from "@/hooks/use-recommended-playlists";
 import { useRecommendedTracks } from "@/hooks/use-recommended-tracks";
+import { useContentBottomInset } from "@/lib/player-layout";
 import { useTheme } from "@/theme";
 
 export default function ExploreScreen() {
   const { colors, typography } = useTheme();
+  const bottomInset = useContentBottomInset({ tabBarAutoInset: true });
   const [query, setQuery] = useState("");
   const [lidarrSubject, setLidarrSubject] = useState<LidarrSubject | null>(
     null,
@@ -45,7 +47,7 @@ export default function ExploreScreen() {
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: bottomInset }]}
       >
         <View style={styles.searchWrap}>
           <SearchField
@@ -147,7 +149,6 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingTop: 8,
-    paddingBottom: 140,
   },
   searchWrap: {
     paddingHorizontal: 16,

@@ -34,6 +34,7 @@ import {
   type LibrarySortKey,
   type LibraryTab,
 } from "@/lib/library-sort";
+import { useContentBottomInset } from "@/lib/player-layout";
 import { useTheme } from "@/theme";
 
 const SCREEN_PADDING = 16;
@@ -42,6 +43,7 @@ const GRID_GAP = 10;
 export default function LibraryScreen() {
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
+  const bottomInset = useContentBottomInset({ tabBarAutoInset: true });
   const columnWidth = Math.floor((width - SCREEN_PADDING * 2 - GRID_GAP) / 2);
 
   const [tab, setTab] = useState<LibraryTab>("albums");
@@ -150,7 +152,7 @@ export default function LibraryScreen() {
       }}
       contentInsetAdjustmentBehavior="automatic"
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingTop: 12, paddingBottom: 34 }}
+      contentContainerStyle={{ paddingTop: 12, paddingBottom: bottomInset }}
       onEndReachedThreshold={0.5}
       onEndReached={() => {
         if (!searching && activeQuery.hasNextPage) activeQuery.fetchNextPage();

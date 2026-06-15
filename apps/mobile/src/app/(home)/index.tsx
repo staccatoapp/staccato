@@ -11,6 +11,7 @@ import {
   type HomeRecPlaylist,
 } from "@/lib/home-types";
 import { pickGradient } from "@/lib/gradient";
+import { useContentBottomInset } from "@/lib/player-layout";
 import { useTheme } from "@/theme";
 
 function deriveArtistSummary(tracks: { artistName: string | null }[]): string {
@@ -26,6 +27,7 @@ function deriveArtistSummary(tracks: { artistName: string | null }[]): string {
 
 export default function HomeScreen() {
   const { colors } = useTheme();
+  const bottomInset = useContentBottomInset({ tabBarAutoInset: true });
   const { data: playlistsData } = usePlaylists();
   const { data: recData } = useRecommendedPlaylists();
   const recentlyPlayed = useRecentlyPlayed();
@@ -74,7 +76,7 @@ export default function HomeScreen() {
       style={{ backgroundColor: colors.bg }}
       contentInsetAdjustmentBehavior="automatic"
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: bottomInset }]}
     >
       {recPlaylist && <HeroRec playlist={recPlaylist} />}
       <QuickStartGrid items={quickStartItems} />
@@ -88,6 +90,5 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   content: {
     paddingTop: 8,
-    paddingBottom: 24,
   },
 });

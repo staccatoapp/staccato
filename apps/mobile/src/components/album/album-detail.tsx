@@ -5,6 +5,7 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { TrackRow } from "@/components/explore/track-row";
 import { albumTrackRows, playableTrackIds } from "@/lib/album-view-model";
 import { formatPlayerTime } from "@/lib/playback";
+import { useContentBottomInset } from "@/lib/player-layout";
 import { usePlayback } from "@/providers/playback-provider";
 import { useTheme } from "@/theme";
 
@@ -30,6 +31,7 @@ export function AlbumDetail({
 }: AlbumDetailProps) {
   const { colors, typography } = useTheme();
   const { playTracks } = usePlayback();
+  const bottomInset = useContentBottomInset({ tabBarAutoInset: false });
 
   const rows = useMemo(() => albumTrackRows(detail), [detail]);
   const playable = useMemo(() => playableTrackIds(detail), [detail]);
@@ -48,7 +50,7 @@ export function AlbumDetail({
     <ScrollView
       style={styles.scroll}
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={{ paddingBottom: bottomInset }}
     >
       <AlbumHero
         detail={detail}
@@ -116,9 +118,6 @@ function shuffle<T>(items: T[]): T[] {
 const styles = StyleSheet.create({
   scroll: {
     flex: 1,
-  },
-  content: {
-    paddingBottom: 120,
   },
   tracklist: {
     marginTop: 4,

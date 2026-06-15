@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { type LidarrSubject } from "@/components/explore/lidarr-sheet";
 import { TrackRow } from "@/components/explore/track-row";
 import { formatPlayerTime } from "@/lib/playback";
+import { useContentBottomInset } from "@/lib/player-layout";
 import { type PlaylistView } from "@/lib/playlist-view-model";
 import { usePlayback } from "@/providers/playback-provider";
 import { useTheme } from "@/theme";
@@ -30,6 +31,7 @@ export function PlaylistDetail({
 }: PlaylistDetailProps) {
   const { colors, typography } = useTheme();
   const { playTracks } = usePlayback();
+  const bottomInset = useContentBottomInset({ tabBarAutoInset: false });
 
   const { playableTrackIds, rows } = view;
   const onPlay = () => {
@@ -40,7 +42,7 @@ export function PlaylistDetail({
     <ScrollView
       style={styles.scroll}
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={{ paddingBottom: bottomInset }}
     >
       <PlaylistHero
         view={view}
@@ -111,9 +113,6 @@ export function PlaylistDetail({
 const styles = StyleSheet.create({
   scroll: {
     flex: 1,
-  },
-  content: {
-    paddingBottom: 120,
   },
   tracklist: {
     marginTop: 4,

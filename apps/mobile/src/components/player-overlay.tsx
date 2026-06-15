@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { Platform, StyleSheet } from "react-native";
+import { StyleSheet } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -9,16 +9,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { MiniPlayer } from "@/components/player/mini-player";
 import { NowPlayingPanel } from "@/components/player/now-playing-panel";
+import { MINI_PLAYER_INSET, TAB_BAR_CONTENT_HEIGHT } from "@/lib/player-layout";
 import { useSession } from "@/lib/session";
 import { usePlayback } from "@/providers/playback-provider";
-
-/**
- * NativeTabs renders a native tab bar whose height JS can't introspect; the
- * platform's standard bar height plus the bottom inset is correct on phones.
- */
-const TAB_BAR_CONTENT_HEIGHT = Platform.OS === "ios" ? 49 : 56;
-/** Mini player inset from the tab bar and screen edges. */
-const MINI_PLAYER_INSET = 8;
 
 /**
  * Root-level mount for the player UI. Lives as an absolute sibling of the

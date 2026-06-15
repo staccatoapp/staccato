@@ -19,6 +19,10 @@ Typed routes are on (`app.json` → `experiments.typedRoutes`). Navigate to a **
 
 Wrap a screen body in `<Screen>` (`components/ui/screen.tsx`) for the `stacScreenIn` entrance animation; the Stacks use `animation: "none"` because screens own their own entrance.
 
+## Scroll content must clear the mini player and tab bar
+
+The mini player (`components/player-overlay.tsx`) is a root-level absolute overlay floating above the native tab bar, so nothing in a screen's tree knows it's there — every vertical scroll surface must reserve bottom space for it explicitly, or its last items get clipped. `lib/player-layout.ts` owns the geometry (`TAB_BAR_CONTENT_HEIGHT`, `MINI_PLAYER_INSET/HEIGHT/CLEARANCE`, consumed by the overlay itself) and the `useContentBottomInset({ tabBarAutoInset })` hook that returns the `contentContainerStyle.paddingBottom` a scroll view needs. Space is reserved unconditionally (assume the mini player is always present). Pass `tabBarAutoInset: true` for tab-root scroll views that set `contentInsetAdjustmentBehavior="automatic"` — NativeTabs already insets the tab bar + bottom safe area (SDK 55+), so only the mini player is added. Pass `false` for nested detail screens (album/playlist) that manage their own top inset via the hero and set no `contentInsetAdjustmentBehavior`; the hook then adds the tab bar + bottom inset too. Never set `contentInsetAdjustmentBehavior="automatic"` on the detail screens — it double-counts the hero's manual `insets.top`.
+
 ## Album detail conventions
 
 `:albumKey` is either a local cuid2 album id (owned albums, opened from the library grid / in-library search) or a MusicBrainz release-group MBID (explore-search albums). `GET /api/albums/:albumKey` resolves either to a `source: "local" | "external"` `UnifiedAlbumDetail`. Fetch via `hooks/use-album-detail.ts`; the "More by artist" rail fetches the artist's discography via `hooks/use-artist-detail.ts` (local artistId or MB artistMbid).

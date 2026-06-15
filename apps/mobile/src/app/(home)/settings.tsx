@@ -1,17 +1,24 @@
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { PrimaryButton } from "@/components/ui/primary-button";
+import { useContentBottomInset } from "@/lib/player-layout";
 import { useSession } from "@/lib/session";
 import { useTheme } from "@/theme";
 
 /** Placeholder until the Settings screen is designed. */
 export default function SettingsScreen() {
   const { colors, spacing } = useTheme();
+  const bottomInset = useContentBottomInset({ tabBarAutoInset: true });
   const { signOut } = useSession();
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.bg }]}>
+    <ScrollView
+      style={{ backgroundColor: colors.bg }}
+      contentInsetAdjustmentBehavior="automatic"
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={[styles.content, { paddingBottom: bottomInset }]}
+    >
       <Text style={[styles.title, { color: colors.fg }]}>Settings</Text>
       <View
         style={{
@@ -22,13 +29,13 @@ export default function SettingsScreen() {
       >
         <PrimaryButton onPress={() => void signOut()}>Sign out</PrimaryButton>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  content: {
+    flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
   },
