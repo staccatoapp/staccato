@@ -2,12 +2,14 @@ import { Colors } from "@staccato/shared";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { PlayerOverlayRoot } from "@/components/player-overlay";
 import { SplashView } from "@/components/splash-view";
 import { SessionProvider, useSession } from "@/lib/session";
+import { PlaybackProvider } from "@/providers/playback-provider";
+import { PreviewProvider } from "@/providers/preview-provider";
 import { StaccatoThemeProvider } from "@/theme";
 
 SplashScreen.preventAutoHideAsync();
@@ -24,13 +26,33 @@ export default function RootLayout() {
       <SessionProvider>
         <StaccatoThemeProvider>
           <StatusBar style="light" />
-          <RootNavigator />
-          {/* Mounted beside (not inside) the navigator so the mini player can
-              float over the native tab bar and Now Playing can cover it. */}
-          <PlayerOverlayRoot />
+          {/* PlaybackProvider wraps both the navigator and the player overlay so
+              screens (Explore previews, future "play" actions) can reach playback
+              state, while the overlay stays an absolute sibling that floats over
+              the native tab bar. */}
+          <PlaybackRoot>
+            <RootNavigator />
+            <PlayerOverlayRoot />
+          </PlaybackRoot>
         </StaccatoThemeProvider>
       </SessionProvider>
     </GestureHandlerRootView>
+  );
+}
+
+/**
+ * Mounts the playback + preview providers once a session exists. Before sign-in
+ * the auth screens don't use playback, so children render without the providers
+ * (and the audio player isn't created). Mirrors the session gate the overlay and
+ * data hooks already apply.
+ */
+function PlaybackRoot({ children }: { children: ReactNode }) {
+  const { session, isLoading } = useSession();
+  if (isLoading || !session) return <>{children}</>;
+  return (
+    <PlaybackProvider>
+      <PreviewProvider>{children}</PreviewProvider>
+    </PlaybackProvider>
   );
 }
 

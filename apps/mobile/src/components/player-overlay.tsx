@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MiniPlayer } from "@/components/player/mini-player";
 import { NowPlayingPanel } from "@/components/player/now-playing-panel";
 import { useSession } from "@/lib/session";
-import { PlaybackProvider, usePlayback } from "@/providers/playback-provider";
+import { usePlayback } from "@/providers/playback-provider";
 
 /**
  * NativeTabs renders a native tab bar whose height JS can't introspect; the
@@ -23,16 +23,15 @@ const MINI_PLAYER_INSET = 8;
 /**
  * Root-level mount for the player UI. Lives as an absolute sibling of the
  * navigator (not inside the tab layout) so the mini player can float over the
- * native tab bar and the Now Playing panel can cover it entirely.
+ * native tab bar and the Now Playing panel can cover it entirely. The
+ * PlaybackProvider that backs it is mounted a level up (see app/_layout.tsx) so
+ * screens can drive playback too; here we only render the overlay once a session
+ * exists (and thus the provider is present).
  */
 export function PlayerOverlayRoot() {
   const { session, isLoading } = useSession();
   if (isLoading || !session) return null;
-  return (
-    <PlaybackProvider>
-      <PlayerOverlay />
-    </PlaybackProvider>
-  );
+  return <PlayerOverlay />;
 }
 
 function PlayerOverlay() {
