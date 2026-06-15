@@ -1,5 +1,6 @@
 import type {
   ExternalReleaseResult,
+  RecommendedPlaylistTrack,
   RecommendedTrack,
   UnifiedAlbumDetail,
 } from "@staccato/shared";
@@ -48,6 +49,27 @@ export interface LidarrSubject {
 /** Build a subject from a recommended track, or null if it can't be requested. */
 export function subjectFromTrack(
   track: RecommendedTrack,
+): LidarrSubject | null {
+  if (!track.releaseGroupMbid || !track.artistMbid || !track.artistName) {
+    return null;
+  }
+  return {
+    releaseGroupMbid: track.releaseGroupMbid,
+    artistMbid: track.artistMbid,
+    artistName: track.artistName,
+    albumTitle: track.albumTitle,
+    coverArtUrl: track.coverArtUrl,
+    title: track.title,
+  };
+}
+
+/**
+ * Build a subject from a playlist track (recommended-playlist row), or null when
+ * it can't be requested. Same shape as {@link subjectFromTrack}; the recommended
+ * playlist-track type just nullable-types its `recordingMbid`.
+ */
+export function subjectFromPlaylistTrack(
+  track: RecommendedPlaylistTrack,
 ): LidarrSubject | null {
   if (!track.releaseGroupMbid || !track.artistMbid || !track.artistName) {
     return null;

@@ -24,6 +24,8 @@ export type PlaylistSort = z.infer<typeof PlaylistSortSchema>;
 export const PlaylistTrackSchema = z.object({
   entryId: z.string(),
   trackId: z.string(),
+  /** MusicBrainz recording id of the owned track, when known. */
+  recordingMbid: z.string().nullable(),
   title: z.string(),
   artistName: z.string().nullable(),
   albumTitle: z.string().nullable(),
@@ -40,6 +42,8 @@ export const PlaylistDetailSchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
   updatedAt: z.string().nullable(),
+  /** Up to 4 dominant cover arts (most-shared first) for a mosaic hero/thumb. */
+  coverArtUrls: z.array(z.string()).max(4),
   tracks: z.array(PlaylistTrackSchema),
 });
 export type PlaylistDetail = z.infer<typeof PlaylistDetailSchema>;

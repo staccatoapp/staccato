@@ -303,6 +303,7 @@ describe("PlaylistTrackSchema", () => {
   const valid = {
     entryId: "e1",
     trackId: "t1",
+    recordingMbid: null,
     title: "Song",
     artistName: null,
     albumTitle: null,
@@ -325,6 +326,7 @@ describe("PlaylistDetailSchema", () => {
       name: "Playlist",
       description: null,
       updatedAt: null,
+      coverArtUrls: [],
       tracks: [],
     };
     expect(PlaylistDetailSchema.parse(valid)).toEqual(valid);

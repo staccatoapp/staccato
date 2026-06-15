@@ -121,9 +121,18 @@ export default function LibraryScreen() {
       // TODO: open artist detail once the mobile detail screen exists.
       return <ArtistCell artist={item as Artist} size={columnWidth} />;
     }
-    // TODO: open playlist detail once the mobile detail screen exists.
+    const playlist = item as PlaylistListItem;
     return (
-      <PlaylistCell playlist={item as PlaylistListItem} size={columnWidth} />
+      <PlaylistCell
+        playlist={playlist}
+        size={columnWidth}
+        onPress={() =>
+          router.push({
+            pathname: "/(home)/library/playlist/[playlistKey]",
+            params: { playlistKey: playlist.id },
+          })
+        }
+      />
     );
   };
 

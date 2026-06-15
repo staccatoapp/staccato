@@ -59,7 +59,7 @@ the **only** supported playback path:
    when unsatisfiable) or a `200` with the true `Content-Length`.
 
 Range support is **load-bearing for client UX, not just an optimisation**: native players (expo-audio →
-AVPlayer on iOS, ExoPlayer on Android) issue a range request to build a *seekable* timeline. Served a plain
+AVPlayer on iOS, ExoPlayer on Android) issue a range request to build a _seekable_ timeline. Served a plain
 `200` with no `Accept-Ranges`, the clip still plays but the player can't establish position, so
 `playbackStatusUpdate` reports `currentTime: 0` and the preview progress bar stays pinned at 0. (This was a
 regression when mobile moved from playing the CDN URL directly — those CDNs support ranges — to this proxy.)

@@ -93,6 +93,29 @@ describe("GET /:id — cross-user isolation", () => {
   });
 });
 
+describe("GET /:id — detail shape", () => {
+  it("includes coverArtUrls and per-track recordingMbid", async () => {
+    vi.mocked(resolveAlbumCoverNow).mockImplementation(
+      (row) => `url-${row.albumId}`,
+    );
+    const artistId = seedArtist();
+    const albumId = seedAlbum(artistId);
+    const trackId = seedTrack(artistId, albumId);
+    const app = buildApp(playlistRoutes, userAId);
+    await app.inject({
+      method: "POST",
+      url: `/${playlistId}/tracks`,
+      payload: { trackIds: [trackId] },
+    });
+
+    const res = await app.inject({ method: "GET", url: `/${playlistId}` });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.coverArtUrls).toEqual([`url-${albumId}`]);
+    expect(body.tracks[0]).toHaveProperty("recordingMbid");
+  });
+});
+
 describe("PUT /:id — cross-user isolation", () => {
   it("returns 403 when requester is not the playlist owner", async () => {
     const app = buildApp(playlistRoutes, userBId);

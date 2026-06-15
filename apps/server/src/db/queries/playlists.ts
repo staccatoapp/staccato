@@ -17,6 +17,7 @@ export type PlaylistTrackEntryRow = typeof playlistTracks.$inferSelect;
 export type PlaylistTrackRow = {
   entryId: string;
   trackId: string;
+  recordingMbid: string | null;
   title: string;
   artistName: string;
   albumTitle: string;
@@ -136,6 +137,7 @@ export function getPlaylistTracks(playlistId: string): PlaylistTrackRow[] {
     .select({
       entryId: playlistTracks.id,
       trackId: tracks.id,
+      recordingMbid: tracks.musicbrainzId,
       title: sql<string>`COALESCE(${tracks.canonicalTitle}, ${tracks.title})`,
       artistName: sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`,
       albumTitle: sql<string>`COALESCE(${albums.canonicalTitle}, ${albums.title})`,

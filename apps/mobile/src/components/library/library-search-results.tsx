@@ -265,6 +265,12 @@ export function LibrarySearchResults({
               title={p.name}
               subtitle={`${p.trackCount} tracks`}
               trailing={chevron}
+              onPress={() =>
+                router.push({
+                  pathname: "/(home)/library/playlist/[playlistKey]",
+                  params: { playlistKey: p.id },
+                })
+              }
             />
           ))}
         </Section>

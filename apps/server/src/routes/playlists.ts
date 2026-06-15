@@ -48,6 +48,39 @@ function requireOwnPlaylist(
   return playlist;
 }
 
+/**
+ * Build a mosaic of up to 4 cover arts for a playlist, ranked by how many tracks
+ * share each album's cover (most-shared first). `rows` must be one row per track
+ * in position order so first-seen order is the tiebreak; cover-less albums (null
+ * resolve) are skipped so we keep walking the ranking until 4 renderable covers.
+ */
+function buildPlaylistCoverMosaic(
+  rows: {
+    albumId: string;
+    releaseGroupMbid: string | null;
+    coverArtUrl: string | null;
+  }[],
+): string[] {
+  const firstRowByAlbum = new Map<string, (typeof rows)[number]>();
+  for (const row of rows) {
+    if (!firstRowByAlbum.has(row.albumId))
+      firstRowByAlbum.set(row.albumId, row);
+  }
+  const rankedAlbumIds = topFrequentKeys(rows.map((r) => r.albumId));
+  const urls: string[] = [];
+  for (const albumId of rankedAlbumIds) {
+    const row = firstRowByAlbum.get(albumId)!;
+    const url = resolveAlbumCoverNow({
+      albumId: row.albumId,
+      releaseGroupMbid: row.releaseGroupMbid,
+      coverArtUrl: row.coverArtUrl,
+    });
+    if (url) urls.push(url);
+    if (urls.length === 4) break;
+  }
+  return urls;
+}
+
 const playlistRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/", async (req, reply) => {
     const userId = req.userId;
@@ -79,9 +112,8 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
       countRows.map((r) => [r.playlistId, r.trackCount]),
     );
 
-    // Build a mosaic of up to 4 cover arts per playlist, ranked by how many
-    // tracks share each album's cover (most-shared first). artRows is one row
-    // per track, ordered by position, so first-seen order is the tiebreak.
+    // artRows is one row per track, ordered by position; group by playlist and
+    // build each playlist's cover mosaic from its rows.
     type ArtRow = (typeof artRows)[number];
     const rowsByPlaylist = new Map<string, ArtRow[]>();
     for (const row of artRows) {
@@ -92,27 +124,7 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
 
     const coverArtUrlsByPlaylist = new Map<string, string[]>();
     for (const [playlistId, rows] of rowsByPlaylist) {
-      const firstRowByAlbum = new Map<string, ArtRow>();
-      for (const row of rows) {
-        if (!firstRowByAlbum.has(row.albumId)) {
-          firstRowByAlbum.set(row.albumId, row);
-        }
-      }
-      const rankedAlbumIds = topFrequentKeys(rows.map((r) => r.albumId));
-      const urls: string[] = [];
-      for (const albumId of rankedAlbumIds) {
-        const row = firstRowByAlbum.get(albumId)!;
-        const url = resolveAlbumCoverNow({
-          albumId: row.albumId,
-          releaseGroupMbid: row.releaseGroupMbid,
-          coverArtUrl: row.coverArtUrl,
-        });
-        // A cover-less album resolves to null and can't be rendered — skip it
-        // and keep walking the ranking until we have 4 renderable covers.
-        if (url) urls.push(url);
-        if (urls.length === 4) break;
-      }
-      coverArtUrlsByPlaylist.set(playlistId, urls);
+      coverArtUrlsByPlaylist.set(playlistId, buildPlaylistCoverMosaic(rows));
     }
 
     return {
@@ -153,6 +165,7 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
       name: playlist.name,
       description: playlist.description,
       updatedAt: playlist.updatedAt?.toISOString() ?? null,
+      coverArtUrls: [],
       tracks: [],
     });
   });
@@ -182,6 +195,7 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
       name: result.name,
       description: result.description,
       updatedAt: result.updatedAt?.toISOString() ?? null,
+      coverArtUrls: buildPlaylistCoverMosaic(trackRows),
       tracks: trackRows.map((t) => ({
         ...t,
         coverArtUrl: resolveAlbumCoverNow({
@@ -299,6 +313,7 @@ const playlistRoutes: FastifyPluginAsync = async (fastify) => {
       name: updated.name,
       description: updated.description,
       updatedAt: updated.updatedAt?.toISOString() ?? null,
+      coverArtUrls: buildPlaylistCoverMosaic(trackRows),
       tracks: trackRows.map((t) => ({
         ...t,
         coverArtUrl: resolveAlbumCoverNow({

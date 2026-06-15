@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import React, { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
@@ -66,7 +67,15 @@ export default function ExploreScreen() {
           </SearchSection>
         ) : (
           <View>
-            <PlaylistCarousel playlists={playlists} />
+            <PlaylistCarousel
+              playlists={playlists}
+              onPressPlaylist={(playlist) =>
+                router.push({
+                  pathname: "/(home)/explore/playlist/[playlistKey]",
+                  params: { playlistKey: playlist.id },
+                })
+              }
+            />
 
             <View style={styles.tracksSection}>
               <SectionHeader
