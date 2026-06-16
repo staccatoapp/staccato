@@ -67,6 +67,7 @@ describe("usePlaybackSession", () => {
       get,
       post: jest.fn(),
       put: jest.fn(),
+      patch: jest.fn(),
       delete: jest.fn(),
     });
 
@@ -86,6 +87,7 @@ describe("usePlaybackSession", () => {
       get,
       post: jest.fn(),
       put: jest.fn(),
+      patch: jest.fn(),
       delete: jest.fn(),
     });
     mockUseSession.mockReturnValue({ session: null });

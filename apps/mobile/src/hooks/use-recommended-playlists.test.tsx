@@ -48,6 +48,7 @@ describe("useRecommendedPlaylists", () => {
       get,
       post: jest.fn(),
       put: jest.fn(),
+      patch: jest.fn(),
       delete: jest.fn(),
     });
 

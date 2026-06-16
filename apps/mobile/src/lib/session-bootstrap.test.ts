@@ -22,6 +22,7 @@ function mockClient(get: jest.Mock) {
     get,
     post: jest.fn(),
     put: jest.fn(),
+    patch: jest.fn(),
     delete: jest.fn(),
   });
 }

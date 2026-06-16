@@ -88,6 +88,7 @@ function clientWith(): ApiClient {
     get,
     post: jest.fn(),
     put,
+    patch: jest.fn(),
     delete: jest.fn(),
   };
 }

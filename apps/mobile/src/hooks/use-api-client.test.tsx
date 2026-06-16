@@ -23,6 +23,7 @@ describe("useApiClient", () => {
       get: jest.fn(),
       post: jest.fn(),
       put: jest.fn(),
+      patch: jest.fn(),
       delete: jest.fn(),
     };
     mockedCreateClient.mockReturnValue(client);
@@ -53,6 +54,7 @@ describe("useApiClient", () => {
       get: jest.fn(),
       post: jest.fn(),
       put: jest.fn(),
+      patch: jest.fn(),
       delete: jest.fn(),
     };
     mockedCreateClient.mockReturnValue(client);

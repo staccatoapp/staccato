@@ -16,6 +16,7 @@ export interface ApiClient {
   get<T>(path: string, schema: z.ZodType<T>): Promise<T>;
   post<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T>;
   put<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T>;
+  patch<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T>;
   delete(path: string): Promise<void>;
 }
 
@@ -95,6 +96,17 @@ export function createApiClient(baseUrl: string, token?: string): ApiClient {
     ): Promise<T> {
       const res = await request(baseUrl, token, path, {
         method: "PUT",
+        body: JSON.stringify(body),
+      });
+      return parseResponse(res, schema, path);
+    },
+    async patch<T>(
+      path: string,
+      body: unknown,
+      schema: z.ZodType<T>,
+    ): Promise<T> {
+      const res = await request(baseUrl, token, path, {
+        method: "PATCH",
         body: JSON.stringify(body),
       });
       return parseResponse(res, schema, path);

@@ -21,3 +21,12 @@ export const ServerSettingsSchema = z.object({
   metadataConfidenceThreshold: z.number(),
 });
 export type ServerSettings = z.infer<typeof ServerSettingsSchema>;
+
+// ─── POST /api/settings/validate-listenbrainz-token response ───
+export const ValidateListenBrainzTokenResponseSchema = z.object({
+  valid: z.boolean(),
+  userName: z.string().optional(),
+});
+export type ValidateListenBrainzTokenResponse = z.infer<
+  typeof ValidateListenBrainzTokenResponseSchema
+>;

@@ -47,6 +47,7 @@ describe("useAuthedQuery", () => {
       get,
       post: jest.fn(),
       put: jest.fn(),
+      patch: jest.fn(),
       delete: jest.fn(),
     });
 
@@ -69,6 +70,7 @@ describe("useAuthedQuery", () => {
       get,
       post: jest.fn(),
       put: jest.fn(),
+      patch: jest.fn(),
       delete: jest.fn(),
     });
     mockUseSession.mockReturnValue({ session: null });
@@ -88,6 +90,7 @@ describe("useAuthedQuery", () => {
       get,
       post: jest.fn(),
       put: jest.fn(),
+      patch: jest.fn(),
       delete: jest.fn(),
     });
 
