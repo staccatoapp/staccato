@@ -1,11 +1,8 @@
-import { Gradients } from "@staccato/shared";
 import {
   BadgeCheck,
-  ChevronLeft,
   Cloud,
   Download,
   ListPlus,
-  MoreHorizontal,
   Play,
   Shuffle,
 } from "lucide-react-native";
@@ -25,82 +22,22 @@ const ART = 196;
 
 interface PlaylistHeroProps {
   view: PlaylistView;
-  onBack: () => void;
   /** Play the whole playlist (in-library only). */
   onPlay: () => void;
   /** Open the (stub) "Add all to library" sheet (recommended only). */
   onAddAll: () => void;
 }
 
-/**
- * Immersive editorial hero, matched to the album screen: a gradient backdrop and
- * legibility scrim fading into the app background, floating cover art, oversized
- * title, an availability chip, and the action zone — play/shuffle for an owned
- * playlist, a single "Add all to library" action for a recommended one.
- */
-export function PlaylistHero({
-  view,
-  onBack,
-  onPlay,
-  onAddAll,
-}: PlaylistHeroProps) {
+export function PlaylistHero({ view, onPlay, onAddAll }: PlaylistHeroProps) {
   const { colors, typography } = useTheme();
   const insets = useSafeAreaInsets();
-  const [from, to] = Gradients[pickGradient(view.id)];
   const recommended = view.mode === "recommended";
 
   return (
     <View style={styles.root}>
-      {/* backdrop + overlays */}
-      <View
-        style={[
-          StyleSheet.absoluteFill,
-          {
-            experimental_backgroundImage: `linear-gradient(160deg, ${from}, ${to})`,
-          },
-        ]}
-      />
-      <View
-        style={[
-          StyleSheet.absoluteFill,
-          {
-            experimental_backgroundImage:
-              "linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0) 42%)",
-          },
-        ]}
-      />
-      <View
-        style={[
-          StyleSheet.absoluteFill,
-          {
-            experimental_backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.34) 0%, rgba(0,0,0,0.14) 34%, rgba(0,0,0,0.46) 66%, ${colors.bg} 100%)`,
-          },
-        ]}
-      />
-
-      <View style={[styles.content, { paddingTop: insets.top + 6 }]}>
-        {/* top bar */}
-        <View style={styles.topBar}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-            onPress={onBack}
-            hitSlop={8}
-            style={styles.ghostNav}
-          >
-            <ChevronLeft size={24} color="#fff" strokeWidth={2.2} />
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="More"
-            hitSlop={8}
-            style={styles.ghostNav}
-          >
-            <MoreHorizontal size={20} color="#fff" />
-          </Pressable>
-        </View>
-
-        {/* floating cover (mosaic for in-library, single for recommended) */}
+      {/* paddingTop clears the floating back/More buttons in DetailHeroLayout */}
+      <View style={[styles.content, { paddingTop: insets.top + 52 }]}>
+        {/* art + content fade together — opacity owned by DetailHeroLayout */}
         <View style={styles.artWrap}>
           <AlbumArt
             gradientKey={pickGradient(view.id)}
@@ -245,25 +182,10 @@ function AvailabilityChip({ view }: { view: PlaylistView }) {
 const styles = StyleSheet.create({
   root: {
     position: "relative",
-    overflow: "hidden",
   },
   content: {
     paddingHorizontal: 24,
     paddingBottom: 14,
-  },
-  topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginHorizontal: -6,
-  },
-  ghostNav: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(0,0,0,0.32)",
-    alignItems: "center",
-    justifyContent: "center",
   },
   artWrap: {
     alignItems: "center",

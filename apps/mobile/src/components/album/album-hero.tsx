@@ -1,11 +1,9 @@
-import { Gradients, type UnifiedAlbumDetail } from "@staccato/shared";
+import { type UnifiedAlbumDetail } from "@staccato/shared";
 import {
   BadgeCheck,
-  ChevronLeft,
   Cloud,
   Heart,
   ListPlus,
-  MoreHorizontal,
   Play,
   Radio,
   Shuffle,
@@ -29,29 +27,20 @@ interface AlbumHeroProps {
   detail: UnifiedAlbumDetail;
   /** Stable key used to colour the gradient placeholder (album id or RG MBID). */
   artKey: string;
-  onBack: () => void;
   onPlay: () => void;
   onShuffle: () => void;
   onRequest: () => void;
 }
 
-/**
- * Immersive editorial hero: a gradient backdrop with a legibility scrim fading
- * into the app background, floating artwork, oversized title, an album-level
- * availability chip, and the primary action zone (play/shuffle for owned albums;
- * "Request via Lidarr" for MusicBrainz-only ones).
- */
 export function AlbumHero({
   detail,
   artKey,
-  onBack,
   onPlay,
   onShuffle,
   onRequest,
 }: AlbumHeroProps) {
   const { colors, typography } = useTheme();
   const insets = useSafeAreaInsets();
-  const [from, to] = Gradients[pickGradient(artKey)];
 
   const availability = getAlbumAvailability(detail);
   const eyebrow = albumEyebrow(detail);
@@ -59,56 +48,9 @@ export function AlbumHero({
 
   return (
     <View style={styles.root}>
-      {/* backdrop + overlays */}
-      <View
-        style={[
-          StyleSheet.absoluteFill,
-          {
-            experimental_backgroundImage: `linear-gradient(160deg, ${from}, ${to})`,
-          },
-        ]}
-      />
-      <View
-        style={[
-          StyleSheet.absoluteFill,
-          {
-            experimental_backgroundImage:
-              "linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0) 42%)",
-          },
-        ]}
-      />
-      <View
-        style={[
-          StyleSheet.absoluteFill,
-          {
-            experimental_backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.34) 0%, rgba(0,0,0,0.14) 34%, rgba(0,0,0,0.46) 66%, ${colors.bg} 100%)`,
-          },
-        ]}
-      />
-
-      <View style={[styles.content, { paddingTop: insets.top + 6 }]}>
-        {/* top bar */}
-        <View style={styles.topBar}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-            onPress={onBack}
-            hitSlop={8}
-            style={styles.ghostNav}
-          >
-            <ChevronLeft size={24} color="#fff" strokeWidth={2.2} />
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="More"
-            hitSlop={8}
-            style={styles.ghostNav}
-          >
-            <MoreHorizontal size={20} color="#fff" />
-          </Pressable>
-        </View>
-
-        {/* floating art */}
+      {/* paddingTop clears the floating back/More buttons in DetailHeroLayout */}
+      <View style={[styles.content, { paddingTop: insets.top + 52 }]}>
+        {/* art + content fade together — opacity owned by DetailHeroLayout */}
         <View style={styles.artWrap}>
           <AlbumArt
             gradientKey={pickGradient(artKey)}
@@ -273,25 +215,10 @@ function AvailabilityChip({
 const styles = StyleSheet.create({
   root: {
     position: "relative",
-    overflow: "hidden",
   },
   content: {
     paddingHorizontal: 24,
     paddingBottom: 14,
-  },
-  topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginHorizontal: -6,
-  },
-  ghostNav: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(0,0,0,0.32)",
-    alignItems: "center",
-    justifyContent: "center",
   },
   artWrap: {
     alignItems: "center",

@@ -1,11 +1,13 @@
+import { Gradients } from "@staccato/shared";
 import { CloudDownload } from "lucide-react-native";
 import React from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { DetailHeroLayout } from "@/components/detail-hero-layout";
 import { type LidarrSubject } from "@/components/explore/lidarr-sheet";
 import { TrackRow } from "@/components/explore/track-row";
+import { pickGradient } from "@/lib/gradient";
 import { formatPlayerTime } from "@/lib/playback";
-import { useContentBottomInset } from "@/lib/player-layout";
 import { type PlaylistView } from "@/lib/playlist-view-model";
 import { usePlayback } from "@/providers/playback-provider";
 import { useTheme } from "@/theme";
@@ -31,7 +33,6 @@ export function PlaylistDetail({
 }: PlaylistDetailProps) {
   const { colors, typography } = useTheme();
   const { playTracks } = usePlayback();
-  const bottomInset = useContentBottomInset({ tabBarAutoInset: false });
 
   const { playableTrackIds, rows } = view;
   const onPlay = () => {
@@ -39,18 +40,12 @@ export function PlaylistDetail({
   };
 
   return (
-    <ScrollView
-      style={styles.scroll}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: bottomInset }}
+    <DetailHeroLayout
+      title={view.name}
+      gradientColors={Gradients[pickGradient(view.id)]}
+      onBack={onBack}
+      hero={<PlaylistHero view={view} onPlay={onPlay} onAddAll={onAddAll} />}
     >
-      <PlaylistHero
-        view={view}
-        onBack={onBack}
-        onPlay={onPlay}
-        onAddAll={onAddAll}
-      />
-
       <View style={styles.tracklist}>
         <View style={[styles.card, { backgroundColor: colors.bgRaised }]}>
           {rows.map((row, i) => {
@@ -106,14 +101,11 @@ export function PlaylistDetail({
           />
         ) : null}
       </View>
-    </ScrollView>
+    </DetailHeroLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: {
-    flex: 1,
-  },
   tracklist: {
     marginTop: 4,
   },

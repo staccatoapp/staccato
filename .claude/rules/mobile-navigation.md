@@ -3,6 +3,7 @@ paths:
   - "apps/mobile/src/app/**/*.tsx"
   - "apps/mobile/src/components/album/**/*.tsx"
   - "apps/mobile/src/components/playlist/**/*.tsx"
+  - "apps/mobile/src/components/detail-hero-layout.tsx"
 ---
 
 # Mobile Navigation & Detail Screens
@@ -26,6 +27,10 @@ Wrap a screen body in `<Screen>` (`components/ui/screen.tsx`) for the `stacScree
 ## Scroll content must clear the mini player and tab bar
 
 The mini player (`components/player-overlay.tsx`) is a root-level absolute overlay floating above the native tab bar, so nothing in a screen's tree knows it's there — every vertical scroll surface must reserve bottom space for it explicitly, or its last items get clipped. `lib/player-layout.ts` owns the geometry (`TAB_BAR_CONTENT_HEIGHT`, `MINI_PLAYER_INSET/HEIGHT/CLEARANCE`, consumed by the overlay itself) and the `useContentBottomInset({ tabBarAutoInset })` hook that returns the `contentContainerStyle.paddingBottom` a scroll view needs. Space is reserved unconditionally (assume the mini player is always present). Pass `tabBarAutoInset: true` for tab-root scroll views that set `contentInsetAdjustmentBehavior="automatic"` — NativeTabs already insets the tab bar + bottom safe area (SDK 55+), so only the mini player is added. Pass `false` for nested detail screens (album/playlist) that manage their own top inset via the hero and set no `contentInsetAdjustmentBehavior`; the hook then adds the tab bar + bottom inset too. Never set `contentInsetAdjustmentBehavior="automatic"` on the detail screens — it double-counts the hero's manual `insets.top`.
+
+## Collapsing hero (shared by album + playlist; artist must follow)
+
+`components/detail-hero-layout.tsx` is the shared scaffold for detail screens: it owns the gradient, the scroll view, the persistent back + **More** buttons, the collapsed title, and all collapse animation (reanimated v4 worklets). `AlbumHero`/`PlaylistHero` are now plain layout (no animation, no top bar) passed as the `hero` prop — the layout wraps them in the fading `Animated.View`, so heroes must reserve top space (`paddingTop: insets.top + 52`) to clear the floating buttons. All motion is driven off the **measured** hero height (`onLayout`), never fixed pixel thresholds, so it scales with content. The pure geometry lives in `lib/hero-collapse.ts` (`heroCollapseDistance` + the content/title fade input-range helpers), unit-tested; keep new collapse math there. Mechanics: the backdrop gradient translates up 1:1 with scroll then clamps (its bottom band becomes the bar); the whole hero fades out over the first ~60% of the collapse; a separate sticky bar + the collapsed title fade in over the last stretch. Two gradient layers exist on purpose — the backdrop sits *behind* the scroll view (hero paints over it) and the sticky bar renders *in front* (so rows scroll under it); both reuse one `GradientStack` so the hand-off is seamless. The back/More buttons and title paint above the bar. Play is deliberately absent from the collapsed bar.
 
 ## Album detail conventions
 

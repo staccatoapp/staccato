@@ -1,11 +1,12 @@
-import type { UnifiedAlbumDetail } from "@staccato/shared";
+import { Gradients, type UnifiedAlbumDetail } from "@staccato/shared";
 import React, { useMemo } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
+import { DetailHeroLayout } from "@/components/detail-hero-layout";
 import { TrackRow } from "@/components/explore/track-row";
+import { pickGradient } from "@/lib/gradient";
 import { albumTrackRows, playableTrackIds } from "@/lib/album-view-model";
 import { formatPlayerTime } from "@/lib/playback";
-import { useContentBottomInset } from "@/lib/player-layout";
 import { usePlayback } from "@/providers/playback-provider";
 import { useTheme } from "@/theme";
 
@@ -31,7 +32,6 @@ export function AlbumDetail({
 }: AlbumDetailProps) {
   const { colors, typography } = useTheme();
   const { playTracks } = usePlayback();
-  const bottomInset = useContentBottomInset({ tabBarAutoInset: false });
 
   const rows = useMemo(() => albumTrackRows(detail), [detail]);
   const playable = useMemo(() => playableTrackIds(detail), [detail]);
@@ -47,20 +47,20 @@ export function AlbumDetail({
   const onShuffle = () => playTracks(shuffle(playable), 0);
 
   return (
-    <ScrollView
-      style={styles.scroll}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: bottomInset }}
+    <DetailHeroLayout
+      title={detail.album.title}
+      gradientColors={Gradients[pickGradient(artKey)]}
+      onBack={onBack}
+      hero={
+        <AlbumHero
+          detail={detail}
+          artKey={artKey}
+          onPlay={onPlay}
+          onShuffle={onShuffle}
+          onRequest={onRequest}
+        />
+      }
     >
-      <AlbumHero
-        detail={detail}
-        artKey={artKey}
-        onBack={onBack}
-        onPlay={onPlay}
-        onShuffle={onShuffle}
-        onRequest={onRequest}
-      />
-
       <View style={styles.tracklist}>
         <View style={[styles.card, { backgroundColor: colors.bgRaised }]}>
           {rows.map((row, i) => {
@@ -101,7 +101,7 @@ export function AlbumDetail({
         currentAlbumKey={albumKey}
         onOpenAlbum={onOpenAlbum}
       />
-    </ScrollView>
+    </DetailHeroLayout>
   );
 }
 
@@ -116,9 +116,6 @@ function shuffle<T>(items: T[]): T[] {
 }
 
 const styles = StyleSheet.create({
-  scroll: {
-    flex: 1,
-  },
   tracklist: {
     marginTop: 4,
   },
