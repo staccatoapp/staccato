@@ -89,6 +89,14 @@ export async function startManualScan(musicDir: string): Promise<void> {
     await drain();
     sweepOrphans();
     completeProgress();
+    log.info(
+      {
+        scanned: libraryProgress.scanned,
+        resolved: libraryProgress.resolved,
+        failed: libraryProgress.failed,
+      },
+      "manual scan complete",
+    );
   })();
 }
 
