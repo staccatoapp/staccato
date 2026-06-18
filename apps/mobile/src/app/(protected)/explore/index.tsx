@@ -2,10 +2,7 @@ import { router } from "expo-router";
 import React, { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
-import {
-  LidarrSheet,
-  type LidarrSubject,
-} from "@/components/explore/lidarr-sheet";
+import { useLidarrSheet } from "@/providers/lidarr-sheet-provider";
 import { PlaylistCarousel } from "@/components/explore/playlist-carousel";
 import { RecTrackRow } from "@/components/explore/rec-track-row";
 import { SearchResultsView } from "@/components/explore/search-results-view";
@@ -23,9 +20,7 @@ export default function ExploreScreen() {
   const { colors, typography } = useTheme();
   const bottomInset = useContentBottomInset({ tabBarAutoInset: true });
   const [query, setQuery] = useState("");
-  const [lidarrSubject, setLidarrSubject] = useState<LidarrSubject | null>(
-    null,
-  );
+  const lidarrSheet = useLidarrSheet();
 
   const active = query.trim().length > 0;
   const debounced = useDebouncedValue(query.trim(), 300);
@@ -63,7 +58,7 @@ export default function ExploreScreen() {
             {search.data ? (
               <SearchResultsView
                 results={search.data}
-                onRequestDownload={setLidarrSubject}
+                onRequestDownload={lidarrSheet.open}
               />
             ) : null}
           </SearchSection>
@@ -89,7 +84,7 @@ export default function ExploreScreen() {
                   key={track.recordingMbid}
                   track={track}
                   index={i + 1}
-                  onRequestDownload={setLidarrSubject}
+                  onRequestDownload={lidarrSheet.open}
                 />
               ))}
               {tracks.length === 0 && recsWarming ? (
@@ -115,10 +110,6 @@ export default function ExploreScreen() {
         )}
       </ScrollView>
 
-      <LidarrSheet
-        subject={lidarrSubject}
-        onClose={() => setLidarrSubject(null)}
-      />
     </View>
   );
 }

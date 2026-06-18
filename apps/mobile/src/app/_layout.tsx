@@ -8,6 +8,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { PlayerOverlayRoot } from "@/components/player-overlay";
 import { SplashView } from "@/components/splash-view";
 import { SessionProvider, useSession } from "@/lib/session";
+import { LidarrSheetProvider } from "@/providers/lidarr-sheet-provider";
 import { PlaybackProvider } from "@/providers/playback-provider";
 import { PreviewProvider } from "@/providers/preview-provider";
 import { StaccatoThemeProvider } from "@/theme";
@@ -31,8 +32,10 @@ export default function RootLayout() {
               state, while the overlay stays an absolute sibling that floats over
               the native tab bar. */}
           <PlaybackRoot>
-            <RootNavigator />
-            <PlayerOverlayRoot />
+            <LidarrSheetProvider>
+              <RootNavigator />
+              <PlayerOverlayRoot />
+            </LidarrSheetProvider>
           </PlaybackRoot>
         </StaccatoThemeProvider>
       </SessionProvider>

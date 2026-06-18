@@ -1,13 +1,12 @@
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useState } from "react";
+import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { AlbumDetail } from "@/components/album/album-detail";
 import {
-  LidarrSheet,
   subjectFromAlbumDetail,
-  type LidarrSubject,
 } from "@/components/explore/lidarr-sheet";
+import { useLidarrSheet } from "@/providers/lidarr-sheet-provider";
 import { Screen } from "@/components/ui/screen";
 import { Spinner } from "@/components/ui/spinner";
 import { useAlbumDetail } from "@/hooks/use-album-detail";
@@ -32,9 +31,7 @@ export function AlbumScreen({ basePath }: { basePath: AlbumBasePath }) {
   const { colors, typography } = useTheme();
   const { albumKey } = useLocalSearchParams<{ albumKey: string }>();
   const { data: detail, isLoading, isError } = useAlbumDetail(albumKey);
-  const [lidarrSubject, setLidarrSubject] = useState<LidarrSubject | null>(
-    null,
-  );
+  const lidarrSheet = useLidarrSheet();
 
   return (
     <Screen scroll={false}>
@@ -61,14 +58,13 @@ export function AlbumScreen({ basePath }: { basePath: AlbumBasePath }) {
           onOpenAlbum={(key) =>
             router.push({ pathname: basePath, params: { albumKey: key } })
           }
-          onRequest={() => setLidarrSubject(subjectFromAlbumDetail(detail))}
+          onRequest={() => {
+            const s = subjectFromAlbumDetail(detail);
+            if (s) lidarrSheet.open(s);
+          }}
         />
       )}
 
-      <LidarrSheet
-        subject={lidarrSubject}
-        onClose={() => setLidarrSubject(null)}
-      />
     </Screen>
   );
 }

@@ -2,10 +2,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-import {
-  LidarrSheet,
-  type LidarrSubject,
-} from "@/components/explore/lidarr-sheet";
+import { useLidarrSheet } from "@/providers/lidarr-sheet-provider";
 import { AddAllSheet } from "@/components/playlist/add-all-sheet";
 import { PlaylistDetail } from "@/components/playlist/playlist-detail";
 import { Screen } from "@/components/ui/screen";
@@ -70,9 +67,7 @@ function PlaylistBody({
   isError: boolean;
 }) {
   const { colors, typography } = useTheme();
-  const [lidarrSubject, setLidarrSubject] = useState<LidarrSubject | null>(
-    null,
-  );
+  const lidarrSheet = useLidarrSheet();
   const [addAllOpen, setAddAllOpen] = useState(false);
 
   return (
@@ -96,15 +91,11 @@ function PlaylistBody({
         <PlaylistDetail
           view={view}
           onBack={() => router.back()}
-          onRequestTrack={setLidarrSubject}
+          onRequestTrack={lidarrSheet.open}
           onAddAll={() => setAddAllOpen(true)}
         />
       )}
 
-      <LidarrSheet
-        subject={lidarrSubject}
-        onClose={() => setLidarrSubject(null)}
-      />
       {view && view.mode === "recommended" ? (
         <AddAllSheet
           open={addAllOpen}
