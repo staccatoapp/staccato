@@ -1,6 +1,14 @@
 import React, { useEffect } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import {
+  Pressable,
+  StyleSheet,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -13,6 +21,8 @@ import {
 import { useTheme } from "@/theme";
 
 const OFFSCREEN = 700;
+const DISMISS_DRAG_PX = 120;
+const DISMISS_VELOCITY = 600;
 
 interface BottomSheetProps {
   open: boolean;
@@ -20,6 +30,7 @@ interface BottomSheetProps {
   children: React.ReactNode;
   testID?: string;
   backdropTestID?: string;
+  style?: StyleProp<ViewStyle>;
 }
 
 export function BottomSheet({
@@ -28,6 +39,7 @@ export function BottomSheet({
   children,
   testID,
   backdropTestID,
+  style,
 }: BottomSheetProps) {
   const { colors } = useTheme();
   const sheetY = useSharedValue(OFFSCREEN);
@@ -48,6 +60,24 @@ export function BottomSheet({
     opacity: backdropOpacity.value,
   }));
 
+  const swipeDown = Gesture.Pan()
+    .activeOffsetY(10)
+    .onUpdate((e) => {
+      // eslint-disable-next-line react-hooks/immutability
+      sheetY.value = Math.max(0, e.translationY);
+    })
+    .onEnd((e) => {
+      if (e.translationY > DISMISS_DRAG_PX || e.velocityY > DISMISS_VELOCITY) {
+        runOnJS(onClose)();
+      } else {
+        // eslint-disable-next-line react-hooks/immutability
+        sheetY.value = withTiming(0, {
+          duration: SHEET_SLIDE_MS,
+          easing: PLAYER_EASING,
+        });
+      }
+    });
+
   return (
     <View
       style={StyleSheet.absoluteFill}
@@ -64,11 +94,18 @@ export function BottomSheet({
 
       <Animated.View
         testID={testID}
-        style={[styles.sheet, { backgroundColor: colors.bgRaised }, sheetStyle]}
+        style={[
+          styles.sheet,
+          { backgroundColor: colors.bgRaised },
+          sheetStyle,
+          style,
+        ]}
       >
-        <View style={styles.handleWrap}>
-          <View style={styles.handle} />
-        </View>
+        <GestureDetector gesture={swipeDown}>
+          <View style={styles.handleWrap}>
+            <View style={styles.handle} />
+          </View>
+        </GestureDetector>
         {children}
       </Animated.View>
     </View>
@@ -86,14 +123,14 @@ const styles = StyleSheet.create({
     bottom: 0,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    paddingTop: 14,
     paddingHorizontal: 20,
     paddingBottom: 30,
     boxShadow: "0 -8px 24px rgba(0,0,0,0.4)",
   },
   handleWrap: {
     alignItems: "center",
-    marginBottom: 16,
+    paddingTop: 14,
+    paddingBottom: 16,
   },
   handle: {
     width: 36,

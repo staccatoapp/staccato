@@ -1,24 +1,17 @@
-import { GripHorizontal, X } from "lucide-react-native";
-import React, { useEffect } from "react";
+import { GripHorizontal } from "lucide-react-native";
+import React from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
 import type { PlaybackTrack } from "@staccato/shared";
 
 import { AlbumArt } from "@/components/home/album-art";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { pickGradient } from "@/lib/gradient";
 import { formatPlayerTime } from "@/lib/playback";
 import { usePlayback } from "@/providers/playback-provider";
 import { useTheme } from "@/theme";
 import { EqualizerBars } from "./equalizer-bars";
-import { PLAYER_EASING, SHEET_SLIDE_MS } from "./player-easing";
 
 const SHEET_HEIGHT = 560;
-/** Sheet surface: oklch(0.18 0 0) converted to sRGB. */
-const SHEET_BACKGROUND = "rgb(19,19,19)";
 
 interface QueueSheetProps {
   open: boolean;
@@ -34,23 +27,6 @@ export function QueueSheet({ open, onClose }: QueueSheetProps) {
   const { colors } = useTheme();
   const { session, currentTrack, isPlaying, jumpToIndex } = usePlayback();
 
-  const sheetY = useSharedValue(SHEET_HEIGHT);
-  const backdropOpacity = useSharedValue(0);
-  useEffect(() => {
-    sheetY.value = withTiming(open ? 0 : SHEET_HEIGHT, {
-      duration: SHEET_SLIDE_MS,
-      easing: PLAYER_EASING,
-    });
-    backdropOpacity.value = withTiming(open ? 1 : 0, { duration: 300 });
-  }, [open, sheetY, backdropOpacity]);
-
-  const sheetStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: sheetY.value }],
-  }));
-  const backdropStyle = useAnimatedStyle(() => ({
-    opacity: backdropOpacity.value,
-  }));
-
   if (!session || !currentTrack) return null;
 
   const currentIndex = session.currentTrackIndex;
@@ -59,83 +35,61 @@ export function QueueSheet({ open, onClose }: QueueSheetProps) {
     .slice(currentIndex + 1);
 
   return (
-    <View
-      style={StyleSheet.absoluteFill}
-      pointerEvents={open ? "auto" : "none"}
+    <BottomSheet
+      open={open}
+      onClose={onClose}
+      backdropTestID="queue-sheet-backdrop"
+      style={styles.sheetOverride}
     >
-      <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
-        <Pressable
-          testID="queue-sheet-backdrop"
-          accessibilityLabel="Close queue"
-          onPress={onClose}
-          style={[StyleSheet.absoluteFill, styles.backdrop]}
-        />
-      </Animated.View>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Up next</Text>
+      </View>
 
-      <Animated.View style={[styles.sheet, sheetStyle]}>
-        <View style={styles.handleWrap}>
-          <View style={styles.handle} />
-        </View>
-
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Up next</Text>
-          <Pressable
-            testID="queue-sheet-close"
-            accessibilityRole="button"
-            accessibilityLabel="Close queue"
-            onPress={onClose}
-            style={styles.closeButton}
-          >
-            <X size={18} color="rgba(255,255,255,0.7)" />
-          </Pressable>
-        </View>
-
-        <View style={styles.nowPlayingSection}>
-          <Text style={styles.eyebrow}>NOW PLAYING</Text>
-          <View style={styles.nowPlayingCard}>
-            <AlbumArt
-              gradientKey={pickGradient(currentTrack.id)}
-              artUrl={currentTrack.coverArtUrl}
-              size={44}
-              radius={6}
-              glyphSize={18}
-            />
-            <View style={styles.trackMeta}>
-              <Text
-                numberOfLines={1}
-                style={[styles.nowPlayingTitle, { color: colors.primaryText }]}
-              >
-                {currentTrack.title}
-              </Text>
-              <Text numberOfLines={1} style={styles.cardArtist}>
-                {currentTrack.artistName ?? "Unknown Artist"}
-              </Text>
-            </View>
-            <EqualizerBars playing={isPlaying} color={colors.primaryText} />
+      <View style={styles.nowPlayingSection}>
+        <Text style={styles.eyebrow}>NOW PLAYING</Text>
+        <View style={styles.nowPlayingCard}>
+          <AlbumArt
+            gradientKey={pickGradient(currentTrack.id)}
+            artUrl={currentTrack.coverArtUrl}
+            size={44}
+            radius={6}
+            glyphSize={18}
+          />
+          <View style={styles.trackMeta}>
+            <Text
+              numberOfLines={1}
+              style={[styles.nowPlayingTitle, { color: colors.primaryText }]}
+            >
+              {currentTrack.title}
+            </Text>
+            <Text numberOfLines={1} style={styles.cardArtist}>
+              {currentTrack.artistName ?? "Unknown Artist"}
+            </Text>
           </View>
+          <EqualizerBars playing={isPlaying} color={colors.primaryText} />
         </View>
+      </View>
 
-        <FlatList
-          data={upNext}
-          keyExtractor={(item) => item.track.id}
-          style={styles.list}
-          contentContainerStyle={styles.listContent}
-          ListHeaderComponent={
-            currentTrack.albumTitle ? (
-              <Text style={[styles.eyebrow, styles.listEyebrow]}>
-                {`FROM ${currentTrack.albumTitle.toUpperCase()}`}
-              </Text>
-            ) : null
-          }
-          renderItem={({ item }) => (
-            <QueueRow
-              track={item.track}
-              onPress={() => jumpToIndex(item.index)}
-            />
-          )}
-        />
-      </Animated.View>
-    </View>
+      <FlatList
+        data={upNext}
+        keyExtractor={(item) => item.track.id}
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
+        ListHeaderComponent={
+          currentTrack.albumTitle ? (
+            <Text style={[styles.eyebrow, styles.listEyebrow]}>
+              {`FROM ${currentTrack.albumTitle.toUpperCase()}`}
+            </Text>
+          ) : null
+        }
+        renderItem={({ item }) => (
+          <QueueRow
+            track={item.track}
+            onPress={() => jumpToIndex(item.index)}
+          />
+        )}
+      />
+    </BottomSheet>
   );
 }
 
@@ -170,36 +124,15 @@ function QueueRow({
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    backgroundColor: "rgba(0,0,0,0.5)",
-  },
-  sheet: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
+  sheetOverride: {
     height: SHEET_HEIGHT,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    backgroundColor: SHEET_BACKGROUND,
-    boxShadow: "0 -20px 60px rgba(0,0,0,0.6)",
     overflow: "hidden",
-  },
-  handleWrap: {
-    alignItems: "center",
-    paddingTop: 8,
-    paddingBottom: 4,
-  },
-  handle: {
-    width: 36,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: "rgba(255,255,255,0.25)",
+    paddingHorizontal: 0,
+    paddingBottom: 0,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     paddingTop: 6,
     paddingHorizontal: 20,
     paddingBottom: 14,
@@ -209,12 +142,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: -0.2,
     color: "#fff",
-  },
-  closeButton: {
-    width: 32,
-    height: 32,
-    alignItems: "center",
-    justifyContent: "center",
   },
   nowPlayingSection: {
     paddingHorizontal: 20,
