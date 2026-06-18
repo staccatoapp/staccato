@@ -126,14 +126,20 @@ describe("AlbumDetail", () => {
     renderDetail(localDetail());
     // The hero FAB is the first "Play" affordance; track-row arts follow.
     fireEvent.press(screen.getAllByLabelText("Play")[0]!);
-    expect(playTracks).toHaveBeenCalledWith(["lt-1", "lt-2", "lt-3"], 0);
+    expect(playTracks).toHaveBeenCalledWith(["lt-1", "lt-2", "lt-3"], 0, {
+      type: "album",
+      id: "al-1",
+    });
   });
 
   it("queues the whole album starting at the tapped track", () => {
     renderDetail(localDetail());
     // [0] = hero FAB, [1..] = track rows in order.
     fireEvent.press(screen.getAllByLabelText("Play")[2]!);
-    expect(playTracks).toHaveBeenCalledWith(["lt-1", "lt-2", "lt-3"], 1);
+    expect(playTracks).toHaveBeenCalledWith(["lt-1", "lt-2", "lt-3"], 1, {
+      type: "album",
+      id: "al-1",
+    });
   });
 
   it("requests an external album via Lidarr from the hero action zone", () => {

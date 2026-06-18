@@ -1,4 +1,5 @@
 import type { FastifyBaseLogger } from "fastify";
+import type { PlaybackSource } from "@staccato/shared";
 import {
   createPendingScrobble,
   markScrobble,
@@ -19,9 +20,10 @@ import "./targets/index.js";
 export async function recordListen(
   userId: string,
   trackId: string,
+  source: PlaybackSource | null,
   log: FastifyBaseLogger,
 ): Promise<void> {
-  const listen = insertListenEvent(userId, trackId);
+  const listen = insertListenEvent(userId, trackId, source);
 
   const settings = getOrCreateUserSettings(userId);
   const eligibleTargets = listRegisteredTargets().filter((t) =>

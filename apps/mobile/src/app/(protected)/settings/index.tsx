@@ -110,7 +110,7 @@ function PersonalRoot() {
           title={username || "Account"}
           subtitle={host}
           chevron
-          onPress={() => router.push("/(home)/settings/account")}
+          onPress={() => router.push("/(protected)/settings/account")}
         />
       </SettingsGroup>
 
@@ -153,7 +153,7 @@ function PersonalRoot() {
             settings?.listenbrainzTokenSet ? colors.successText : colors.fgMuted
           }
           chevron
-          onPress={() => router.push("/(home)/settings/listenbrainz")}
+          onPress={() => router.push("/(protected)/settings/listenbrainz")}
         />
         <SettingsRow
           icon={<Languages size={17} color="#fff" strokeWidth={2.2} />}
@@ -169,7 +169,7 @@ function PersonalRoot() {
           title="About"
           subtitle="Version & app info"
           chevron
-          onPress={() => router.push("/(home)/settings/about")}
+          onPress={() => router.push("/(protected)/settings/about")}
         />
       </SettingsGroup>
     </>
@@ -190,7 +190,7 @@ function AdminRoot() {
           title="Library"
           subtitle="Indexing, paths & metadata"
           chevron
-          onPress={() => router.push("/(home)/settings/admin/library")}
+          onPress={() => router.push("/(protected)/settings/admin/library")}
         />
         <SettingsRow
           icon={<Server size={17} color="#fff" strokeWidth={2.2} />}
@@ -198,7 +198,9 @@ function AdminRoot() {
           title="Integrations"
           subtitle="Lidarr, MusicBrainz & more"
           chevron
-          onPress={() => router.push("/(home)/settings/admin/integrations")}
+          onPress={() =>
+            router.push("/(protected)/settings/admin/integrations")
+          }
         />
         <SettingsRow
           icon={<Users size={17} color="#fff" strokeWidth={2.2} />}
@@ -206,7 +208,7 @@ function AdminRoot() {
           title="Users"
           subtitle="Accounts & permissions"
           chevron
-          onPress={() => router.push("/(home)/settings/admin/users/index")}
+          onPress={() => router.push("/(protected)/settings/admin/users/index")}
         />
         <SettingsRow
           icon={<HardDrive size={17} color="#fff" strokeWidth={2.2} />}
@@ -214,7 +216,7 @@ function AdminRoot() {
           title="Maintenance"
           subtitle="Logs & server health"
           chevron
-          onPress={() => router.push("/(home)/settings/admin/maintenance")}
+          onPress={() => router.push("/(protected)/settings/admin/maintenance")}
         />
       </SettingsGroup>
     </>

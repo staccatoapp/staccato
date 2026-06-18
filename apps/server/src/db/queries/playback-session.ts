@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { SQLiteUpdateSetSource } from "drizzle-orm/sqlite-core";
 import { db } from "../client.js";
-import { playbackSession } from "../schema/playback-session.js";
+import { playbackSession, type QueueItem } from "../schema/playback-session.js";
 
 export type PlaybackSessionRow = typeof playbackSession.$inferSelect;
 export type PlaybackSessionUpdate = SQLiteUpdateSetSource<
@@ -34,7 +34,7 @@ export function updatePlaybackSession(
 
 export function appendToQueue(
   userId: string,
-  trackIds: string[],
+  items: QueueItem[],
 ): PlaybackSessionRow {
   return db.transaction((tx) => {
     const current = tx
@@ -42,7 +42,7 @@ export function appendToQueue(
       .from(playbackSession)
       .where(eq(playbackSession.userId, userId))
       .get();
-    const next = (current?.trackQueue ?? []).concat(trackIds);
+    const next = (current?.trackQueue ?? []).concat(items);
     return tx
       .update(playbackSession)
       .set({ trackQueue: next })

@@ -12,7 +12,7 @@ export default function AppTabs() {
       backgroundColor={colors.bg}
       blurEffect="systemChromeMaterialDark"
     >
-      <NativeTabs.Trigger name="index">
+      <NativeTabs.Trigger name="(home)">
         <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           sf={{ default: "house", selected: "house.fill" }}

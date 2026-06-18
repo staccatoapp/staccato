@@ -1,4 +1,4 @@
-import { Gradients } from "@staccato/shared";
+import { Gradients, type PlaybackSource } from "@staccato/shared";
 import { CloudDownload } from "lucide-react-native";
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -35,8 +35,12 @@ export function PlaylistDetail({
   const { playTracks } = usePlayback();
 
   const { playableTrackIds, rows } = view;
+  // Only in-library playlists have a stable id to attribute recently-played to;
+  // recommended playlists are ephemeral, so their plays carry no source.
+  const source: PlaybackSource | undefined =
+    view.mode === "inLibrary" ? { type: "playlist", id: view.id } : undefined;
   const onPlay = () => {
-    if (playableTrackIds.length > 0) playTracks(playableTrackIds, 0);
+    if (playableTrackIds.length > 0) playTracks(playableTrackIds, 0, source);
   };
 
   return (
@@ -60,6 +64,7 @@ export function PlaylistDetail({
                 divider={i !== rows.length - 1}
                 queueTrackIds={queueIndex >= 0 ? playableTrackIds : undefined}
                 queueIndex={queueIndex >= 0 ? queueIndex : undefined}
+                source={source}
                 trailing={
                   subject ? (
                     <Pressable

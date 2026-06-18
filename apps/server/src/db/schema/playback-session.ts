@@ -1,7 +1,17 @@
 import { createId } from "@paralleldrive/cuid2";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import type { PlaybackSource } from "@staccato/shared";
 import { users } from "./users.js";
-import { albums } from "./albums.js";
+
+/**
+ * One queued track plus the source it was enqueued from. Source is per-item (not
+ * per-session) so a heterogeneous queue — e.g. an album with a playlist appended
+ * via "add to queue" — attributes each recorded listen to the right origin.
+ */
+export interface QueueItem {
+  trackId: string;
+  source: PlaybackSource | null;
+}
 
 export const playbackSession = sqliteTable("playback_session", {
   id: text("id")
@@ -11,13 +21,10 @@ export const playbackSession = sqliteTable("playback_session", {
     .notNull()
     .unique()
     .references(() => users.id, { onDelete: "cascade" }),
-  playbackSourceId: text("playback_source_id").references(() => albums.id, {
-    onDelete: "set null",
-  }), // TODO - hack, fails when we implement playlists/other playback sources. using for now so i don't need to create a new table for playback sources
   trackQueue: text("track_queue", { mode: "json" })
-    .$type<string[]>()
+    .$type<QueueItem[]>()
     .notNull()
-    .default([]), // TODO - just an array of track IDs. there is 100% a better way to do this
+    .default([]),
   currentTrackIndex: integer("current_track_index").notNull().default(0),
   currentTrackPositionInSeconds: integer("current_track_position_in_seconds")
     .notNull()

@@ -239,7 +239,7 @@ export function LibrarySearchResults({
               trailing={chevron}
               onPress={() =>
                 router.push({
-                  pathname: "/(home)/library/album/[albumKey]",
+                  pathname: "/(protected)/library/album/[albumKey]",
                   params: { albumKey: a.id },
                 })
               }
@@ -267,7 +267,7 @@ export function LibrarySearchResults({
               trailing={chevron}
               onPress={() =>
                 router.push({
-                  pathname: "/(home)/library/playlist/[playlistKey]",
+                  pathname: "/(protected)/library/playlist/[playlistKey]",
                   params: { playlistKey: p.id },
                 })
               }

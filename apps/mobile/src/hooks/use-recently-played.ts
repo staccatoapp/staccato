@@ -1,55 +1,53 @@
-import { type HomeAlbum } from "@/lib/home-types";
+import {
+  RecentlyPlayedResponseSchema,
+  type RecentlyPlayedItem,
+  type RecentlyPlayedResponse,
+} from "@staccato/shared";
 
-// TODO: replace with real API fetching when the recently-played endpoint exists
-export function useRecentlyPlayed(): HomeAlbum[] {
-  return [
-    {
-      id: "1",
-      title: "Rumours",
-      artistName: "Fleetwood Mac",
-      releaseYear: 1977,
-      gradientKey: "sunset",
-      artUrl: null,
-    },
-    {
-      id: "3",
-      title: "Blue",
-      artistName: "Joni Mitchell",
-      releaseYear: 1971,
-      gradientKey: "sea",
-      artUrl: null,
-    },
-    {
-      id: "6",
-      title: "In the Aeroplane Over the Sea",
-      artistName: "Neutral Milk Hotel",
-      releaseYear: 1998,
-      gradientKey: "dusk",
-      artUrl: null,
-    },
-    {
-      id: "8",
-      title: "Loveless",
-      artistName: "My Bloody Valentine",
-      releaseYear: 1991,
-      gradientKey: "rose",
-      artUrl: null,
-    },
-    {
-      id: "4",
-      title: "Purple Rain",
-      artistName: "Prince",
-      releaseYear: 1984,
-      gradientKey: "berry",
-      artUrl: null,
-    },
-    {
-      id: "10",
-      title: "Astral Weeks",
-      artistName: "Van Morrison",
-      releaseYear: 1968,
-      gradientKey: "sea",
-      artUrl: null,
-    },
-  ];
+import { type HomeAlbum, type HomePlaylist } from "@/lib/home-types";
+import { pickGradient } from "@/lib/gradient";
+import { useAuthedQuery } from "./use-authed-query";
+
+/**
+ * Map the recently-played API items onto the `HomeAlbum | HomePlaylist` union
+ * the QuickStartGrid consumes (it discriminates on `"title" in item`). Order is
+ * preserved — the API already returns items most-recent first.
+ */
+export function recentlyPlayedToHomeItems(
+  items: RecentlyPlayedItem[],
+): (HomeAlbum | HomePlaylist)[] {
+  return items.map((item) =>
+    item.kind === "album"
+      ? {
+          id: item.id,
+          title: item.title,
+          artistName: item.artistName,
+          // The grid shows the artist, not the year; 0 is a harmless fallback.
+          releaseYear: item.releaseYear ?? 0,
+          gradientKey: pickGradient(item.id),
+          artUrl: item.coverArtUrl,
+        }
+      : {
+          id: item.id,
+          name: item.name,
+          trackCount: item.trackCount,
+          gradientKey: pickGradient(item.id),
+          artUrls: item.coverArtUrls,
+        },
+  );
+}
+
+/**
+ * The user's six most recently played albums / in-library playlists, shaped for
+ * the home QuickStartGrid. Returns an empty list while loading or if the user
+ * has no attributed plays yet.
+ */
+export function useRecentlyPlayed(): (HomeAlbum | HomePlaylist)[] {
+  const { data } = useAuthedQuery<RecentlyPlayedResponse>(
+    ["recently-played"],
+    "/api/recently-played",
+    RecentlyPlayedResponseSchema,
+    { staleTime: 60 * 1000 },
+  );
+  return recentlyPlayedToHomeItems(data?.items ?? []);
 }

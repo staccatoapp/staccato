@@ -1,4 +1,8 @@
-import { Gradients, type UnifiedAlbumDetail } from "@staccato/shared";
+import {
+  Gradients,
+  type PlaybackSource,
+  type UnifiedAlbumDetail,
+} from "@staccato/shared";
 import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
@@ -43,8 +47,15 @@ export function AlbumDetail({
   const artistKey =
     detail.source === "local" ? detail.album.artistId : detail.album.artistMbid;
 
-  const onPlay = () => playTracks(playable, 0);
-  const onShuffle = () => playTracks(shuffle(playable), 0);
+  // Only owned (local) albums have playable tracks and a stable id to attribute
+  // recently-played to; external albums are preview-only so source is moot.
+  const source: PlaybackSource | undefined =
+    detail.source === "local"
+      ? { type: "album", id: detail.album.id }
+      : undefined;
+
+  const onPlay = () => playTracks(playable, 0, source);
+  const onShuffle = () => playTracks(shuffle(playable), 0, source);
 
   return (
     <DetailHeroLayout
@@ -74,6 +85,7 @@ export function AlbumDetail({
                 divider={i !== rows.length - 1}
                 queueTrackIds={queueIndex >= 0 ? playable : undefined}
                 queueIndex={queueIndex >= 0 ? queueIndex : undefined}
+                source={source}
                 trailing={
                   row.durationSeconds != null ? (
                     <Text

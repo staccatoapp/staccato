@@ -1,4 +1,5 @@
 import { Pause, Play } from "lucide-react-native";
+import type { PlaybackSource } from "@staccato/shared";
 import React, { type ReactNode } from "react";
 import {
   ActivityIndicator,
@@ -44,6 +45,11 @@ interface TrackRowProps {
    */
   queueTrackIds?: string[];
   queueIndex?: number;
+  /**
+   * Origin of the queue (album / in-library playlist), recorded with the listen
+   * for recently-played. Only meaningful alongside `queueTrackIds`.
+   */
+  source?: PlaybackSource;
 }
 
 /**
@@ -62,6 +68,7 @@ export function TrackRow({
   trailing,
   queueTrackIds,
   queueIndex,
+  source,
 }: TrackRowProps) {
   const { colors, typography } = useTheme();
   const {
@@ -92,8 +99,8 @@ export function TrackRow({
         queueTrackIds.length > 0 &&
         queueIndex != null
       ) {
-        // Album context: queue the whole album, starting at this track.
-        playTracks(queueTrackIds, queueIndex);
+        // Album/playlist context: queue the whole list, starting at this track.
+        playTracks(queueTrackIds, queueIndex, source);
       } else playTracks([localTrackId], 0);
       return;
     }

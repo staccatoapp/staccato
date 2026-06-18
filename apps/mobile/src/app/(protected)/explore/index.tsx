@@ -73,7 +73,7 @@ export default function ExploreScreen() {
               playlists={playlists}
               onPressPlaylist={(playlist) =>
                 router.push({
-                  pathname: "/(home)/explore/playlist/[playlistKey]",
+                  pathname: "/(protected)/explore/playlist/[playlistKey]",
                   params: { playlistKey: playlist.id },
                 })
               }

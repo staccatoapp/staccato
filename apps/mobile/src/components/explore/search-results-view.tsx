@@ -324,7 +324,7 @@ function openReleaseAlbum(
   if (!releaseGroupMbid) return undefined;
   return () =>
     router.push({
-      pathname: "/(home)/explore/album/[albumKey]",
+      pathname: "/(protected)/explore/album/[albumKey]",
       params: { albumKey: releaseGroupMbid },
     });
 }

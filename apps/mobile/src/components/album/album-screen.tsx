@@ -19,8 +19,9 @@ import { useTheme } from "@/theme";
  * the sibling album onto the *same* tab stack — the host passes its own path.
  */
 export type AlbumBasePath =
-  | "/(home)/explore/album/[albumKey]"
-  | "/(home)/library/album/[albumKey]";
+  | "/(protected)/explore/album/[albumKey]"
+  | "/(protected)/library/album/[albumKey]"
+  | "/(protected)/(home)/album/[albumKey]";
 
 /**
  * Album detail screen, shared by owned albums (opened by local id) and

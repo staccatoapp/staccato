@@ -27,8 +27,10 @@ target:
 
 ## When a listen is recorded
 
-Play-time accounting lives in the **web client**, not the server. The server is told how much of
-the current track has genuinely been listened to and applies the threshold rule.
+Play-time accounting lives in the **client**, not the server. The server is told how much of
+the current track has genuinely been listened to and applies the threshold rule. The web client is
+described below; the mobile client (`apps/mobile/src/providers/playback-provider.tsx`) mirrors the
+same accumulator-and-poll contract.
 
 - `apps/web/src/components/layout/seek-bar.tsx` advances an accumulator on each `timeupdate`
   event from the `<audio>` element, adding only the natural play delta while audio is playing and
@@ -57,12 +59,13 @@ playback session handling; this page only covers the listen-recording slice of i
 
 ## What happens next: scrobbling
 
-When the threshold trips, the route calls `recordListen(userId, trackId, log)`
+When the threshold trips, the route calls `recordListen(userId, trackId, source, log)`
 (`apps/server/src/scrobbling/dispatch.ts`) **fire-and-forget** — its promise is intentionally not
 awaited (`.catch()` swallows the rejection; failures are logged inside). The steps:
 
-1. **Insert the ledger row.** `insertListenEvent(userId, trackId)` writes the `listening_history`
-   row and returns it, including the SQLite-assigned `listenedAt` timestamp. This is unconditional.
+1. **Insert the ledger row.** `insertListenEvent(userId, trackId, source)` writes the
+   `listening_history` row (including `source_type`/`source_id`) and returns it, including the
+   SQLite-assigned `listenedAt` timestamp. This is unconditional.
 2. **Find eligible targets.** Load the full `UserSettingsRow` via `getOrCreateUserSettings(userId)`
    and filter `listRegisteredTargets()` to those whose `isEligible(settings)` passes. If none, log
    a `warn` and return — the local row stays written but unscrobbled.
@@ -119,10 +122,29 @@ one row per recorded play, the unconditional local ledger:
 | `user_id`     | `text`                 | `NOT NULL` FK → `users.id`, `ON DELETE CASCADE`.                                      |
 | `track_id`    | `text`                 | `NOT NULL` FK → `tracks.id`, `ON DELETE CASCADE`.                                     |
 | `listened_at` | `integer` (unix epoch) | `NOT NULL`, `DEFAULT (unixepoch())` — set by SQLite at insert; callers never pass it. |
+| `source_type` | `text` (nullable)      | `"album"` \| `"playlist"` — where the play started from, or `null` (contextless).     |
+| `source_id`   | `text` (nullable)      | The album / in-library playlist id the source points at, or `null`.                   |
 
-There are no indexes beyond the primary key, and no unique constraint — `insertListenEvent` does
-no dedup, so repeated triggers would write repeated rows (the `currentTrackListenEventCreated`
-gate is what prevents that in practice). Deleting a user or a track cascades away their history.
+Indexes: `(user_id)`, `(track_id)`, and `(user_id, listened_at)` (the last backs the
+recently-played query). There is no unique constraint — `insertListenEvent` does no dedup, so
+repeated triggers would write repeated rows (the `currentTrackListenEventCreated` gate is what
+prevents that in practice). Deleting a user or a track cascades away their history.
+
+`source_type`/`source_id` are denormalised from the playback session at record time. The session's
+`trackQueue` is a JSON array of `{ trackId, source }` items (`source` =
+`{ type: "album" | "playlist"; id }` or `null`), stamped when tracks are enqueued via
+`PUT /session/play` or `POST /session/queue` — so a heterogeneous queue (an album with a playlist
+appended) attributes each track's listen to the right origin. When the listen fires,
+`/session/state` reads `trackQueue[currentTrackIndex].source` and hands it to `recordListen`. Both
+the web and mobile clients send `source` (album + in-library playlist contexts only); the
+`PlaybackPlayRequestSchema` / `PlaybackQueueRequestSchema` in `@staccato/shared` carry it. This
+replaced the old single-album `playback_session.playback_source_id` column, which couldn't model a
+mixed queue.
+
+`getRecentlyPlayedSources(userId, limit)` reads the distinct non-null `(source_type, source_id)`
+pairs ordered by their most recent listen; `GET /api/recently-played`
+(`routes/recently-played.ts`) resolves each id to album- or playlist-shaped metadata (dropping any
+that no longer resolve) and powers the mobile home recently-played grid.
 
 The `listen_scrobbles` table (`apps/server/src/db/schema/listen-scrobbles.ts`) — one row per
 `(listenId, target)`, tracking per-target delivery:
@@ -141,10 +163,12 @@ record per target per listen. Rows cascade-delete with their parent `listening_h
 
 ## Current limitations & future work
 
-- **Barely read.** The only reader of `listening_history` is the in-house recommendations profile
+- **Lightly read.** `listening_history` has two readers: the in-house recommendations profile
   foundation (`getListenAggregatesForUser`, which aggregates plays per track to build a taste
-  profile); `listen_scrobbles` is still unread. There is no recently-played view, no listening
-  stats, and no export. Otherwise the data flows outward to scrobble targets.
+  profile) and `getRecentlyPlayedSources` (the recently-played grid). Only plays with a non-null
+  source appear in recently-played, so plays recorded before source tracking shipped, and
+  contextless plays (search, flat library), are excluded. `listen_scrobbles` is still unread. There
+  are no listening stats and no export yet.
 - **No retry.** A failed scrobble leaves its `listen_scrobbles` row at `failed` (or `pending` if
   the process died mid-submit) and is never retried. The per-target status table is in place to
   support a future replay job, but that job is not yet implemented.

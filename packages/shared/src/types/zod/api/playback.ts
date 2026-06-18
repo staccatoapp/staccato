@@ -23,3 +23,30 @@ export const PlaybackSessionSchema = z.object({
   isPlaying: z.boolean(),
 });
 export type PlaybackSession = z.infer<typeof PlaybackSessionSchema>;
+
+/**
+ * Where a queued track was played from. Captured at enqueue time and threaded
+ * through the play/queue requests so the server can stamp each recorded listen
+ * with its origin (powering recently-played). Only album/playlist origins are
+ * tracked; contextless plays (search, flat library) send no source.
+ */
+export const PlaybackSourceSchema = z.object({
+  type: z.enum(["album", "playlist"]),
+  id: z.string(),
+});
+export type PlaybackSource = z.infer<typeof PlaybackSourceSchema>;
+
+/** Body of PUT /api/playback/session/play. */
+export const PlaybackPlayRequestSchema = z.object({
+  trackIds: z.array(z.string()),
+  startIndex: z.number(),
+  source: PlaybackSourceSchema.optional(),
+});
+export type PlaybackPlayRequest = z.infer<typeof PlaybackPlayRequestSchema>;
+
+/** Body of POST/PUT /api/playback/session/queue. */
+export const PlaybackQueueRequestSchema = z.object({
+  trackIds: z.array(z.string()),
+  source: PlaybackSourceSchema.optional(),
+});
+export type PlaybackQueueRequest = z.infer<typeof PlaybackQueueRequestSchema>;

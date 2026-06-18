@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import React from "react";
 import { ScrollView, StyleSheet } from "react-native";
 
@@ -6,6 +7,7 @@ import { usePlaylists } from "@/hooks/use-playlists";
 import { useRecentlyPlayed } from "@/hooks/use-recently-played";
 import { useRecommendedPlaylists } from "@/hooks/use-recommended-playlists";
 import {
+  type HomeAlbum,
   type HomeMix,
   type HomePlaylist,
   type HomeRecPlaylist,
@@ -62,14 +64,21 @@ export default function HomeScreen() {
       }
     : null;
 
-  const quickStartItems = [
-    playlists[0],
-    recentlyPlayed[0],
-    playlists[1],
-    recentlyPlayed[1],
-    playlists[2],
-    recentlyPlayed[2],
-  ].filter((item) => item !== undefined);
+  // The recently-played grid now spans both albums and playlists; tapping a tile
+  // opens its detail screen within the Home tab stack.
+  const openRecentlyPlayed = (item: HomeAlbum | HomePlaylist) => {
+    if ("title" in item) {
+      router.push({
+        pathname: "/(protected)/(home)/album/[albumKey]",
+        params: { albumKey: item.id },
+      });
+    } else {
+      router.push({
+        pathname: "/(protected)/(home)/playlist/[playlistKey]",
+        params: { playlistKey: item.id },
+      });
+    }
+  };
 
   return (
     <ScrollView
@@ -79,8 +88,7 @@ export default function HomeScreen() {
       contentContainerStyle={[styles.content, { paddingBottom: bottomInset }]}
     >
       {recPlaylist && <HeroRec playlist={recPlaylist} />}
-      <QuickStartGrid items={quickStartItems} />
-      <Carousel title="Recently played" items={recentlyPlayed} />
+      <QuickStartGrid items={recentlyPlayed} onPress={openRecentlyPlayed} />
       <Carousel title="Made for you" items={mixes} />
       <Carousel title="Your playlists" items={playlists} />
     </ScrollView>

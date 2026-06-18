@@ -135,14 +135,20 @@ describe("PlaylistDetail — in-library", () => {
   it("plays the whole playlist from the hero play button", () => {
     renderDetail(playlistViewFromLibrary(libraryDetail()));
     fireEvent.press(screen.getAllByLabelText("Play")[0]!);
-    expect(playTracks).toHaveBeenCalledWith(["t1", "t2", "t3"], 0);
+    expect(playTracks).toHaveBeenCalledWith(["t1", "t2", "t3"], 0, {
+      type: "playlist",
+      id: "pl-lib",
+    });
   });
 
   it("queues the whole playlist starting at the tapped track", () => {
     renderDetail(playlistViewFromLibrary(libraryDetail()));
     // [0] = hero FAB, [1..] = track rows in order.
     fireEvent.press(screen.getAllByLabelText("Play")[2]!);
-    expect(playTracks).toHaveBeenCalledWith(["t1", "t2", "t3"], 1);
+    expect(playTracks).toHaveBeenCalledWith(["t1", "t2", "t3"], 1, {
+      type: "playlist",
+      id: "pl-lib",
+    });
   });
 });
 

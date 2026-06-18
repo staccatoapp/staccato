@@ -15,6 +15,7 @@ import artistRoutes from "./routes/artists.js";
 import playbackRoutes from "./routes/playback.js";
 import tracksRoutes from "./routes/tracks.js";
 import playlistRoutes from "./routes/playlists.js";
+import recentlyPlayedRoutes from "./routes/recently-played.js";
 import settingsRoutes from "./routes/settings.js";
 import searchRoutes from "./routes/search.js";
 import previewRoutes from "./routes/preview.js";
@@ -62,6 +63,9 @@ app.register(async (protectedApp) => {
   protectedApp.register(playbackRoutes, { prefix: "/api/playback" });
   protectedApp.register(tracksRoutes, { prefix: "/api" });
   protectedApp.register(playlistRoutes, { prefix: "/api/playlists" });
+  protectedApp.register(recentlyPlayedRoutes, {
+    prefix: "/api/recently-played",
+  });
   protectedApp.register(settingsRoutes, { prefix: "/api/settings" });
   protectedApp.register(searchRoutes, { prefix: "/api/search" });
   protectedApp.register(previewRoutes, { prefix: "/api/preview" });

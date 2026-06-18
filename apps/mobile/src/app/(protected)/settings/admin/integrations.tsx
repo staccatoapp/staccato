@@ -34,7 +34,7 @@ export default function AdminIntegrationsScreen() {
           value={lidarrValue}
           valueColor={lidarrColor}
           chevron
-          onPress={() => router.push("/(home)/settings/admin/lidarr")}
+          onPress={() => router.push("/(protected)/settings/admin/lidarr")}
         />
         <SettingsRow
           icon={<Database size={17} color="#fff" strokeWidth={2.2} />}

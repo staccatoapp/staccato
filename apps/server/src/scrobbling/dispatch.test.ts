@@ -82,11 +82,24 @@ describe("recordListen", () => {
     const userId = seedUser();
     const trackId = seedPlayableTrack();
 
-    await recordListen(userId, trackId, log);
+    await recordListen(userId, trackId, null, log);
 
     expect(listenRows()).toHaveLength(1);
     expect(scrobbleRows()).toHaveLength(0);
     expect(log.warn).toHaveBeenCalled();
+  });
+
+  it("stamps the ledger row with the play source", async () => {
+    registeredTargets = [makeTarget("listenbrainz", false)];
+    const userId = seedUser();
+    const trackId = seedPlayableTrack();
+
+    await recordListen(userId, trackId, { type: "album", id: "al-1" }, log);
+
+    const rows = listenRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.sourceType).toBe("album");
+    expect(rows[0]?.sourceId).toBe("al-1");
   });
 
   it("marks a scrobble delivered when the target submits successfully", async () => {
@@ -95,7 +108,7 @@ describe("recordListen", () => {
     const userId = seedUser();
     const trackId = seedPlayableTrack();
 
-    await recordListen(userId, trackId, log);
+    await recordListen(userId, trackId, null, log);
 
     const rows = scrobbleRows();
     expect(rows).toHaveLength(1);
@@ -121,7 +134,7 @@ describe("recordListen", () => {
     const userId = seedUser();
     const trackId = seedPlayableTrack();
 
-    await recordListen(userId, trackId, log);
+    await recordListen(userId, trackId, null, log);
 
     const rows = scrobbleRows();
     expect(rows).toHaveLength(1);
@@ -138,7 +151,7 @@ describe("recordListen", () => {
     const userId = seedUser();
     const trackId = seedPlayableTrack();
 
-    await recordListen(userId, trackId, log);
+    await recordListen(userId, trackId, null, log);
 
     const byTarget = Object.fromEntries(
       scrobbleRows().map((r) => [r.target, r.status]),
@@ -153,7 +166,7 @@ describe("recordListen", () => {
     const trackId = seedPlayableTrack();
     vi.mocked(getTrackForScrobble).mockReturnValueOnce(undefined);
 
-    await recordListen(userId, trackId, log);
+    await recordListen(userId, trackId, null, log);
 
     expect(submit).not.toHaveBeenCalled();
     expect(listenRows()).toHaveLength(1);

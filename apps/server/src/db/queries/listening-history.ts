@@ -1,4 +1,5 @@
-import { eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
+import type { PlaybackSource } from "@staccato/shared";
 import { db } from "../client.js";
 import { listeningHistory } from "../schema/listening-history.js";
 import { albums } from "../schema/albums.js";
@@ -10,12 +11,54 @@ export type ListenHistoryRow = typeof listeningHistory.$inferSelect;
 export function insertListenEvent(
   userId: string,
   trackId: string,
+  source?: PlaybackSource | null,
 ): ListenHistoryRow {
   return db
     .insert(listeningHistory)
-    .values({ userId, trackId })
+    .values({
+      userId,
+      trackId,
+      sourceType: source?.type ?? null,
+      sourceId: source?.id ?? null,
+    })
     .returning()
     .get()!;
+}
+
+export interface RecentSourceRow {
+  sourceType: PlaybackSource["type"];
+  sourceId: string;
+  lastListenedAtMs: number;
+}
+
+/**
+ * The user's most recently played sources (albums / in-library playlists),
+ * de-duplicated by `(sourceType, sourceId)` and ordered by the most recent
+ * listen attributed to each. Contextless (null-source) plays are excluded.
+ * `lastListenedAtMs` is converted from stored unix **seconds** to **ms**.
+ */
+export function getRecentlyPlayedSources(
+  userId: string,
+  limit: number,
+): RecentSourceRow[] {
+  return db
+    .select({
+      sourceType: sql<PlaybackSource["type"]>`${listeningHistory.sourceType}`,
+      sourceId: sql<string>`${listeningHistory.sourceId}`,
+      lastListenedAtMs: sql<number>`max(${listeningHistory.listenedAt}) * 1000`,
+    })
+    .from(listeningHistory)
+    .where(
+      and(
+        eq(listeningHistory.userId, userId),
+        isNotNull(listeningHistory.sourceType),
+        isNotNull(listeningHistory.sourceId),
+      ),
+    )
+    .groupBy(listeningHistory.sourceType, listeningHistory.sourceId)
+    .orderBy(desc(sql`max(${listeningHistory.listenedAt})`))
+    .limit(limit)
+    .all();
 }
 
 export interface ListenAggregate {

@@ -81,7 +81,7 @@ export default function AdminUsersScreen() {
           iconBg={TILE.orange}
           title="Add User"
           chevron
-          onPress={() => router.push("/(home)/settings/admin/users/new")}
+          onPress={() => router.push("/(protected)/settings/admin/users/new")}
         />
       </SettingsGroup>
 
@@ -107,7 +107,7 @@ export default function AdminUsersScreen() {
             chevron
             onPress={() =>
               router.push({
-                pathname: "/(home)/settings/admin/users/[userId]",
+                pathname: "/(protected)/settings/admin/users/[userId]",
                 params: { userId: u.id },
               })
             }

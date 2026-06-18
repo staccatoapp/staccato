@@ -5,7 +5,10 @@ const expoConfig = require('eslint-config-expo/flat');
 module.exports = defineConfig([
   expoConfig,
   {
-    ignores: ['dist/*'],
+    // dist/ is the export output; .expo/ holds generated caches including the
+    // typed-routes router.d.ts, which the dev server regenerates and must not
+    // gate lint.
+    ignores: ['dist/*', '.expo/*'],
   },
   {
     files: ['jest-setup.js', '**/*.test.ts', '**/*.test.tsx'],

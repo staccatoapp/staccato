@@ -1,5 +1,11 @@
 import React from "react";
-import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
 
 import { type HomeAlbum, type HomePlaylist } from "@/lib/home-types";
 import { AlbumArt } from "@/components/home/album-art";
@@ -11,10 +17,12 @@ const CELL_GAP = 8;
 interface QuickStartGridProps {
   /** Mixed recent albums and playlists; only the first six render. */
   items: (HomeAlbum | HomePlaylist)[];
+  /** Open the tapped item's detail screen. */
+  onPress?: (item: HomeAlbum | HomePlaylist) => void;
 }
 
 /** 2-column grid of shortcut tiles below the hero (or in its place). */
-export function QuickStartGrid({ items }: QuickStartGridProps) {
+export function QuickStartGrid({ items, onPress }: QuickStartGridProps) {
   const { colors, radius, spacing, typography } = useTheme();
   const { width } = useWindowDimensions();
   const cellWidth = (width - spacing.homeScreenPadding * 2 - CELL_GAP) / 2;
@@ -26,8 +34,11 @@ export function QuickStartGrid({ items }: QuickStartGridProps) {
       {items.slice(0, MAX_CELLS).map((item) => {
         const isAlbum = "title" in item;
         return (
-          <View
+          <Pressable
             key={item.id}
+            accessibilityRole="button"
+            accessibilityLabel={isAlbum ? item.title : item.name}
+            onPress={() => onPress?.(item)}
             style={[
               styles.cell,
               {
@@ -68,7 +79,7 @@ export function QuickStartGrid({ items }: QuickStartGridProps) {
                   : `Playlist · ${item.trackCount} tracks`}
               </Text>
             </View>
-          </View>
+          </Pressable>
         );
       })}
     </View>

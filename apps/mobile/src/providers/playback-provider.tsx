@@ -15,6 +15,7 @@ import React, {
 import {
   PlaybackSessionSchema,
   type PlaybackSession,
+  type PlaybackSource,
   type PlaybackTrack,
 } from "@staccato/shared";
 
@@ -54,8 +55,16 @@ interface PlaybackContextValue {
   prev: () => void;
   seekTo: (seconds: number) => void;
   jumpToIndex: (index: number) => void;
-  /** Replace the queue with the given tracks and start playing at startIndex. */
-  playTracks: (trackIds: string[], startIndex: number) => void;
+  /**
+   * Replace the queue with the given tracks and start playing at startIndex.
+   * `source` records where the queue was started from (album / in-library
+   * playlist) so recorded listens are attributed for recently-played.
+   */
+  playTracks: (
+    trackIds: string[],
+    startIndex: number,
+    source?: PlaybackSource,
+  ) => void;
 }
 
 const PlaybackContext = createContext<PlaybackContextValue | null>(null);
@@ -107,7 +116,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
   // refetch rather than an optimistic write.
   const playMutation = useAuthedMutation<
     PlaybackSession,
-    { trackIds: string[]; startIndex: number }
+    { trackIds: string[]; startIndex: number; source?: PlaybackSource }
   >(PLAYBACK_SESSION_KEY, (client, vars) =>
     client.put("/api/playback/session/play", vars, PlaybackSessionSchema),
   );
@@ -342,9 +351,9 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
   );
 
   const playTracks = useCallback(
-    (trackIds: string[], startIndex: number) => {
+    (trackIds: string[], startIndex: number, source?: PlaybackSource) => {
       if (trackIds.length === 0) return;
-      mutatePlay({ trackIds, startIndex });
+      mutatePlay({ trackIds, startIndex, source });
     },
     [mutatePlay],
   );

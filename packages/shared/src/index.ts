@@ -13,6 +13,7 @@ export * from "./types/zod/api/downloads.js";
 export * from "./types/zod/api/tracks.js";
 export * from "./types/zod/api/playback.js";
 export * from "./types/zod/api/playlists.js";
+export * from "./types/zod/api/recently-played.js";
 export * from "./types/zod/api/scan.js";
 export * from "./types/zod/api/library.js";
 export * from "./types/zod/api/lyrics.js";

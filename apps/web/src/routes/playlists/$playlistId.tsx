@@ -63,7 +63,11 @@ function PlaylistDetailPage() {
       const res = await fetch("/api/playback/session/play", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trackIds, startIndex }),
+        body: JSON.stringify({
+          trackIds,
+          startIndex,
+          source: { type: "playlist", id: playlistId },
+        }),
       });
       if (!res.ok) throw new Error("Failed to start playback");
       return PlaybackSessionSchema.parse(await res.json());

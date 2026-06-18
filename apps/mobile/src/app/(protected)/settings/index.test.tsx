@@ -64,7 +64,9 @@ describe("SettingsScreen", () => {
     renderScreen();
 
     fireEvent.press(screen.getByRole("button", { name: /Services/ }));
-    expect(router.push).toHaveBeenCalledWith("/(home)/settings/listenbrainz");
+    expect(router.push).toHaveBeenCalledWith(
+      "/(protected)/settings/listenbrainz",
+    );
   });
 
   it("exposes the Admin segment and admin categories for admins", () => {

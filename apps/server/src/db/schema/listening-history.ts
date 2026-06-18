@@ -24,9 +24,19 @@ export const listeningHistory = sqliteTable(
     })
       .notNull()
       .default(false),
+    // Where this play was started from (album or in-library playlist),
+    // denormalised from the playback session at record time so recently-played
+    // can aggregate plays by their origin. Null for contextless plays.
+    sourceType: text("source_type"),
+    sourceId: text("source_id"),
   },
   (table) => [
     index("listening_history_user_id_idx").on(table.userId),
     index("listening_history_track_id_idx").on(table.trackId),
+    // Backs the recently-played query (most-recent listen per source for a user).
+    index("listening_history_user_listened_at_idx").on(
+      table.userId,
+      table.listenedAt,
+    ),
   ],
 );

@@ -101,7 +101,12 @@ describe("TrackRow", () => {
       </StaccatoThemeProvider>,
     );
     fireEvent.press(screen.getByLabelText("Play"));
-    expect(playTracks).toHaveBeenCalledWith(["lt-1", "lt-2", "lt-3"], 1);
+    // No source prop here, so none is forwarded.
+    expect(playTracks).toHaveBeenCalledWith(
+      ["lt-1", "lt-2", "lt-3"],
+      1,
+      undefined,
+    );
   });
 
   it("toggles pause when the owned track is already the current track", () => {
