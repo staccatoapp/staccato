@@ -6,7 +6,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import {
   subjectFromPlaylistTrack,
   type LidarrSubject,
-} from "@/components/explore/lidarr-sheet";
+} from "@/components/explore/add-album-sheet";
 import { TrackRow } from "@/components/explore/track-row";
 import { usePlaylistSuggestions } from "@/hooks/use-playlist-suggestions";
 import { useTheme } from "@/theme";

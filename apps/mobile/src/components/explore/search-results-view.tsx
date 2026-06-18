@@ -14,7 +14,7 @@ import { pickGradient } from "@/lib/gradient";
 import { formatPlayerTime } from "@/lib/playback";
 import { useTheme } from "@/theme";
 
-import { subjectFromRelease, type LidarrSubject } from "./lidarr-sheet";
+import { subjectFromRelease, type LidarrSubject } from "./add-album-sheet";
 import { TrackRow } from "./track-row";
 
 const ART = 44;

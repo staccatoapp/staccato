@@ -1,11 +1,6 @@
-import type {
-  ExternalReleaseResult,
-  RecommendedPlaylistTrack,
-  RecommendedTrack,
-  UnifiedAlbumDetail,
-} from "@staccato/shared";
+import { type GradientKey } from "@staccato/shared";
 import { Info } from "lucide-react-native";
-import React, { useEffect, useState } from "react";
+import React from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -13,301 +8,157 @@ import {
   Text,
   View,
 } from "react-native";
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
 
 import { AlbumArt } from "@/components/home/album-art";
-import {
-  PLAYER_EASING,
-  SHEET_SLIDE_MS,
-} from "@/components/player/player-easing";
-import { ApiError } from "@/lib/api-client";
-import { pickGradient } from "@/lib/gradient";
-import { useRequestDownload } from "@/hooks/use-request-download";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { useTheme } from "@/theme";
 
-/**
- * Everything the Lidarr request needs, normalised so both a recommended track
- * and a search-result album can open the same sheet. A subject only exists when
- * the release-group and artist MBIDs are both present (the request is
- * album-level), so callers build it through the helpers below and skip the
- * affordance when they return null.
- */
-export interface LidarrSubject {
-  releaseGroupMbid: string;
-  artistMbid: string;
-  artistName: string;
-  albumTitle: string | null;
-  coverArtUrl: string | null;
-  /** Display title — the track title, or the album title for a release. */
+interface SheetHeader {
+  artUrl: string | null;
+  artUrls?: string[];
+  gradientKey: GradientKey;
   title: string;
+  subtitle: string;
 }
 
-/** Build a subject from a recommended track, or null if it can't be requested. */
-export function subjectFromTrack(
-  track: RecommendedTrack,
-): LidarrSubject | null {
-  if (!track.releaseGroupMbid || !track.artistMbid || !track.artistName) {
-    return null;
-  }
-  return {
-    releaseGroupMbid: track.releaseGroupMbid,
-    artistMbid: track.artistMbid,
-    artistName: track.artistName,
-    albumTitle: track.albumTitle,
-    coverArtUrl: track.coverArtUrl,
-    title: track.title,
-  };
+interface SheetInfo {
+  text: React.ReactNode;
+  /** "primary" → orange banner with border; "muted" → grey block, no border. */
+  variant: "primary" | "muted";
 }
 
-/**
- * Build a subject from a playlist track (recommended-playlist row), or null when
- * it can't be requested. Same shape as {@link subjectFromTrack}; the recommended
- * playlist-track type just nullable-types its `recordingMbid`.
- */
-export function subjectFromPlaylistTrack(
-  track: RecommendedPlaylistTrack,
-): LidarrSubject | null {
-  if (!track.releaseGroupMbid || !track.artistMbid || !track.artistName) {
-    return null;
-  }
-  return {
-    releaseGroupMbid: track.releaseGroupMbid,
-    artistMbid: track.artistMbid,
-    artistName: track.artistName,
-    albumTitle: track.albumTitle,
-    coverArtUrl: track.coverArtUrl,
-    title: track.title,
-  };
+interface SheetCta {
+  label: string;
+  onPress: () => void;
+  loading?: boolean;
+  testID?: string;
 }
 
-/** Build a subject from a search-result release, or null if not requestable. */
-export function subjectFromRelease(
-  release: ExternalReleaseResult,
-): LidarrSubject | null {
-  if (!release.releaseGroupMbid || !release.artistMbid) return null;
-  return {
-    releaseGroupMbid: release.releaseGroupMbid,
-    artistMbid: release.artistMbid,
-    artistName: release.artistName,
-    albumTitle: release.title,
-    coverArtUrl: release.coverArtUrl,
-    title: release.title,
-  };
-}
-
-/**
- * Build a subject from an album-detail payload, or null if not requestable.
- * Only external (MusicBrainz-only) albums carry the `artistMbid` the request
- * needs — local albums omit it, so they return null.
- */
-export function subjectFromAlbumDetail(
-  detail: UnifiedAlbumDetail,
-): LidarrSubject | null {
-  if (detail.source !== "external") return null;
-  const { releaseGroupMbid, artistMbid, artistName, title, coverArtUrl } =
-    detail.album;
-  if (!releaseGroupMbid || !artistMbid) return null;
-  return {
-    releaseGroupMbid,
-    artistMbid,
-    artistName,
-    albumTitle: title,
-    coverArtUrl,
-    title,
-  };
-}
-
-const OFFSCREEN = 600;
-
-interface LidarrSheetProps {
-  /** Non-null opens the sheet for that subject; null closes it. */
-  subject: LidarrSubject | null;
+export interface LidarrSheetProps {
+  open: boolean;
   onClose: () => void;
+  header: SheetHeader;
+  info: SheetInfo;
+  cta: SheetCta;
+  error?: string;
+  showCancel?: boolean;
+  testID?: string;
+  backdropTestID?: string;
 }
 
 /**
- * Bottom sheet that queues a Lidarr download request for an album. Mirrors the
- * queue-sheet presentation (backdrop + slide-up). No quality-profile picker —
- * the request omits it and the server uses its configured default.
+ * Shared layout shell for Lidarr-flavoured bottom sheets. Renders art header,
+ * info block, optional error, CTA, and optional cancel button inside a
+ * BottomSheet. Not used directly by screens — use AddAlbumSheet or AddAllSheet.
  */
-export function LidarrSheet({ subject, onClose }: LidarrSheetProps) {
+export function LidarrSheet({
+  open,
+  onClose,
+  header,
+  info,
+  cta,
+  error,
+  showCancel,
+  testID,
+  backdropTestID,
+}: LidarrSheetProps) {
   const { colors, typography } = useTheme();
-  const request = useRequestDownload();
-  const [errored, setErrored] = useState(false);
 
-  // Retain the last subject so its content stays rendered through the close
-  // animation (the prop goes null the instant the sheet starts dismissing).
-  // Uses React's "adjust state on prop change" pattern (render-phase setState,
-  // guarded), so a new subject also clears any stale error.
-  const [shown, setShown] = useState<LidarrSubject | null>(subject);
-  const [seen, setSeen] = useState<LidarrSubject | null>(subject);
-  if (subject !== seen) {
-    setSeen(subject);
-    if (subject) {
-      setShown(subject);
-      setErrored(false);
-    }
-  }
-
-  const open = subject != null;
-  const sheetY = useSharedValue(OFFSCREEN);
-  const backdropOpacity = useSharedValue(0);
-  useEffect(() => {
-    sheetY.value = withTiming(open ? 0 : OFFSCREEN, {
-      duration: SHEET_SLIDE_MS,
-      easing: PLAYER_EASING,
-    });
-    backdropOpacity.value = withTiming(open ? 1 : 0, { duration: 300 });
-  }, [open, sheetY, backdropOpacity]);
-
-  const sheetStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: sheetY.value }],
-  }));
-  const backdropStyle = useAnimatedStyle(() => ({
-    opacity: backdropOpacity.value,
-  }));
-
-  if (!shown) return null;
-
-  const subtitle = [shown.artistName, shown.albumTitle]
-    .filter(Boolean)
-    .join(" · ");
-
-  const submit = () => {
-    request.mutate(
-      {
-        releaseGroupMbid: shown.releaseGroupMbid,
-        artistMbid: shown.artistMbid,
-        artistName: shown.artistName,
-        albumTitle: shown.albumTitle,
-      },
-      {
-        onSuccess: onClose,
-        onError: (err) => {
-          // 409 = a request for this album is already active; that's a benign
-          // "already requested" outcome, so close rather than show an error.
-          if (err instanceof ApiError && err.status === 409) {
-            onClose();
-            return;
-          }
-          setErrored(true);
-        },
-      },
-    );
-  };
+  const infoBg = info.variant === "primary" ? colors.primaryBg : colors.bgMuted;
+  const infoBorder =
+    info.variant === "primary" ? "rgba(253, 121, 51, 0.35)" : undefined;
 
   return (
-    <View
-      style={StyleSheet.absoluteFill}
-      pointerEvents={open ? "auto" : "none"}
+    <BottomSheet
+      open={open}
+      onClose={onClose}
+      testID={testID}
+      backdropTestID={backdropTestID}
     >
-      <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
-        <Pressable
-          testID="lidarr-sheet-backdrop"
-          accessibilityLabel="Dismiss request sheet"
-          onPress={onClose}
-          style={[StyleSheet.absoluteFill, styles.backdrop]}
+      <View style={styles.header}>
+        <AlbumArt
+          gradientKey={header.gradientKey}
+          artUrl={header.artUrl}
+          artUrls={header.artUrls}
+          size={56}
+          radius={8}
+          glyphSize={22}
         />
-      </Animated.View>
-
-      <Animated.View
-        testID="lidarr-sheet"
-        style={[styles.sheet, { backgroundColor: colors.bgRaised }, sheetStyle]}
-      >
-        <View style={styles.handleWrap}>
-          <View style={styles.handle} />
-        </View>
-
-        <View style={styles.header}>
-          <AlbumArt
-            gradientKey={pickGradient(shown.releaseGroupMbid)}
-            artUrl={shown.coverArtUrl}
-            size={56}
-            radius={8}
-            glyphSize={22}
-          />
-          <View style={styles.headerText}>
-            <Text
-              numberOfLines={1}
-              style={[
-                styles.title,
-                { color: colors.fg, fontFamily: typography.fontFamily },
-              ]}
-            >
-              {shown.title}
-            </Text>
-            <Text
-              numberOfLines={1}
-              style={[
-                styles.subtitle,
-                { color: colors.fgMuted, fontFamily: typography.fontFamily },
-              ]}
-            >
-              {subtitle}
-            </Text>
-          </View>
-        </View>
-
-        <View
-          style={[
-            styles.banner,
-            {
-              backgroundColor: colors.primaryBg,
-              borderColor: "rgba(253, 121, 51, 0.35)",
-            },
-          ]}
-        >
-          <Info size={16} color={colors.primaryText} strokeWidth={2} />
+        <View style={styles.headerText}>
           <Text
+            numberOfLines={1}
             style={[
-              styles.bannerText,
+              styles.title,
               { color: colors.fg, fontFamily: typography.fontFamily },
             ]}
           >
-            Additional tracks will be downloaded along with your request.
+            {header.title}
           </Text>
-        </View>
-
-        {errored ? (
           <Text
+            numberOfLines={1}
             style={[
-              styles.error,
-              { color: colors.destructive, fontFamily: typography.fontFamily },
+              styles.subtitle,
+              { color: colors.fgMuted, fontFamily: typography.fontFamily },
             ]}
           >
-            Couldn&apos;t send the request. Please try again.
+            {header.subtitle}
           </Text>
-        ) : null}
+        </View>
+      </View>
 
-        <Pressable
-          testID="lidarr-sheet-request"
-          accessibilityRole="button"
-          accessibilityLabel="Request via Lidarr"
-          disabled={request.isPending}
-          onPress={submit}
+      <View
+        style={[
+          styles.info,
+          {
+            backgroundColor: infoBg,
+            borderWidth: infoBorder ? 1 : 0,
+            borderColor: infoBorder,
+          },
+        ]}
+      >
+        <Info size={16} color={colors.primaryText} strokeWidth={2} />
+        <Text
           style={[
-            styles.cta,
-            {
-              backgroundColor: colors.primary,
-              opacity: request.isPending ? 0.7 : 1,
-            },
+            styles.infoText,
+            { color: colors.fg, fontFamily: typography.fontFamily },
           ]}
         >
-          {request.isPending ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text
-              style={[styles.ctaText, { fontFamily: typography.fontFamily }]}
-            >
-              Request via Lidarr
-            </Text>
-          )}
-        </Pressable>
+          {info.text}
+        </Text>
+      </View>
 
+      {error ? (
+        <Text
+          style={[
+            styles.error,
+            { color: colors.destructive, fontFamily: typography.fontFamily },
+          ]}
+        >
+          {error}
+        </Text>
+      ) : null}
+
+      <Pressable
+        testID={cta.testID}
+        accessibilityRole="button"
+        accessibilityLabel={cta.label}
+        disabled={cta.loading}
+        onPress={cta.onPress}
+        style={[
+          styles.cta,
+          { backgroundColor: colors.primary, opacity: cta.loading ? 0.7 : 1 },
+        ]}
+      >
+        {cta.loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={[styles.ctaText, { fontFamily: typography.fontFamily }]}>
+            {cta.label}
+          </Text>
+        )}
+      </Pressable>
+
+      {showCancel ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Cancel"
@@ -323,37 +174,12 @@ export function LidarrSheet({ subject, onClose }: LidarrSheetProps) {
             Cancel
           </Text>
         </Pressable>
-      </Animated.View>
-    </View>
+      ) : null}
+    </BottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    backgroundColor: "rgba(0,0,0,0.4)",
-  },
-  sheet: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    paddingTop: 12,
-    paddingHorizontal: 16,
-    paddingBottom: 28,
-    boxShadow: "0 -8px 24px rgba(0,0,0,0.4)",
-  },
-  handleWrap: {
-    alignItems: "center",
-    marginBottom: 14,
-  },
-  handle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "rgba(255,255,255,0.18)",
-  },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -373,17 +199,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 2,
   },
-  banner: {
+  info: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 8,
-    borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 12,
     paddingVertical: 11,
     paddingHorizontal: 12,
     marginBottom: 16,
   },
-  bannerText: {
+  infoText: {
     flex: 1,
     fontSize: 13,
     lineHeight: 19,

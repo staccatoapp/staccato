@@ -1,9 +1,14 @@
-import React, { createContext, useContext, useState, type ReactNode } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  type ReactNode,
+} from "react";
 
 import {
-  LidarrSheet,
+  AddAlbumSheet,
   type LidarrSubject,
-} from "@/components/explore/lidarr-sheet";
+} from "@/components/explore/add-album-sheet";
 
 interface LidarrSheetContextValue {
   open: (subject: LidarrSubject) => void;
@@ -19,13 +24,14 @@ export function LidarrSheetProvider({ children }: { children: ReactNode }) {
   return (
     <LidarrSheetContext.Provider value={{ open: setSubject, close }}>
       {children}
-      <LidarrSheet subject={subject} onClose={close} />
+      <AddAlbumSheet subject={subject} onClose={close} />
     </LidarrSheetContext.Provider>
   );
 }
 
 export function useLidarrSheet(): LidarrSheetContextValue {
   const ctx = useContext(LidarrSheetContext);
-  if (!ctx) throw new Error("useLidarrSheet must be used inside LidarrSheetProvider");
+  if (!ctx)
+    throw new Error("useLidarrSheet must be used inside LidarrSheetProvider");
   return ctx;
 }

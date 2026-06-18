@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react-native";
 import React from "react";
 
 import { StaccatoThemeProvider } from "@/theme";
-import { LidarrSheet, type LidarrSubject } from "./lidarr-sheet";
+import { AddAlbumSheet, type LidarrSubject } from "./add-album-sheet";
 
 const mockMutate = jest.fn();
 const mockUseRequestDownload = jest.fn();
@@ -29,7 +29,7 @@ function renderSheet(subject: LidarrSubject | null = SUBJECT) {
   const onClose = jest.fn();
   render(
     <StaccatoThemeProvider>
-      <LidarrSheet subject={subject} onClose={onClose} />
+      <AddAlbumSheet subject={subject} onClose={onClose} />
     </StaccatoThemeProvider>,
   );
   return { onClose };
@@ -43,7 +43,7 @@ beforeEach(() => {
   });
 });
 
-describe("LidarrSheet", () => {
+describe("AddAlbumSheet", () => {
   it("shows the subject and request CTA when open", () => {
     renderSheet();
     expect(screen.getByText("Rumours")).toBeTruthy();

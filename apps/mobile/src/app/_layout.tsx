@@ -8,6 +8,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { PlayerOverlayRoot } from "@/components/player-overlay";
 import { SplashView } from "@/components/splash-view";
 import { SessionProvider, useSession } from "@/lib/session";
+import { AddAllSheetProvider } from "@/providers/add-all-sheet-provider";
 import { LidarrSheetProvider } from "@/providers/lidarr-sheet-provider";
 import { PlaybackProvider } from "@/providers/playback-provider";
 import { PreviewProvider } from "@/providers/preview-provider";
@@ -33,8 +34,10 @@ export default function RootLayout() {
               the native tab bar. */}
           <PlaybackRoot>
             <LidarrSheetProvider>
-              <RootNavigator />
-              <PlayerOverlayRoot />
+              <AddAllSheetProvider>
+                <RootNavigator />
+                <PlayerOverlayRoot />
+              </AddAllSheetProvider>
             </LidarrSheetProvider>
           </PlaybackRoot>
         </StaccatoThemeProvider>

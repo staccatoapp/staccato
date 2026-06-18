@@ -4,7 +4,7 @@ import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { DetailHeroLayout } from "@/components/detail-hero-layout";
-import { type LidarrSubject } from "@/components/explore/lidarr-sheet";
+import { type LidarrSubject } from "@/components/explore/add-album-sheet";
 import { TrackRow } from "@/components/explore/track-row";
 import { pickGradient } from "@/lib/gradient";
 import { formatPlayerTime } from "@/lib/playback";

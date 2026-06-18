@@ -6,7 +6,7 @@ import { Pressable, StyleSheet, Text } from "react-native";
 import { formatPlayerTime } from "@/lib/playback";
 import { useTheme } from "@/theme";
 
-import { subjectFromTrack, type LidarrSubject } from "./lidarr-sheet";
+import { subjectFromTrack, type LidarrSubject } from "./add-album-sheet";
 import { TrackRow } from "./track-row";
 
 interface RecTrackRowProps {

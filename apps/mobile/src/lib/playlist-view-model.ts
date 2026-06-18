@@ -5,7 +5,7 @@ import type {
   RecommendedPlaylistTrack,
 } from "@staccato/shared";
 
-import type { LidarrSubject } from "@/components/explore/lidarr-sheet";
+import type { LidarrSubject } from "@/components/explore/add-album-sheet";
 import type { TrackRowTrack } from "@/components/explore/track-row";
 
 /**

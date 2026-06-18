@@ -1,9 +1,9 @@
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { useLidarrSheet } from "@/providers/lidarr-sheet-provider";
-import { AddAllSheet } from "@/components/playlist/add-all-sheet";
+import { useAddAllSheet } from "@/providers/add-all-sheet-provider";
 import { PlaylistDetail } from "@/components/playlist/playlist-detail";
 import { Screen } from "@/components/ui/screen";
 import { Spinner } from "@/components/ui/spinner";
@@ -68,7 +68,7 @@ function PlaylistBody({
 }) {
   const { colors, typography } = useTheme();
   const lidarrSheet = useLidarrSheet();
-  const [addAllOpen, setAddAllOpen] = useState(false);
+  const addAllSheet = useAddAllSheet();
 
   return (
     <Screen scroll={false}>
@@ -92,17 +92,9 @@ function PlaylistBody({
           view={view}
           onBack={() => router.back()}
           onRequestTrack={lidarrSheet.open}
-          onAddAll={() => setAddAllOpen(true)}
+          onAddAll={() => addAllSheet.open(view)}
         />
       )}
-
-      {view && view.mode === "recommended" ? (
-        <AddAllSheet
-          open={addAllOpen}
-          view={view}
-          onClose={() => setAddAllOpen(false)}
-        />
-      ) : null}
     </Screen>
   );
 }
