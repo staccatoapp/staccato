@@ -3,6 +3,20 @@
   "main": "expo-router/entry",
   "version": "0.0.0",
   "private": true,
+  "expo": {
+    "autolinking": {
+      "ios": {
+        "buildFromSource": [
+          "expo-file-system"
+        ]
+      },
+      "android": {
+        "buildFromSource": [
+          "expo-file-system"
+        ]
+      }
+    }
+  },
   "dependencies": {
     "@expo/ui": "~56.0.15",
     "@react-native-async-storage/async-storage": "2.2.0",
