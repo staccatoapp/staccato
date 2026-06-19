@@ -57,6 +57,7 @@ docs/
 .claude/tmp
 .claude/worktrees/
 .claude/handoffs/
+.claude/handoff/
 .playwright-mcp/
 .claudeignore
 .superpowers/

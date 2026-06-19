@@ -84,6 +84,11 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
   const player = useAudioPlayer();
   const status = useAudioPlayerStatus(player);
   const [isPlayerOpen, setPlayerOpen] = useState(false);
+  // Local file:// cover for the current track, attached to the lock screen once
+  // downloaded. Reset on every track change so a previous cover can't leak.
+  const [lockArtworkUri, setLockArtworkUri] = useState<string | undefined>(
+    undefined,
+  );
 
   const currentTrack =
     playbackSession?.trackQueue[playbackSession.currentTrackIndex] ?? null;
@@ -161,43 +166,49 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     if (session?.isPlaying) player.play();
 
     // Lock screens fetch artworkUrl themselves and can't send the Bearer header
-    // the server-relative cover URLs require, so set the text metadata first for
-    // an instant update, then download the cover to a local file (with auth) and
-    // re-set the metadata with a file:// artworkUrl once it lands.
-    const metadata = {
-      title: track.title,
-      artist: track.artistName ?? undefined,
-      albumTitle: track.albumTitle ?? undefined,
+    // the server-relative cover URLs require, so download the cover to a local
+    // file (with auth); the publish effect below attaches it once it lands.
+    // Reset any previous track's cover first so it can't leak through.
+    setLockArtworkUri(undefined);
+    let cancelled = false;
+    void ensureArtworkFile(track.coverArtUrl, authSession).then((fileUri) => {
+      // A newer track may have loaded while the download ran; don't clobber it.
+      if (cancelled || !fileUri) return;
+      setLockArtworkUri(fileUri);
+    });
+    return () => {
+      cancelled = true;
     };
+  }, [currentTrackId, authSession, player]);
+
+  // Publish lock-screen metadata only once the player has loaded the item and
+  // reported a real duration. Setting it while the duration is still 0 (the
+  // window right after `replace`) makes iOS render the Now Playing widget as a
+  // live stream ("LIVE", no scrubber); a known duration plus isLiveStream:false
+  // restores the scrubber and seek. Re-runs when the cached cover resolves to
+  // attach the artwork.
+  const lockScreenReady = status.isLoaded && status.duration > 0;
+  useEffect(() => {
+    const track = currentTrackRef.current;
+    if (!track || !authSession || !lockScreenReady) return;
     try {
-      player.setActiveForLockScreen(true, metadata);
+      player.setActiveForLockScreen(
+        true,
+        {
+          title: track.title,
+          artist: track.artistName ?? undefined,
+          albumTitle: track.albumTitle ?? undefined,
+          artworkUrl: lockArtworkUri,
+        },
+        { isLiveStream: false },
+      );
     } catch (err) {
       console.warn("failed to set lock-screen metadata", {
         trackId: track.id,
         err,
       });
     }
-
-    let cancelled = false;
-    void ensureArtworkFile(track.coverArtUrl, authSession).then((fileUri) => {
-      // A newer track may have loaded while the download ran; don't clobber it.
-      if (cancelled || !fileUri) return;
-      try {
-        player.setActiveForLockScreen(true, {
-          ...metadata,
-          artworkUrl: fileUri,
-        });
-      } catch (err) {
-        console.warn("failed to set lock-screen artwork", {
-          trackId: track.id,
-          err,
-        });
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [currentTrackId, authSession, player]);
+  }, [currentTrackId, lockScreenReady, lockArtworkUri, authSession, player]);
 
   // Play/pause sync: the session's isPlaying drives the player.
   const sessionIsPlaying = playbackSession?.isPlaying;

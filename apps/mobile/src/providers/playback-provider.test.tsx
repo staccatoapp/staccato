@@ -155,7 +155,24 @@ describe("PlaybackProvider", () => {
     await waitFor(() => expect(mockPlayer.play).toHaveBeenCalled());
   });
 
-  it("sets lock-screen metadata for the current track", async () => {
+  it("does not set lock-screen metadata until the duration is known (avoids 'LIVE')", async () => {
+    // Player is loaded but the duration is not yet determined; publishing now
+    // makes iOS render the Now Playing widget as a live stream ("LIVE", no
+    // scrubber). The provider must wait for a real duration.
+    mockUseStatus.mockReturnValue({
+      ...defaultStatus,
+      isLoaded: true,
+      duration: 0,
+    });
+
+    await renderPlayback();
+
+    expect(mockPlayer.setActiveForLockScreen).not.toHaveBeenCalled();
+  });
+
+  it("sets lock-screen metadata with isLiveStream:false once the duration is known", async () => {
+    mockUseStatus.mockReturnValue({ ...defaultStatus, duration: 254 });
+
     await renderPlayback();
 
     expect(mockPlayer.setActiveForLockScreen).toHaveBeenCalledWith(
@@ -165,11 +182,13 @@ describe("PlaybackProvider", () => {
         artist: "Fleetwood Mac",
         albumTitle: "Rumours",
       }),
+      { isLiveStream: false },
     );
   });
 
   it("caches the cover and sets it as lock-screen artwork once ready", async () => {
     mockEnsureArtworkFile.mockResolvedValue("file://blobs/cover.jpg");
+    mockUseStatus.mockReturnValue({ ...defaultStatus, duration: 254 });
 
     await renderPlayback();
 
@@ -180,6 +199,7 @@ describe("PlaybackProvider", () => {
           title: "Dreams",
           artworkUrl: "file://blobs/cover.jpg",
         }),
+        { isLiveStream: false },
       ),
     );
     expect(mockEnsureArtworkFile).toHaveBeenCalledWith(
