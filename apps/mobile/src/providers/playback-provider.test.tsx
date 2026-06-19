@@ -52,6 +52,11 @@ jest.mock("expo-audio", () => ({
   setAudioModeAsync: jest.fn().mockResolvedValue(undefined),
 }));
 
+const mockEnsureArtworkFile = jest.fn();
+jest.mock("@/lib/storage/artwork-cache", () => ({
+  ensureArtworkFile: (...args: unknown[]) => mockEnsureArtworkFile(...args),
+}));
+
 const mockedCreateClient = jest.mocked(createApiClient);
 
 const track = (id: string, title: string) => ({
@@ -61,7 +66,7 @@ const track = (id: string, title: string) => ({
   discNumber: 1,
   artistName: "Fleetwood Mac",
   albumTitle: "Rumours",
-  coverArtUrl: null,
+  coverArtUrl: `/metadata/covers/${id}.jpg`,
   durationSeconds: 254,
   artists: [],
 });
@@ -95,6 +100,7 @@ function clientWith(): ApiClient {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockEnsureArtworkFile.mockResolvedValue(null);
   mockPlayer.currentTime = 0;
   mockPlayer.seekTo.mockResolvedValue(undefined);
   mockUseStatus.mockReturnValue(defaultStatus);
@@ -159,6 +165,29 @@ describe("PlaybackProvider", () => {
         artist: "Fleetwood Mac",
         albumTitle: "Rumours",
       }),
+    );
+  });
+
+  it("caches the cover and sets it as lock-screen artwork once ready", async () => {
+    mockEnsureArtworkFile.mockResolvedValue("file://blobs/cover.jpg");
+
+    await renderPlayback();
+
+    await waitFor(() =>
+      expect(mockPlayer.setActiveForLockScreen).toHaveBeenCalledWith(
+        true,
+        expect.objectContaining({
+          title: "Dreams",
+          artworkUrl: "file://blobs/cover.jpg",
+        }),
+      ),
+    );
+    expect(mockEnsureArtworkFile).toHaveBeenCalledWith(
+      "/metadata/covers/t2.jpg",
+      {
+        serverUrl: "https://music.home.arpa",
+        token: "tok",
+      },
     );
   });
 

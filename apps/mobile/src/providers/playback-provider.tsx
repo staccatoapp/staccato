@@ -30,6 +30,7 @@ import {
   getPrevTrackState,
 } from "@/lib/playback";
 import { useSession } from "@/lib/session";
+import { ensureArtworkFile } from "@/lib/storage/artwork-cache";
 
 /** Body of PUT /api/playback/session/state. */
 interface PlaybackStateUpdate {
@@ -159,21 +160,43 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     lastTrackedAudioTimeRef.current = position;
     if (session?.isPlaying) player.play();
 
-    // No artworkUrl yet: lock screens can't send the Bearer header that the
-    // server-relative cover URLs require. Once the app caches album art
-    // locally we can pass the cached file path here and artwork will render.
+    // Lock screens fetch artworkUrl themselves and can't send the Bearer header
+    // the server-relative cover URLs require, so set the text metadata first for
+    // an instant update, then download the cover to a local file (with auth) and
+    // re-set the metadata with a file:// artworkUrl once it lands.
+    const metadata = {
+      title: track.title,
+      artist: track.artistName ?? undefined,
+      albumTitle: track.albumTitle ?? undefined,
+    };
     try {
-      player.setActiveForLockScreen(true, {
-        title: track.title,
-        artist: track.artistName ?? undefined,
-        albumTitle: track.albumTitle ?? undefined,
-      });
+      player.setActiveForLockScreen(true, metadata);
     } catch (err) {
       console.warn("failed to set lock-screen metadata", {
         trackId: track.id,
         err,
       });
     }
+
+    let cancelled = false;
+    void ensureArtworkFile(track.coverArtUrl, authSession).then((fileUri) => {
+      // A newer track may have loaded while the download ran; don't clobber it.
+      if (cancelled || !fileUri) return;
+      try {
+        player.setActiveForLockScreen(true, {
+          ...metadata,
+          artworkUrl: fileUri,
+        });
+      } catch (err) {
+        console.warn("failed to set lock-screen artwork", {
+          trackId: track.id,
+          err,
+        });
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [currentTrackId, authSession, player]);
 
   // Play/pause sync: the session's isPlaying drives the player.

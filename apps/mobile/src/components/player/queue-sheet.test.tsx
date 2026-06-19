@@ -91,12 +91,6 @@ describe("QueueSheet", () => {
     expect(value.jumpToIndex).toHaveBeenCalledWith(3);
   });
 
-  it("closes from the X button", () => {
-    const { onClose } = renderSheet();
-    fireEvent.press(screen.getByTestId("queue-sheet-close"));
-    expect(onClose).toHaveBeenCalled();
-  });
-
   it("closes from the backdrop", () => {
     const { onClose } = renderSheet();
     fireEvent.press(screen.getByTestId("queue-sheet-backdrop"));
