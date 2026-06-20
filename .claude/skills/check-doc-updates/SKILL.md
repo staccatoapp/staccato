@@ -11,7 +11,7 @@ After any session that changes code, check whether `.claude/rules/` files or `ap
 
 **Core principle:** Doc drift is silent. Check every time, and explicitly confirm even when nothing needs updating.
 
-**Rules stay lean.** A `.claude/rules/` file loads into agent context and must earn every line — keep it **under 100 lines**, prose only. Depth, tables, code, and examples belong in the internal doc, not the rule. When a subsystem you touched has no rule or doc yet, create one rather than just flagging it.
+**Rules stay lean.** A `.claude/rules/` file loads into agent context and must earn every line — keep it **under 100 lines**, prose only. Any additions should be brief - don't decorate your additions with excessive detail or over-describe. Depth, tables, code, and examples belong in the internal doc, not the rule. When a subsystem you touched has no rule or doc yet, create one rather than just flagging it.
 
 ## When to Use
 
@@ -73,12 +73,12 @@ Silence is not acceptable as evidence of a complete check.
 
 ## Common Mistakes
 
-| Mistake                                       | Correct approach                                      |
-| --------------------------------------------- | ----------------------------------------------------- |
-| Staying silent when nothing needs updating    | Always report explicitly                              |
-| Updating only one surface when both exist     | Both must stay in sync                                |
-| Adding code blocks or tables to a rule file   | Rules are prose-only; put those in the internal doc   |
-| Letting a rule grow past ~100 lines           | Hard ceiling — move depth into the internal doc        |
-| Only flagging an undocumented subsystem       | Create the rule (and doc, if warranted) — don't just flag |
-| Cramming a deep-dive into a new rule          | Rule = dense essentials; depth goes in the internal doc |
-| Skipping the loaded-rules reflection          | Rules loaded during the session are always candidates |
+| Mistake                                     | Correct approach                                          |
+| ------------------------------------------- | --------------------------------------------------------- |
+| Staying silent when nothing needs updating  | Always report explicitly                                  |
+| Updating only one surface when both exist   | Both must stay in sync                                    |
+| Adding code blocks or tables to a rule file | Rules are prose-only; put those in the internal doc       |
+| Letting a rule grow past ~100 lines         | Hard ceiling — move depth into the internal doc           |
+| Only flagging an undocumented subsystem     | Create the rule (and doc, if warranted) — don't just flag |
+| Cramming a deep-dive into a new rule        | Rule = dense essentials; depth goes in the internal doc   |
+| Skipping the loaded-rules reflection        | Rules loaded during the session are always candidates     |

@@ -82,6 +82,7 @@ export function AlbumDetail({
                 key={`${row.track.recordingMbid || row.track.title}-${i}`}
                 track={row.track}
                 index={row.index}
+                album
                 divider={i !== rows.length - 1}
                 queueTrackIds={queueIndex >= 0 ? playable : undefined}
                 queueIndex={queueIndex >= 0 ? queueIndex : undefined}

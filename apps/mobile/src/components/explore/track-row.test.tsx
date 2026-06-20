@@ -1,4 +1,9 @@
-import { fireEvent, render, screen } from "@testing-library/react-native";
+import {
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react-native";
 import React from "react";
 
 import { StaccatoThemeProvider } from "@/theme";
@@ -138,5 +143,69 @@ describe("TrackRow", () => {
     setProviders({ previewingId: "rec-1" });
     renderRow(makeTrack({ inLibrary: false }));
     expect(screen.getByLabelText("Stop")).toBeTruthy();
+  });
+
+  it("makes the whole row the tap target — the title sits inside the play control", () => {
+    renderRow(makeTrack({ inLibrary: true, localTrackId: "lt-1" }));
+    const control = screen.getByLabelText("Play");
+    expect(within(control).getByText("Dreams")).toBeTruthy();
+  });
+
+  describe("equalizer indicator", () => {
+    it("shows for the current owned track", () => {
+      setProviders({}, { currentTrack: { id: "lt-1" }, isPlaying: true });
+      renderRow(makeTrack({ inLibrary: true, localTrackId: "lt-1" }));
+      expect(screen.getByTestId("equalizer-bars")).toBeTruthy();
+    });
+
+    it("still shows (frozen) for the current owned track while paused", () => {
+      setProviders({}, { currentTrack: { id: "lt-1" }, isPlaying: false });
+      renderRow(makeTrack({ inLibrary: true, localTrackId: "lt-1" }));
+      expect(screen.getByTestId("equalizer-bars")).toBeTruthy();
+    });
+
+    it("shows while previewing an external track", () => {
+      setProviders({ previewingId: "rec-1" });
+      renderRow(makeTrack({ inLibrary: false }));
+      expect(screen.getByTestId("equalizer-bars")).toBeTruthy();
+    });
+
+    it("is absent for an idle row", () => {
+      renderRow(makeTrack({ inLibrary: true, localTrackId: "lt-1" }));
+      expect(screen.queryByTestId("equalizer-bars")).toBeNull();
+    });
+  });
+
+  describe("album context", () => {
+    function renderAlbumRow(track: TrackRowTrack) {
+      render(
+        <StaccatoThemeProvider>
+          <TrackRow track={track} album index={3} />
+        </StaccatoThemeProvider>,
+      );
+    }
+
+    it("hides the artwork and keeps the index", () => {
+      renderAlbumRow(makeTrack({ inLibrary: true, localTrackId: "lt-1" }));
+      expect(screen.queryByTestId("track-art")).toBeNull();
+      expect(screen.getByText("3")).toBeTruthy();
+    });
+
+    it("renders a non-functional more-options button", () => {
+      renderAlbumRow(makeTrack({ inLibrary: true, localTrackId: "lt-1" }));
+      expect(screen.getByLabelText("More options")).toBeTruthy();
+    });
+
+    it("still plays the owned track on a row tap", () => {
+      renderAlbumRow(makeTrack({ inLibrary: true, localTrackId: "lt-1" }));
+      fireEvent.press(screen.getByLabelText("Play"));
+      expect(playTracks).toHaveBeenCalledWith(["lt-1"], 0);
+    });
+  });
+
+  it("shows artwork and no more-options button outside album context", () => {
+    renderRow(makeTrack({ inLibrary: true, localTrackId: "lt-1" }));
+    expect(screen.getByTestId("track-art")).toBeTruthy();
+    expect(screen.queryByLabelText("More options")).toBeNull();
   });
 });
