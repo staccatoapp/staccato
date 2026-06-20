@@ -5,8 +5,8 @@
   "private": true,
   "scripts": {
     "build": "vitepress build",
-    "dev": "vitepress dev",
-    "dev:remote": "vitepress dev --host",
+    "dev": "vitepress dev --port 5175",
+    "dev:remote": "vitepress dev --port 5175 --host",
     "lint": "eslint src/ --max-warnings=0 && prettier --check src/ --ignore-path ../../.prettierignore",
     "lint:fix": "eslint src/ --max-warnings=0 --fix && prettier --write src/ --ignore-path ../../.prettierignore",
     "preview": "vitepress preview"
