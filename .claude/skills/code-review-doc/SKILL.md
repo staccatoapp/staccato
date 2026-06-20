@@ -72,6 +72,8 @@ State the chosen filename and id prefix to the user before writing. They're chea
 
 Invoke the `code-review` skill (`/code-review`) at the chosen effort over the chosen scope. Let it do the actual finding-hunting — this skill owns the *document*, not the review methodology. Capture its full output: correctness/bug findings and the reuse/simplification/efficiency cleanups it surfaces.
 
+**Match machinery to diff size — don't auto-fan-out.** `code-review` at `high`+ *defaults* to dispatching ~8 finder subagents, but that's the wrong reflex for a tight, self-contained diff: each subagent starts cold and re-derives context you already hold, and it conflicts with the standing "don't spawn agents unless asked" guidance. For a small or single-area diff (roughly: a handful of files in one app/package, where you can hold the whole change in your head), **trace the hunks directly yourself** — read each hunk, then the enclosing function and the contracts it touches (callers, callees, schemas). Reserve the parallel-subagent fan-out for genuinely large or cross-cutting diffs where no single pass can cover the surface. Either way the *output* is the same finding set; only the machinery differs.
+
 If the review comes back clean (no findings), don't write an empty doc — tell the user the diff is clean and stop.
 
 ### Phase 4 — Transform findings into the document
@@ -171,5 +173,5 @@ Tell the user: the path written, the finding count by severity, the id prefix us
 ## Field Notes
 
 - **Confirming the name means state-and-continue, not stop-and-wait.** For a mechanically derived slug, state the filename + prefix and proceed; only prompt when it's genuinely ambiguous (detached HEAD, no clean subject).
-- **Match machinery to diff size.** For a tight diff, tracing hunks directly beats fanning out finder subagents.
+- **Match machinery to diff size.** For a tight diff, tracing hunks directly beats fanning out finder subagents — and `code-review`'s `high`+ default *is* to fan out, so this is an active override, not a no-op. See Phase 3.
 - **Read the contracts a change touches.** Key-prefix mismatches and broken call contracts surface from the callees, not the diff alone.

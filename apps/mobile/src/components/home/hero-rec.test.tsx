@@ -6,6 +6,13 @@ import { StaccatoThemeProvider } from "@/theme";
 
 import { HeroRec } from "./hero-rec";
 
+// HeroRec now renders artwork via AlbumArt → StaccatoImage, which reads the session.
+jest.mock("@/lib/session", () => ({
+  useSession: () => ({
+    session: { serverUrl: "https://music.example.com", token: "tok" },
+  }),
+}));
+
 const playlist: HomeRecPlaylist = {
   id: "rp1",
   name: "Songs for Night Drives",
@@ -15,10 +22,10 @@ const playlist: HomeRecPlaylist = {
   artUrl: null,
 };
 
-function renderHero(onPlay?: () => void) {
+function renderHero(onPress?: () => void) {
   return render(
     <StaccatoThemeProvider>
-      <HeroRec playlist={playlist} onPlay={onPlay} />
+      <HeroRec playlist={playlist} onPress={onPress} />
     </StaccatoThemeProvider>,
   );
 }
@@ -38,10 +45,12 @@ describe("HeroRec", () => {
     ).toBeOnTheScreen();
   });
 
-  it("fires onPlay when the play button is pressed", () => {
-    const onPlay = jest.fn();
-    renderHero(onPlay);
-    fireEvent.press(screen.getByRole("button", { name: "Play" }));
-    expect(onPlay).toHaveBeenCalledTimes(1);
+  it("fires onPress when the card is pressed", () => {
+    const onPress = jest.fn();
+    renderHero(onPress);
+    fireEvent.press(
+      screen.getByRole("button", { name: "Songs for Night Drives" }),
+    );
+    expect(onPress).toHaveBeenCalledTimes(1);
   });
 });

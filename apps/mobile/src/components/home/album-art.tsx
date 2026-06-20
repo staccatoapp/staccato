@@ -17,6 +17,11 @@ interface AlbumArtProps {
   artUrls?: string[];
   /** Square side length in pt. */
   size?: number;
+  /**
+   * Fill the parent container instead of rendering a fixed `size` square — used
+   * by the wide Home hero. Pass an explicit `glyphSize` when filling.
+   */
+  fill?: boolean;
   /** Corner radius in pt. */
   radius?: number;
   /** Music glyph size; defaults to 28% of the art size. */
@@ -35,6 +40,7 @@ export function AlbumArt({
   artUrl,
   artUrls,
   size = 120,
+  fill = false,
   radius = 10,
   glyphSize,
   style,
@@ -68,7 +74,16 @@ export function AlbumArt({
       testID="album-art"
       style={[
         styles.root,
-        { width: size, height: size, borderRadius: radius },
+        fill
+          ? {
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              borderRadius: radius,
+            }
+          : { width: size, height: size, borderRadius: radius },
         style,
       ]}
     >

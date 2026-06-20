@@ -24,6 +24,8 @@ export interface HomeMix {
   subtitle: string;
   gradientKey: GradientKey;
   artUrl: string | null;
+  /** Up to 4 unique track cover arts; 4 render as a mosaic, fewer fall back to `artUrl`. */
+  artUrls?: string[];
 }
 
 export interface HomeRecPlaylist {
@@ -33,4 +35,6 @@ export interface HomeRecPlaylist {
   artistSummary: string;
   gradientKey: GradientKey;
   artUrl: string | null;
+  /** Up to 4 unique track cover arts; 4 render as a mosaic, fewer fall back to `artUrl`. */
+  artUrls?: string[];
 }

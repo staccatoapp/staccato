@@ -13,6 +13,7 @@ import {
   type HomeRecPlaylist,
 } from "@/lib/home-types";
 import { pickGradient } from "@/lib/gradient";
+import { mosaicArtFromTracks } from "@/lib/mosaic-art";
 import { useContentBottomInset } from "@/lib/player-layout";
 import { useTheme } from "@/theme";
 
@@ -50,6 +51,7 @@ export default function HomeScreen() {
     subtitle: p.description ?? "",
     gradientKey: pickGradient(p.id),
     artUrl: p.coverArtUrl ?? null,
+    artUrls: mosaicArtFromTracks(p.tracks),
   }));
 
   const firstRec = recReady[0];
@@ -61,8 +63,26 @@ export default function HomeScreen() {
         artistSummary: deriveArtistSummary(firstRec.tracks),
         gradientKey: pickGradient(firstRec.id),
         artUrl: firstRec.coverArtUrl ?? null,
+        artUrls: mosaicArtFromTracks(firstRec.tracks),
       }
     : null;
+
+  // Recommended playlists (hero + "Made for you") push the recommended-mode
+  // playlist route; in-library playlists ("Your playlists") push the in-library
+  // one. Both stack within the Home tab so the native tab bar stays visible.
+  const openRecPlaylist = (id: string) => {
+    router.push({
+      pathname: "/(protected)/(home)/rec-playlist/[playlistKey]",
+      params: { playlistKey: id },
+    });
+  };
+
+  const openPlaylist = (id: string) => {
+    router.push({
+      pathname: "/(protected)/(home)/playlist/[playlistKey]",
+      params: { playlistKey: id },
+    });
+  };
 
   // The recently-played grid now spans both albums and playlists; tapping a tile
   // opens its detail screen within the Home tab stack.
@@ -87,10 +107,30 @@ export default function HomeScreen() {
       showsVerticalScrollIndicator={false}
       contentContainerStyle={[styles.content, { paddingBottom: bottomInset }]}
     >
-      {recPlaylist && <HeroRec playlist={recPlaylist} />}
+      {recPlaylist && (
+        <HeroRec
+          playlist={recPlaylist}
+          onPress={() => openRecPlaylist(recPlaylist.id)}
+        />
+      )}
       <QuickStartGrid items={recentlyPlayed} onPress={openRecentlyPlayed} />
-      <Carousel title="Made for you" items={mixes} />
-      <Carousel title="Your playlists" items={playlists} />
+      <Carousel
+        title="Made for you"
+        items={mixes}
+        onPressItem={(item) => openRecPlaylist(item.id)}
+        onSeeAll={() => router.navigate("/(protected)/explore")}
+      />
+      <Carousel
+        title="Your playlists"
+        items={playlists}
+        onPressItem={(item) => openPlaylist(item.id)}
+        onSeeAll={() =>
+          router.navigate({
+            pathname: "/(protected)/library",
+            params: { tab: "playlists" },
+          })
+        }
+      />
     </ScrollView>
   );
 }

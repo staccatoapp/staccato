@@ -2,6 +2,7 @@ import {
   isSortKeyValidForTab,
   resolveAlbumSort,
   resolveArtistSort,
+  resolveInitialTab,
   resolvePlaylistSort,
   sortOptionsForTab,
 } from "./library-sort";
@@ -62,5 +63,19 @@ describe("resolvePlaylistSort", () => {
     expect(resolvePlaylistSort("createdAt")).toBe("createdAt");
     expect(resolvePlaylistSort("artist")).toBe("createdAt");
     expect(resolvePlaylistSort("year")).toBe("createdAt");
+  });
+});
+
+describe("resolveInitialTab", () => {
+  it("returns a valid tab param unchanged", () => {
+    expect(resolveInitialTab("playlists")).toBe("playlists");
+    expect(resolveInitialTab("artists")).toBe("artists");
+    expect(resolveInitialTab("albums")).toBe("albums");
+  });
+
+  it("defaults to albums for missing or unknown params", () => {
+    expect(resolveInitialTab(undefined)).toBe("albums");
+    expect(resolveInitialTab("")).toBe("albums");
+    expect(resolveInitialTab("nonsense")).toBe("albums");
   });
 });

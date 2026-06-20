@@ -12,7 +12,7 @@ import { StaccatoThemeProvider } from "@/theme";
 import HomeScreen from "./index";
 
 jest.mock("expo-router", () => ({
-  router: { push: jest.fn(), back: jest.fn() },
+  router: { push: jest.fn(), navigate: jest.fn(), back: jest.fn() },
 }));
 
 const mockUsePlaylists = jest.fn();
@@ -153,6 +153,42 @@ describe("HomeScreen", () => {
     expect(router.push).toHaveBeenCalledWith({
       pathname: "/(protected)/(home)/playlist/[playlistKey]",
       params: { playlistKey: "pl-9" },
+    });
+  });
+
+  it("opens the recommended playlist within the Home tab when the hero is pressed", () => {
+    renderHome();
+    // The hero and the Made-for-you card share the playlist's accessible name;
+    // the hero renders first.
+    fireEvent.press(screen.getAllByLabelText("Songs for Night Drives")[0]!);
+    expect(router.push).toHaveBeenCalledWith({
+      pathname: "/(protected)/(home)/rec-playlist/[playlistKey]",
+      params: { playlistKey: "rp1" },
+    });
+  });
+
+  it("opens the in-library playlist when a Your-playlists card is pressed", () => {
+    renderHome();
+    fireEvent.press(screen.getByLabelText("Morning Chill"));
+    expect(router.push).toHaveBeenCalledWith({
+      pathname: "/(protected)/(home)/playlist/[playlistKey]",
+      params: { playlistKey: "p1" },
+    });
+  });
+
+  it("routes See all on Made for you to the Explore tab", () => {
+    renderHome();
+    // Two "See all" buttons render; Made-for-you is first.
+    fireEvent.press(screen.getAllByText("See all")[0]!);
+    expect(router.navigate).toHaveBeenCalledWith("/(protected)/explore");
+  });
+
+  it("routes See all on Your playlists to the Library playlists tab", () => {
+    renderHome();
+    fireEvent.press(screen.getAllByText("See all")[1]!);
+    expect(router.navigate).toHaveBeenCalledWith({
+      pathname: "/(protected)/library",
+      params: { tab: "playlists" },
     });
   });
 

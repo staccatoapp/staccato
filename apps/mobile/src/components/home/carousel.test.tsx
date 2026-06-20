@@ -60,6 +60,21 @@ describe("Carousel", () => {
     fireEvent.press(screen.getByText("See all"));
     expect(onSeeAll).toHaveBeenCalledTimes(1);
   });
+
+  it("calls onPressItem with the tapped item", () => {
+    const onPressItem = jest.fn();
+    render(
+      <StaccatoThemeProvider>
+        <Carousel
+          title="Made for you"
+          items={[album, mix, playlist]}
+          onPressItem={onPressItem}
+        />
+      </StaccatoThemeProvider>,
+    );
+    fireEvent.press(screen.getByLabelText("Discover Weekly"));
+    expect(onPressItem).toHaveBeenCalledWith(mix);
+  });
 });
 
 describe("CarouselCard", () => {

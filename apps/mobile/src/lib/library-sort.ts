@@ -15,6 +15,19 @@ export const LIBRARY_SORT_OPTIONS: { id: LibrarySortKey; label: string }[] = [
 
 export type LibraryTab = "albums" | "artists" | "playlists";
 
+const LIBRARY_TABS: LibraryTab[] = ["albums", "artists", "playlists"];
+
+/**
+ * The tab to open the Library on, from an optional `tab` navigation param (e.g.
+ * "See all" on Home's playlists carousel deep-links to `playlists`). Unknown or
+ * missing values default to `albums`.
+ */
+export function resolveInitialTab(param: string | undefined): LibraryTab {
+  return LIBRARY_TABS.includes(param as LibraryTab)
+    ? (param as LibraryTab)
+    : "albums";
+}
+
 /**
  * Which sort keys each tab actually supports. Albums sort by all four; artists
  * and playlists only by recently-added and title (their backends have no

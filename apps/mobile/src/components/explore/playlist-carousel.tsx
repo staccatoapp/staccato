@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AlbumArt } from "@/components/home/album-art";
 import { pickGradient } from "@/lib/gradient";
+import { mosaicArtFromTracks } from "@/lib/mosaic-art";
 import { useTheme } from "@/theme";
 
 import { SectionHeader } from "./section-header";
@@ -72,6 +73,7 @@ function PlaylistCard({
       <AlbumArt
         gradientKey={pickGradient(playlist.id)}
         artUrl={playlist.coverArtUrl}
+        artUrls={mosaicArtFromTracks(playlist.tracks)}
         size={CARD_SIZE}
         radius={12}
       />

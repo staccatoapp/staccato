@@ -18,6 +18,7 @@ interface CarouselProps {
   title: string;
   items: CarouselItem[];
   onSeeAll?: () => void;
+  onPressItem?: (item: CarouselItem) => void;
 }
 
 interface CarouselCardProps {
@@ -26,7 +27,12 @@ interface CarouselCardProps {
 }
 
 /** Horizontally snap-scrolling section with a title header. */
-export function Carousel({ title, items, onSeeAll }: CarouselProps) {
+export function Carousel({
+  title,
+  items,
+  onSeeAll,
+  onPressItem,
+}: CarouselProps) {
   const { colors, spacing, typography } = useTheme();
 
   return (
@@ -68,7 +74,11 @@ export function Carousel({ title, items, onSeeAll }: CarouselProps) {
         ]}
       >
         {items.map((item) => (
-          <CarouselCard key={item.id} item={item} />
+          <CarouselCard
+            key={item.id}
+            item={item}
+            onPress={onPressItem ? () => onPressItem(item) : undefined}
+          />
         ))}
       </ScrollView>
     </View>
@@ -90,10 +100,15 @@ export function CarouselCard({ item, onPress }: CarouselCardProps) {
   const { colors, radius, typography } = useTheme();
 
   return (
-    <Pressable onPress={onPress} style={styles.card}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={cardTitle(item)}
+      onPress={onPress}
+      style={styles.card}
+    >
       <AlbumArt
         gradientKey={item.gradientKey}
-        artUrl={"artUrls" in item ? undefined : item.artUrl}
+        artUrl={"artUrl" in item ? item.artUrl : undefined}
         artUrls={"artUrls" in item ? item.artUrls : undefined}
         size={CARD_WIDTH}
         radius={radius.carouselArt}

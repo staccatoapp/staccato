@@ -3,7 +3,7 @@ import {
   type Artist,
   type PlaylistListItem,
 } from "@staccato/shared";
-import { router } from "expo-router";
+import { router, useGlobalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   FlatList,
@@ -29,6 +29,7 @@ import {
   isSortKeyValidForTab,
   resolveAlbumSort,
   resolveArtistSort,
+  resolveInitialTab,
   resolvePlaylistSort,
   sortOptionsForTab,
   type LibrarySortKey,
@@ -46,10 +47,31 @@ export default function LibraryScreen() {
   const bottomInset = useContentBottomInset({ tabBarAutoInset: true });
   const columnWidth = Math.floor((width - SCREEN_PADDING * 2 - GRID_GAP) / 2);
 
-  const [tab, setTab] = useState<LibraryTab>("albums");
+  // "See all" on Home's playlists carousel deep-links here with `?tab=playlists`.
+  // Use the *global* params hook: the Library tab is often already mounted (just
+  // unfocused), and useLocalSearchParams only updates while focused, so it would
+  // miss the new param. useGlobalSearchParams updates regardless of focus.
+  const { tab: tabParam } = useGlobalSearchParams<{ tab?: string }>();
+  const [tab, setTab] = useState<LibraryTab>(() => resolveInitialTab(tabParam));
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [sortKey, setSortKey] = useState<LibrarySortKey>("createdAt");
+
+  // Apply the `tab` param (adjusting state during render — React's recommended
+  // alternative to a syncing effect), then clear it below so a *repeat* "See all"
+  // tap (e.g. after the user manually switched tabs) is seen as a fresh change.
+  const [prevTabParam, setPrevTabParam] = useState(tabParam);
+  if (tabParam !== prevTabParam) {
+    setPrevTabParam(tabParam);
+    if (tabParam) setTab(resolveInitialTab(tabParam));
+  }
+
+  // Consume the one-shot param once applied. This is a navigation call (not a
+  // setState), so it doesn't fall foul of the no-setState-in-effect rule, and it
+  // resets the URL so an identical later navigation re-triggers the change above.
+  useEffect(() => {
+    if (tabParam) router.setParams({ tab: undefined });
+  }, [tabParam]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(query), 300);

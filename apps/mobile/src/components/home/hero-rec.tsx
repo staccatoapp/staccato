@@ -1,20 +1,24 @@
-import { Gradients } from "@staccato/shared";
-import { Play, Sparkles } from "lucide-react-native";
+import { Sparkles } from "lucide-react-native";
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { AlbumArt } from "@/components/home/album-art";
 import { type HomeRecPlaylist } from "@/lib/home-types";
 import { useTheme } from "@/theme";
 
 interface HeroRecProps {
   playlist: HomeRecPlaylist;
-  onPlay?: () => void;
+  onPress?: () => void;
 }
 
-/** Full-width hero card for the recommended playlist. */
-export function HeroRec({ playlist, onPlay }: HeroRecProps) {
+/**
+ * Full-width hero card for the recommended playlist. Shows a large version of
+ * the playlist's cover art (a 2x2 mosaic when 4+ unique track arts exist), only
+ * falling back to the gradient placeholder when no artwork is present. The whole
+ * card is pressable and links to the playlist.
+ */
+export function HeroRec({ playlist, onPress }: HeroRecProps) {
   const { colors, radius, spacing, typography } = useTheme();
-  const [from, to] = Gradients[playlist.gradientKey];
 
   return (
     <View
@@ -32,15 +36,23 @@ export function HeroRec({ playlist, onPlay }: HeroRecProps) {
         </Text>
       </View>
 
-      <View
-        style={[
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={playlist.name}
+        onPress={onPress}
+        style={({ pressed }) => [
           styles.card,
-          {
-            borderRadius: radius.heroCard,
-            experimental_backgroundImage: `linear-gradient(135deg, ${from}, ${to})`,
-          },
+          { borderRadius: radius.heroCard, opacity: pressed ? 0.92 : 1 },
         ]}
       >
+        <AlbumArt
+          fill
+          gradientKey={playlist.gradientKey}
+          artUrl={playlist.artUrl}
+          artUrls={playlist.artUrls}
+          radius={radius.heroCard}
+          glyphSize={48}
+        />
         <View style={[StyleSheet.absoluteFill, styles.overlay]} />
 
         <View style={styles.bottomRow}>
@@ -64,20 +76,8 @@ export function HeroRec({ playlist, onPlay }: HeroRecProps) {
               {playlist.artistSummary}
             </Text>
           </View>
-
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Play"
-            onPress={onPlay}
-            style={({ pressed }) => [
-              styles.playButton,
-              { backgroundColor: pressed ? colors.primaryDim : colors.primary },
-            ]}
-          >
-            <Play size={22} color="#fff" fill="#fff" style={styles.playIcon} />
-          </Pressable>
         </View>
-      </View>
+      </Pressable>
     </View>
   );
 }
@@ -112,10 +112,6 @@ const styles = StyleSheet.create({
     left: 16,
     right: 16,
     bottom: 14,
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    gap: 12,
   },
   textBlock: {
     flexShrink: 1,
@@ -138,17 +134,5 @@ const styles = StyleSheet.create({
   artists: {
     fontSize: 13,
     color: "rgba(255,255,255,0.8)",
-  },
-  playButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-    boxShadow: "0 6px 16px rgba(0,0,0,0.35)",
-  },
-  playIcon: {
-    marginLeft: 2,
   },
 });
