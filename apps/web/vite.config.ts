@@ -15,8 +15,8 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      "/api": "http://localhost:8380",
-      "/metadata": "http://localhost:8380",
+      "/api": "http://localhost:8280",
+      "/metadata": "http://localhost:8280",
     },
     allowedHosts: ["christos-pc.rhino-panga.ts.net", "100.95.9.124"],
   },
