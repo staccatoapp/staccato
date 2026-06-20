@@ -9,7 +9,11 @@ import { StyleSheet, Text, View } from "react-native";
 import { DetailHeroLayout } from "@/components/detail-hero-layout";
 import { TrackRow } from "@/components/explore/track-row";
 import { pickGradient } from "@/lib/gradient";
-import { albumTrackRows, playableTrackIds } from "@/lib/album-view-model";
+import {
+  albumDownloadable,
+  albumTrackRows,
+  playableTrackIds,
+} from "@/lib/album-view-model";
 import { formatPlayerTime } from "@/lib/playback";
 import { usePlayback } from "@/providers/playback-provider";
 import { useTheme } from "@/theme";
@@ -39,6 +43,8 @@ export function AlbumDetail({
 
   const rows = useMemo(() => albumTrackRows(detail), [detail]);
   const playable = useMemo(() => playableTrackIds(detail), [detail]);
+  // Local albums own their tracks and are downloadable; external albums are not.
+  const downloadable = useMemo(() => albumDownloadable(detail), [detail]);
 
   // Stable per-album identity for gradient colour + rail exclusion. Local albums
   // key off their cuid id; external albums off the release-group MBID.
@@ -69,6 +75,7 @@ export function AlbumDetail({
           onPlay={onPlay}
           onShuffle={onShuffle}
           onRequest={onRequest}
+          downloadable={downloadable ?? undefined}
         />
       }
     >

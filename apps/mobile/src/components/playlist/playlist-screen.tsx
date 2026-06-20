@@ -7,7 +7,9 @@ import { Screen } from "@/components/ui/screen";
 import { Spinner } from "@/components/ui/spinner";
 import { usePlaylistDetail } from "@/hooks/use-playlist-detail";
 import { useRecommendedPlaylist } from "@/hooks/use-recommended-playlist";
+import type { DownloadableCollection } from "@/lib/downloadable";
 import {
+  playlistDownloadable,
   playlistViewFromLibrary,
   playlistViewFromRecommended,
   type PlaylistView,
@@ -53,15 +55,29 @@ function LibraryPlaylistScreen({ playlistKey }: { playlistKey: string }) {
     () => (data ? playlistViewFromLibrary(data) : undefined),
     [data],
   );
-  return <PlaylistBody view={view} isLoading={isLoading} isError={isError} />;
+  // Every track is owned, so an in-library playlist is downloadable for offline.
+  const downloadable = useMemo(
+    () => (data ? playlistDownloadable(data) : undefined),
+    [data],
+  );
+  return (
+    <PlaylistBody
+      view={view}
+      downloadable={downloadable}
+      isLoading={isLoading}
+      isError={isError}
+    />
+  );
 }
 
 function PlaylistBody({
   view,
+  downloadable,
   isLoading,
   isError,
 }: {
   view: PlaylistView | undefined;
+  downloadable?: DownloadableCollection;
   isLoading: boolean;
   isError: boolean;
 }) {
@@ -89,6 +105,7 @@ function PlaylistBody({
       ) : (
         <PlaylistDetail
           view={view}
+          downloadable={downloadable}
           onBack={() => router.back()}
           onRequestTrack={lidarrSheet.open}
           onAddAll={() => addAllSheet.open(view)}

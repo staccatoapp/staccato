@@ -22,6 +22,10 @@ App-global bottom sheets (opened imperatively from many screens, must float abov
 
 Call-site hooks (`useLidarrSheet`, `useAddAllSheet`) are drop-in replacements for the old context hooks: same `{ open, close }` shape, so consumers only changed their import. They select each action **individually** and assemble the returned object in the hook body.
 
+## Stores aren't only for sheets; Providers may read them imperatively
+
+`stores/downloads-store.ts` is a non-sheet store (offline-download status/progress + a `trackUris` map) — plain client state, so a store, not a Provider. A Provider that owns a native resource may still **read** a store without subscribing: `playback-provider` reads `useDownloadsStore.getState().trackUris[id]` inside its track-change effect to prefer a downloaded file, so it never re-renders on a download tick. Use `getState()` (not the hook) for these imperative one-shot reads inside effects/callbacks. See [[mobile-storage]].
+
 ## zustand v5 gotcha (load-bearing)
 
 zustand v5 dropped snapshot caching, so a selector that returns a **new object or array** every call (`(s) => ({ open, close })`, `(s) => [...]`) triggers an infinite render loop. Always select primitives or individual stable refs (actions are stable) and build any composite object in the hook body, outside the selector. The comment in `sheet-store.ts` guards this — don't "tidy" it back into an object selector.

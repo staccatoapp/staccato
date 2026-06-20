@@ -62,6 +62,7 @@ function libraryDetail(): PlaylistDetail {
     coverArtUrl: null,
     durationSeconds: 100 + n,
     trackNumber: n,
+    fileExtension: "flac",
     position: n - 1,
   });
   return {

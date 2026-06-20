@@ -311,6 +311,7 @@ describe("PlaylistTrackSchema", () => {
     coverArtUrl: null,
     durationSeconds: null,
     trackNumber: null,
+    fileExtension: null,
     position: 0,
   };
 

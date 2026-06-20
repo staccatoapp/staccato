@@ -1,3 +1,4 @@
+import path from "node:path";
 import {
   and,
   asc,
@@ -26,6 +27,19 @@ const resolvedTitle = sql<string>`COALESCE(${tracks.canonicalTitle}, ${tracks.ti
 const resolvedArtistName = sql<string>`COALESCE(${artists.canonicalName}, ${artists.name})`;
 const resolvedAlbumTitle = sql<string>`COALESCE(${albums.canonicalTitle}, ${albums.title})`;
 
+/**
+ * The container extension of a source audio file (lowercase, no dot), or null
+ * when the path carries none. This is the *real* container the file lives in —
+ * unlike `tracks.fileFormat`, which is a codec label (`vorbis`/`alac`/`aac`)
+ * unsuitable as a download filename extension. The `/stream` route serves bytes
+ * verbatim, so a download is a byte-for-byte copy and its correct extension is
+ * simply the source file's own. Derived in the query so the path itself is never
+ * exposed to clients.
+ */
+export function fileExtensionFromPath(filePath: string): string | null {
+  return path.extname(filePath).slice(1).toLowerCase() || null;
+}
+
 export function getTracksInAlbum(albumId: string) {
   return db
     .select({
@@ -35,11 +49,16 @@ export function getTracksInAlbum(albumId: string) {
       discNumber: tracks.discNumber,
       durationSeconds: tracks.durationSeconds,
       recordingMbid: tracks.musicbrainzId,
+      filePath: tracks.filePath,
     })
     .from(tracks)
     .where(eq(tracks.albumId, albumId))
     .orderBy(asc(tracks.discNumber), asc(tracks.trackNumber))
-    .all();
+    .all()
+    .map(({ filePath, ...rest }) => ({
+      ...rest,
+      fileExtension: fileExtensionFromPath(filePath),
+    }));
 }
 
 // The album's primary artist = the most-frequent lead among its resolved

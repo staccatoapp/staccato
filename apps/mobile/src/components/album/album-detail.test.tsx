@@ -56,6 +56,7 @@ function localDetail(): UnifiedAlbumDetail {
     discNumber: null,
     durationSeconds: 100 + n,
     recordingMbid: `rec-${n}`,
+    fileExtension: "flac",
     artists: [],
   });
   return {

@@ -183,6 +183,53 @@ describe("createBlobStore", () => {
     expect(fs.download).toHaveBeenCalledTimes(2); // gone -> re-downloaded
   });
 
+  it("uses the given extension for the cached filename", async () => {
+    const fs = makeFakeFs();
+    const store = createBlobStore(CONFIG, fs);
+
+    await store.ensure("k", "https://cdn/a.flac", { extension: "flac" });
+
+    expect(fs.downloadCalls[0]!.filename).toMatch(/\.flac$/);
+  });
+
+  it("defaults the filename extension to jpg", async () => {
+    const fs = makeFakeFs();
+    const store = createBlobStore(CONFIG, fs);
+
+    await store.ensure("k", "https://cdn/a.jpg");
+
+    expect(fs.downloadCalls[0]!.filename).toMatch(/\.jpg$/);
+  });
+
+  it("uri returns the local uri for a present key without downloading", async () => {
+    const fs = makeFakeFs();
+    const store = createBlobStore(CONFIG, fs);
+    await store.ensure("k", "https://cdn/a.flac", { extension: "flac" });
+    const filename = fs.downloadCalls[0]!.filename;
+
+    const uri = await store.uri("k");
+
+    expect(uri).toBe(`file://blobs/${filename}`);
+    expect(fs.download).toHaveBeenCalledTimes(1); // no extra download
+  });
+
+  it("uri returns null for an unknown key", async () => {
+    const fs = makeFakeFs();
+    const store = createBlobStore(CONFIG, fs);
+
+    expect(await store.uri("missing")).toBeNull();
+    expect(fs.download).not.toHaveBeenCalled();
+  });
+
+  it("uri returns null when the indexed file is gone from disk", async () => {
+    const fs = makeFakeFs();
+    const store = createBlobStore(CONFIG, fs);
+    await store.ensure("k", "https://cdn/a.jpg");
+    fs.disk.clear(); // OS reclaimed the file
+
+    expect(await store.uri("k")).toBeNull();
+  });
+
   it("clear removes every cached file", async () => {
     const fs = makeFakeFs();
     const store = createBlobStore(CONFIG, fs);

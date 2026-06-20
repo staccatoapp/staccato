@@ -62,7 +62,7 @@ Record the exact scope phrase you used — it goes verbatim into the doc header 
 
 ### Phase 2 — Derive names, then confirm
 
-- **Slug:** the branch name with any `user/` prefix stripped (`chrisanicolaou/mobile-explore-page` → `mobile-explore-page`). On a detached/working-tree review with no useful branch, derive a short slug from the subject of the change and ask if unsure.
+- **Slug:** the branch name with any `user/` prefix stripped (`chrisanicolaou/mobile-explore-page` → `mobile-explore-page`). On a detached/working-tree review with no useful branch — including a working-tree diff on the default branch (`main`) — the branch name is useless: derive the slug from the dominant new subsystem in the diff (`mobile-downloads`) and state-and-continue; only ask if it's genuinely ambiguous.
 - **Id prefix:** initials of the slug words, upper-cased (`mobile-explore-page` → `MEP`). Findings are then `MEP-1`, `MEP-2`, …
 - **Filename:** `docs/review/<slug>-DDMM.md`, where `DDMM` is today's day-then-month (e.g. 15 June → `1506`).
 
@@ -73,6 +73,8 @@ State the chosen filename and id prefix to the user before writing. They're chea
 Invoke the `code-review` skill (`/code-review`) at the chosen effort over the chosen scope. Let it do the actual finding-hunting — this skill owns the *document*, not the review methodology. Capture its full output: correctness/bug findings and the reuse/simplification/efficiency cleanups it surfaces.
 
 **Match machinery to diff size — don't auto-fan-out.** `code-review` at `high`+ *defaults* to dispatching ~8 finder subagents, but that's the wrong reflex for a tight, self-contained diff: each subagent starts cold and re-derives context you already hold, and it conflicts with the standing "don't spawn agents unless asked" guidance. For a small or single-area diff (roughly: a handful of files in one app/package, where you can hold the whole change in your head), **trace the hunks directly yourself** — read each hunk, then the enclosing function and the contracts it touches (callers, callees, schemas). Reserve the parallel-subagent fan-out for genuinely large or cross-cutting diffs where no single pass can cover the surface. Either way the *output* is the same finding set; only the machinery differs.
+
+Run down suspected findings to confirm or kill them before they reach the doc — verifying a *negative* (the theme key does exist, the type does match) is part of tracing, not wasted effort. The doc carries only confirmed issues.
 
 If the review comes back clean (no findings), don't write an empty doc — tell the user the diff is clean and stop.
 

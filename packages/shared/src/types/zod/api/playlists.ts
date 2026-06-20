@@ -33,6 +33,8 @@ export const PlaylistTrackSchema = z.object({
   coverArtUrl: z.string().nullable(),
   durationSeconds: z.number().nullable(),
   trackNumber: z.number().nullable(),
+  /** Source file extension (e.g. "mp3", "m4a") — the local download extension. */
+  fileExtension: z.string().nullable(),
   position: z.number(),
 });
 export type PlaylistTrack = z.infer<typeof PlaylistTrackSchema>;

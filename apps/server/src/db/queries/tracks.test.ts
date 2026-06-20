@@ -25,6 +25,7 @@ vi.mock("../../logger.js", () => ({
 import {
   deleteTrackById,
   getPlaybackTracksByIds,
+  getTracksInAlbum,
   markPendingRemovalByPaths,
 } from "./tracks.js";
 
@@ -99,6 +100,41 @@ describe("getPlaybackTracksByIds", () => {
     const ids = results.map((r) => r.id);
     expect(ids).toContain(withAlbum);
     expect(ids).toContain(withoutAlbum);
+  });
+});
+
+describe("getTracksInAlbum — fileExtension", () => {
+  it("derives the extension from the source file path, not the codec label", () => {
+    // The fixture stores fileFormat (codec) "flac", but the on-disk container
+    // is m4a — the download extension must follow the path so the OS can decode
+    // the byte-for-byte copy.
+    const artistId = seedArtist("Artist A");
+    const albumId = seedAlbum(artistId);
+    seedTrack(artistId, albumId, { filePath: "/music/song.m4a" });
+
+    const [track] = getTracksInAlbum(albumId);
+
+    expect(track?.fileExtension).toBe("m4a");
+  });
+
+  it("returns null when the source path has no extension", () => {
+    const artistId = seedArtist("Artist A");
+    const albumId = seedAlbum(artistId);
+    seedTrack(artistId, albumId, { filePath: "/music/noext" });
+
+    const [track] = getTracksInAlbum(albumId);
+
+    expect(track?.fileExtension).toBeNull();
+  });
+
+  it("does not leak the server file path", () => {
+    const artistId = seedArtist("Artist A");
+    const albumId = seedAlbum(artistId);
+    seedTrack(artistId, albumId, { filePath: "/music/song.mp3" });
+
+    const [track] = getTracksInAlbum(albumId);
+
+    expect(track).not.toHaveProperty("filePath");
   });
 });
 

@@ -1,6 +1,7 @@
 import type { UnifiedAlbumDetail } from "@staccato/shared";
 
 import {
+  albumDownloadable,
   albumDurationLabel,
   albumEyebrow,
   albumMetaLabel,
@@ -22,6 +23,7 @@ function localDetail(
       trackNumber: number | null;
       durationSeconds: number | null;
       recordingMbid: string | null;
+      fileExtension: string | null;
       artists: { name: string; joinPhrase: string | null; position: number }[];
     }[];
   }> = {},
@@ -33,6 +35,7 @@ function localDetail(
       trackNumber: 1,
       durationSeconds: 163,
       recordingMbid: "rec-1",
+      fileExtension: "flac",
       artists: [],
     },
     {
@@ -41,6 +44,7 @@ function localDetail(
       trackNumber: 2,
       durationSeconds: 254,
       recordingMbid: "rec-2",
+      fileExtension: "mp3",
       artists: [],
     },
   ];
@@ -66,6 +70,7 @@ function localDetail(
       discNumber: null,
       durationSeconds: t.durationSeconds,
       recordingMbid: t.recordingMbid,
+      fileExtension: t.fileExtension,
       artists: t.artists.map((a, i) => ({
         artistId: `ar-${i}`,
         name: a.name,
@@ -161,6 +166,7 @@ describe("durations", () => {
           trackNumber: 1,
           durationSeconds: 60,
           recordingMbid: "rec-1",
+          fileExtension: "flac",
           artists: [],
         },
       ],
@@ -221,6 +227,7 @@ describe("albumTrackRows", () => {
           trackNumber: 1,
           durationSeconds: 100,
           recordingMbid: "rec-1",
+          fileExtension: "flac",
           artists: [
             { name: "Stevie Nicks", joinPhrase: " & ", position: 0 },
             { name: "Lindsey Buckingham", joinPhrase: null, position: 1 },
@@ -246,5 +253,35 @@ describe("albumTrackRows", () => {
         subtitle: "",
       },
     });
+  });
+});
+
+describe("albumDownloadable", () => {
+  it("maps a local album's owned tracks with their formats", () => {
+    const detail = localDetail({ coverArtUrl: "http://art/r.jpg" });
+    const c = albumDownloadable(detail);
+    expect(c).toMatchObject({ id: "al-1", kind: "album", name: "Rumours" });
+    expect(c!.coverArtUrls).toEqual(["http://art/r.jpg"]);
+    expect(c!.tracks).toEqual([
+      {
+        trackId: "lt-1",
+        fileExtension: "flac",
+        coverArtUrl: "http://art/r.jpg",
+      },
+      {
+        trackId: "lt-2",
+        fileExtension: "mp3",
+        coverArtUrl: "http://art/r.jpg",
+      },
+    ]);
+    expect(c!.snapshot).toBe(detail);
+  });
+
+  it("returns no covers when the album has none", () => {
+    expect(albumDownloadable(localDetail())!.coverArtUrls).toEqual([]);
+  });
+
+  it("returns null for an external album (no owned audio)", () => {
+    expect(albumDownloadable(externalDetail())).toBeNull();
   });
 });

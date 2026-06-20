@@ -113,6 +113,8 @@ describe("GET /:id — detail shape", () => {
     const body = res.json();
     expect(body.coverArtUrls).toEqual([`url-${albumId}`]);
     expect(body.tracks[0]).toHaveProperty("recordingMbid");
+    // fileExtension is the local extension the offline-download feature needs.
+    expect(body.tracks[0].fileExtension).toBe("flac");
   });
 });
 

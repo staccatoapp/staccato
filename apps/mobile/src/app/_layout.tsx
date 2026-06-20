@@ -12,6 +12,7 @@ import { StaccatoToastHost } from "@/components/ui/staccato-toast";
 import { SessionProvider, useSession } from "@/lib/session";
 import { PlaybackProvider } from "@/providers/playback-provider";
 import { PreviewProvider } from "@/providers/preview-provider";
+import { useDownloadsStore } from "@/stores/downloads-store";
 import { StaccatoThemeProvider } from "@/theme";
 
 SplashScreen.preventAutoHideAsync();
@@ -21,6 +22,15 @@ export default function RootLayout() {
     SplashScreen.hideAsync().catch((err) =>
       console.warn("failed to hide splash screen", err),
     );
+  }, []);
+
+  // Restore the offline-download state from disk so the player can prefer local
+  // files and the hero buttons show "downloaded" before any interaction.
+  useEffect(() => {
+    useDownloadsStore
+      .getState()
+      .hydrate()
+      .catch((err) => console.warn("failed to hydrate downloads", err));
   }, []);
 
   return (

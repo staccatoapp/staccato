@@ -24,6 +24,7 @@ vi.mock("../../logger.js", () => ({
 import {
   addTrackToPlaylist,
   getMaxPlaylistTrackPosition,
+  getPlaylistTracks,
 } from "./playlists.js";
 
 let userId: string;
@@ -70,6 +71,39 @@ describe("addTrackToPlaylist — position assignment", () => {
       .all()
       .filter((r) => r.trackId === trackId);
     expect(rows).toHaveLength(2);
+  });
+});
+
+describe("getPlaylistTracks — fileExtension", () => {
+  it("derives the extension from the source file path, not the codec label", () => {
+    const trackId = seedTrack(artistId, albumId, {
+      filePath: "/music/song.m4a",
+    });
+    addTrackToPlaylist(playlistId, trackId, 0);
+
+    const [track] = getPlaylistTracks(playlistId);
+
+    expect(track?.fileExtension).toBe("m4a");
+  });
+
+  it("returns null when the source path has no extension", () => {
+    const trackId = seedTrack(artistId, albumId, { filePath: "/music/noext" });
+    addTrackToPlaylist(playlistId, trackId, 0);
+
+    const [track] = getPlaylistTracks(playlistId);
+
+    expect(track?.fileExtension).toBeNull();
+  });
+
+  it("does not leak the server file path", () => {
+    const trackId = seedTrack(artistId, albumId, {
+      filePath: "/music/song.mp3",
+    });
+    addTrackToPlaylist(playlistId, trackId, 0);
+
+    const [track] = getPlaylistTracks(playlistId);
+
+    expect(track).not.toHaveProperty("filePath");
   });
 });
 

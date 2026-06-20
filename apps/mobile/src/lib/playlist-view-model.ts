@@ -7,6 +7,7 @@ import type {
 
 import type { LidarrSubject } from "@/components/explore/add-album-sheet";
 import type { TrackRowTrack } from "@/components/explore/track-row";
+import type { DownloadableCollection } from "@/lib/downloadable";
 
 /**
  * Pure view-model helpers for the shared playlist-detail screen. Two sources
@@ -169,5 +170,27 @@ export function playlistViewFromLibrary(p: PlaylistDetail): PlaylistView {
     ),
     rows,
     playableTrackIds: p.tracks.map((t) => t.trackId),
+  };
+}
+
+/**
+ * Build the offline-download descriptor for an in-library playlist. Every track
+ * is owned, so all are downloadable; the raw detail is the persisted snapshot so
+ * the collection can be rendered offline later (Phase 2).
+ */
+export function playlistDownloadable(
+  p: PlaylistDetail,
+): DownloadableCollection {
+  return {
+    id: p.id,
+    kind: "playlist",
+    name: p.name,
+    coverArtUrls: p.coverArtUrls,
+    tracks: p.tracks.map((t) => ({
+      trackId: t.trackId,
+      fileExtension: t.fileExtension,
+      coverArtUrl: t.coverArtUrl,
+    })),
+    snapshot: p,
   };
 }

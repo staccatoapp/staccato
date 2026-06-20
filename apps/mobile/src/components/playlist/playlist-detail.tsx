@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { DetailHeroLayout } from "@/components/detail-hero-layout";
 import { type LidarrSubject } from "@/components/explore/add-album-sheet";
 import { TrackRow } from "@/components/explore/track-row";
+import type { DownloadableCollection } from "@/lib/downloadable";
 import { pickGradient } from "@/lib/gradient";
 import { formatPlayerTime } from "@/lib/playback";
 import { type PlaylistView } from "@/lib/playlist-view-model";
@@ -22,6 +23,8 @@ interface PlaylistDetailProps {
   onRequestTrack: (subject: LidarrSubject) => void;
   /** Open the (stub) "Add all to library" sheet (recommended playlists). */
   onAddAll: () => void;
+  /** Offline-download descriptor for an in-library playlist; absent otherwise. */
+  downloadable?: DownloadableCollection;
 }
 
 /** Composes the playlist hero, tracklist, and (in-library) suggested-tracks block. */
@@ -30,6 +33,7 @@ export function PlaylistDetail({
   onBack,
   onRequestTrack,
   onAddAll,
+  downloadable,
 }: PlaylistDetailProps) {
   const { colors, typography } = useTheme();
   const { playTracks } = usePlayback();
@@ -48,7 +52,14 @@ export function PlaylistDetail({
       title={view.name}
       gradientColors={Gradients[pickGradient(view.id)]}
       onBack={onBack}
-      hero={<PlaylistHero view={view} onPlay={onPlay} onAddAll={onAddAll} />}
+      hero={
+        <PlaylistHero
+          view={view}
+          onPlay={onPlay}
+          onAddAll={onAddAll}
+          downloadable={downloadable}
+        />
+      }
     >
       <View style={styles.tracklist}>
         <View style={[styles.card, { backgroundColor: colors.bgRaised }]}>

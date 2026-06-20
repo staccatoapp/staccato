@@ -7,6 +7,7 @@ import { playlistTracks } from "../schema/playlist-tracks.js";
 import { tracks } from "../schema/tracks.js";
 import { albums } from "../schema/albums.js";
 import { artists } from "../schema/artists.js";
+import { fileExtensionFromPath } from "./tracks.js";
 
 export type PlaylistRow = typeof playlists.$inferSelect;
 export type PlaylistInsert = typeof playlists.$inferInsert;
@@ -26,6 +27,7 @@ export type PlaylistTrackRow = {
   coverArtUrl: string | null;
   durationSeconds: number | null;
   trackNumber: number | null;
+  fileExtension: string | null;
   position: number;
 };
 
@@ -146,6 +148,7 @@ export function getPlaylistTracks(playlistId: string): PlaylistTrackRow[] {
       coverArtUrl: albums.coverArtUrl,
       durationSeconds: tracks.durationSeconds,
       trackNumber: tracks.trackNumber,
+      filePath: tracks.filePath,
       position: playlistTracks.position,
     })
     .from(playlistTracks)
@@ -154,7 +157,11 @@ export function getPlaylistTracks(playlistId: string): PlaylistTrackRow[] {
     .innerJoin(artists, eq(tracks.artistId, artists.id))
     .where(eq(playlistTracks.playlistId, playlistId))
     .orderBy(asc(playlistTracks.position))
-    .all();
+    .all()
+    .map(({ filePath, ...rest }) => ({
+      ...rest,
+      fileExtension: fileExtensionFromPath(filePath),
+    }));
 }
 
 export interface PlaylistSeedRow {

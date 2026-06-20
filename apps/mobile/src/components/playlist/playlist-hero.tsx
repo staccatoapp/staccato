@@ -10,7 +10,9 @@ import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { DownloadButton } from "@/components/downloads/download-button";
 import { AlbumArt } from "@/components/home/album-art";
+import type { DownloadableCollection } from "@/lib/downloadable";
 import { pickGradient } from "@/lib/gradient";
 import {
   playlistMetaLabel,
@@ -26,9 +28,16 @@ interface PlaylistHeroProps {
   onPlay: () => void;
   /** Open the (stub) "Add all to library" sheet (recommended only). */
   onAddAll: () => void;
+  /** Offline-download descriptor for an in-library playlist; absent otherwise. */
+  downloadable?: DownloadableCollection;
 }
 
-export function PlaylistHero({ view, onPlay, onAddAll }: PlaylistHeroProps) {
+export function PlaylistHero({
+  view,
+  onPlay,
+  onAddAll,
+  downloadable,
+}: PlaylistHeroProps) {
   const { colors, typography } = useTheme();
   const insets = useSafeAreaInsets();
   const recommended = view.mode === "recommended";
@@ -137,13 +146,9 @@ export function PlaylistHero({ view, onPlay, onAddAll }: PlaylistHeroProps) {
               >
                 <Shuffle size={20} color="#fff" strokeWidth={2.1} />
               </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Download"
-                style={styles.ghostCircle}
-              >
-                <Download size={20} color="#fff" strokeWidth={2} />
-              </Pressable>
+              {downloadable ? (
+                <DownloadButton collection={downloadable} />
+              ) : null}
               <View style={styles.spacer} />
               <Pressable
                 accessibilityRole="button"

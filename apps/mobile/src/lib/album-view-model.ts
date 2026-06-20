@@ -5,6 +5,7 @@ import type {
 } from "@staccato/shared";
 
 import type { TrackRowTrack } from "@/components/explore/track-row";
+import type { DownloadableCollection } from "@/lib/downloadable";
 
 /**
  * Pure view-model helpers for the album-detail screen. Availability is
@@ -133,6 +134,30 @@ export function albumTrackRows(detail: UnifiedAlbumDetail): AlbumTrackRow[] {
       artistName,
     },
   }));
+}
+
+/**
+ * Build the offline-download descriptor for a **local** album (owns its tracks),
+ * or null for an external one (no audio to download). The raw detail is the
+ * persisted snapshot for offline rendering (Phase 2).
+ */
+export function albumDownloadable(
+  detail: UnifiedAlbumDetail,
+): DownloadableCollection | null {
+  if (detail.source !== "local") return null;
+  const { coverArtUrl } = albumDisplay(detail);
+  return {
+    id: detail.album.id,
+    kind: "album",
+    name: detail.album.title,
+    coverArtUrls: coverArtUrl ? [coverArtUrl] : [],
+    tracks: detail.tracks.map((t) => ({
+      trackId: t.id,
+      fileExtension: t.fileExtension,
+      coverArtUrl,
+    })),
+    snapshot: detail,
+  };
 }
 
 /** Cover + display artist common to both album sources. */

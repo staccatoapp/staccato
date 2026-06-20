@@ -31,6 +31,7 @@ import {
 } from "@/lib/playback";
 import { useSession } from "@/lib/session";
 import { ensureArtworkFile } from "@/lib/storage/artwork-cache";
+import { useDownloadsStore } from "@/stores/downloads-store";
 
 /** Body of PUT /api/playback/session/state. */
 interface PlaybackStateUpdate {
@@ -150,10 +151,18 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     if (!track || !authSession) return;
 
     const position = session?.currentTrackPositionInSeconds ?? 0;
-    player.replace({
-      uri: `${authSession.serverUrl}/api/tracks/${track.id}/stream`,
-      headers: { Authorization: `Bearer ${authSession.token}` },
-    });
+    // Prefer a downloaded local file (no auth header needed) over streaming, so
+    // offline-saved tracks play without the network. Read the store imperatively
+    // so the player isn't a subscriber that re-renders on every download tick.
+    const localUri = useDownloadsStore.getState().trackUris[track.id];
+    player.replace(
+      localUri
+        ? { uri: localUri }
+        : {
+            uri: `${authSession.serverUrl}/api/tracks/${track.id}/stream`,
+            headers: { Authorization: `Bearer ${authSession.token}` },
+          },
+    );
     player.seekTo(position).catch((err) => {
       console.warn("failed to seek after track load", {
         trackId: track.id,

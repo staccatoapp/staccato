@@ -5,6 +5,7 @@ import type {
 } from "@staccato/shared";
 
 import {
+  playlistDownloadable,
   playlistDurationLabel,
   playlistMetaLabel,
   playlistViewFromLibrary,
@@ -61,6 +62,7 @@ function libraryDetail(): PlaylistDetail {
         coverArtUrl: "http://art/r.jpg",
         durationSeconds: 254,
         trackNumber: 1,
+        fileExtension: "flac",
         position: 0,
       },
       {
@@ -74,11 +76,30 @@ function libraryDetail(): PlaylistDetail {
         coverArtUrl: null,
         durationSeconds: 184,
         trackNumber: 2,
+        fileExtension: "mp3",
         position: 1,
       },
     ],
   };
 }
+
+describe("playlistDownloadable", () => {
+  it("maps every owned track with its file format and keeps the detail snapshot", () => {
+    const detail = libraryDetail();
+    const c = playlistDownloadable(detail);
+    expect(c).toMatchObject({
+      id: "pl-lib",
+      kind: "playlist",
+      name: "Morning Chill",
+    });
+    expect(c.coverArtUrls).toEqual(["http://art/a.jpg", "http://art/b.jpg"]);
+    expect(c.tracks).toEqual([
+      { trackId: "t1", fileExtension: "flac", coverArtUrl: "http://art/r.jpg" },
+      { trackId: "t2", fileExtension: "mp3", coverArtUrl: null },
+    ]);
+    expect(c.snapshot).toBe(detail);
+  });
+});
 
 describe("playlistDurationLabel", () => {
   it("formats minutes under an hour", () => {

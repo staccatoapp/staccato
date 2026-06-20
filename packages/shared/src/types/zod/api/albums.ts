@@ -13,6 +13,8 @@ export const UnifiedAlbumLocalTrackSchema = z.object({
   discNumber: z.number().nullable(),
   durationSeconds: z.number().nullable(),
   recordingMbid: z.string().nullable(),
+  /** Source file extension (e.g. "mp3", "m4a") — the local download extension. */
+  fileExtension: z.string().nullable(),
   artists: z.array(TrackArtistCreditSchema),
 });
 export type UnifiedAlbumLocalTrack = z.infer<typeof UnifiedAlbumLocalTrackSchema>;

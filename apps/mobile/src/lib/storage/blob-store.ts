@@ -40,12 +40,21 @@ export interface BlobStore {
   /**
    * Ensure the resource at `url` is cached locally under `key`, returning its
    * `file://` uri. Concurrent calls for the same key share one download.
+   * `opts.extension` sets the cached filename's extension (default `jpg`) —
+   * audio downloads pass the track's container format so the player can decode
+   * the local file, which carries no Content-Type.
    */
   ensure(
     key: string,
     url: string,
-    opts?: { headers?: Record<string, string> },
+    opts?: { headers?: Record<string, string>; extension?: string },
   ): Promise<string>;
+  /**
+   * The `file://` uri already cached under `key`, or null if absent. Unlike
+   * {@link ensure} this never downloads — used to look up a pinned download
+   * without fetching. Returns null if the index entry's file is gone from disk.
+   */
+  uri(key: string): Promise<string | null>;
   /** Remove a single cached entry (file + index). */
   remove(key: string): Promise<void>;
   /** Remove every cached entry and the persisted index. */
@@ -170,7 +179,7 @@ export function createBlobStore(
   async function doEnsure(
     key: string,
     url: string,
-    opts?: { headers?: Record<string, string> },
+    opts?: { headers?: Record<string, string>; extension?: string },
   ): Promise<string> {
     const current = await loadIndex();
     const existing = current[key];
@@ -181,7 +190,7 @@ export function createBlobStore(
     }
 
     await fs.ensureDir();
-    const filename = `${fnv1a(key)}.jpg`;
+    const filename = `${fnv1a(key)}.${opts?.extension ?? "jpg"}`;
     const bytes = await fs.download(url, filename, opts?.headers);
     current[key] = { filename, bytes, lastAccessedAt: Date.now() };
     evict(current);
@@ -198,6 +207,12 @@ export function createBlobStore(
       });
       inFlight.set(key, promise);
       return promise;
+    },
+    async uri(key) {
+      const current = await loadIndex();
+      const entry = current[key];
+      if (!entry || !fs.exists(entry.filename)) return null;
+      return fs.uriFor(entry.filename);
     },
     async remove(key) {
       const current = await loadIndex();

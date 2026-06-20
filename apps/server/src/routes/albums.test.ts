@@ -52,6 +52,7 @@ import {
   getAlbumById,
   getAlbumWithArtistDetails,
 } from "../db/queries/albums.js";
+import { getTracksInAlbum } from "../db/queries/tracks.js";
 import { applyAlbumEdit } from "../db/queries/album-edit.js";
 import { cacheCoverFromUrl } from "../coverart/store.js";
 
@@ -258,5 +259,36 @@ describe("GET /:albumKey stays public", () => {
     const res = await app.inject({ method: "GET", url: `/${ALBUM_ID}` });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ source: "local" });
+  });
+
+  it("exposes each local track's fileExtension (the offline download extension)", async () => {
+    asAdmin(false);
+    vi.mocked(getAlbumWithArtistDetails).mockReturnValue({
+      id: ALBUM_ID,
+      title: "Test Album",
+      artistId: "artist-1",
+      artistName: "Test Artist",
+      releaseYear: 2020,
+      releaseMbid: null,
+      releaseGroupMbid: null,
+      coverArtUrl: null,
+      confidenceScore: null,
+      pendingTrackCount: 0,
+    } as never);
+    vi.mocked(getTracksInAlbum).mockReturnValue([
+      {
+        id: "track-1",
+        title: "Song",
+        trackNumber: 1,
+        discNumber: 1,
+        durationSeconds: 180,
+        recordingMbid: null,
+        fileExtension: "flac",
+      },
+    ] as never);
+
+    const app = buildApp(albumRoutes);
+    const res = await app.inject({ method: "GET", url: `/${ALBUM_ID}` });
+    expect(res.json().tracks[0].fileExtension).toBe("flac");
   });
 });

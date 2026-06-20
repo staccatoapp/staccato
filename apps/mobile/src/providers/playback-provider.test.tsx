@@ -4,6 +4,7 @@ import React from "react";
 import type { PlaybackSession } from "@staccato/shared";
 
 import { createApiClient, type ApiClient } from "@/lib/api-client";
+import { useDownloadsStore } from "@/stores/downloads-store";
 import { PlaybackProvider, usePlayback } from "./playback-provider";
 
 jest.mock("@/lib/api-client", () => {
@@ -100,6 +101,7 @@ function clientWith(): ApiClient {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  useDownloadsStore.setState({ collections: {}, trackUris: {} });
   mockEnsureArtworkFile.mockResolvedValue(null);
   mockPlayer.currentTime = 0;
   mockPlayer.seekTo.mockResolvedValue(undefined);
@@ -144,6 +146,21 @@ describe("PlaybackProvider", () => {
     });
     expect(mockPlayer.seekTo).toHaveBeenCalledWith(42);
     expect(mockPlayer.play).not.toHaveBeenCalled();
+  });
+
+  it("plays a downloaded track from its local file without auth headers", async () => {
+    useDownloadsStore.setState({
+      trackUris: { t2: "file://downloads/t2.flac" },
+    });
+
+    await renderPlayback();
+
+    expect(mockPlayer.replace).toHaveBeenCalledWith({
+      uri: "file://downloads/t2.flac",
+    });
+    expect(mockPlayer.replace).not.toHaveBeenCalledWith(
+      expect.objectContaining({ headers: expect.anything() }),
+    );
   });
 
   it("starts playback when the session says it is playing", async () => {
