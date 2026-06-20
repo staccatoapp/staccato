@@ -6,11 +6,10 @@ import { useEffect, type ReactNode } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { PlayerOverlayRoot } from "@/components/player-overlay";
+import { GlobalSheetHost } from "@/components/sheets/global-sheet-host";
 import { SplashView } from "@/components/splash-view";
 import { StaccatoToastHost } from "@/components/ui/staccato-toast";
 import { SessionProvider, useSession } from "@/lib/session";
-import { AddAllSheetProvider } from "@/providers/add-all-sheet-provider";
-import { LidarrSheetProvider } from "@/providers/lidarr-sheet-provider";
 import { PlaybackProvider } from "@/providers/playback-provider";
 import { PreviewProvider } from "@/providers/preview-provider";
 import { StaccatoThemeProvider } from "@/theme";
@@ -34,14 +33,13 @@ export default function RootLayout() {
               state, while the overlay stays an absolute sibling that floats over
               the native tab bar. */}
           <PlaybackRoot>
-            <LidarrSheetProvider>
-              <AddAllSheetProvider>
-                <RootNavigator />
-                <PlayerOverlayRoot />
-                {/* Mounted last so toasts float above the player overlay. */}
-                <StaccatoToastHost />
-              </AddAllSheetProvider>
-            </LidarrSheetProvider>
+            <RootNavigator />
+            <PlayerOverlayRoot />
+            {/* Global bottom sheets (Lidarr request, add-all): flat siblings
+                driven by the sheet store, no provider nesting. */}
+            <GlobalSheetHost />
+            {/* Mounted last so toasts float above the player overlay. */}
+            <StaccatoToastHost />
           </PlaybackRoot>
         </StaccatoThemeProvider>
       </SessionProvider>

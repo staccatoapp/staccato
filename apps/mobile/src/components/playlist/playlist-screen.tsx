@@ -2,8 +2,6 @@ import { router, useLocalSearchParams } from "expo-router";
 import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-import { useLidarrSheet } from "@/providers/lidarr-sheet-provider";
-import { useAddAllSheet } from "@/providers/add-all-sheet-provider";
 import { PlaylistDetail } from "@/components/playlist/playlist-detail";
 import { Screen } from "@/components/ui/screen";
 import { Spinner } from "@/components/ui/spinner";
@@ -14,6 +12,7 @@ import {
   playlistViewFromRecommended,
   type PlaylistView,
 } from "@/lib/playlist-view-model";
+import { useAddAllSheet, useLidarrSheet } from "@/stores/sheet-store";
 import { useTheme } from "@/theme";
 
 /**

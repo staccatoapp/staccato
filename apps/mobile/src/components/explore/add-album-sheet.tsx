@@ -111,7 +111,7 @@ interface AddAlbumSheetProps {
 
 /**
  * Bottom sheet that queues a Lidarr download request for an album. Provided
- * globally via LidarrSheetProvider so it renders above all other overlays.
+ * via the sheet store + GlobalSheetHost so it renders above all other overlays.
  */
 export function AddAlbumSheet({ subject, onClose }: AddAlbumSheetProps) {
   const request = useRequestDownload();

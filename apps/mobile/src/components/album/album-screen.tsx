@@ -4,10 +4,10 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { AlbumDetail } from "@/components/album/album-detail";
 import { subjectFromAlbumDetail } from "@/components/explore/add-album-sheet";
-import { useLidarrSheet } from "@/providers/lidarr-sheet-provider";
 import { Screen } from "@/components/ui/screen";
 import { Spinner } from "@/components/ui/spinner";
 import { useAlbumDetail } from "@/hooks/use-album-detail";
+import { useLidarrSheet } from "@/stores/sheet-store";
 import { useTheme } from "@/theme";
 
 /**

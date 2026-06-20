@@ -2,7 +2,6 @@ import { router } from "expo-router";
 import React, { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { useLidarrSheet } from "@/providers/lidarr-sheet-provider";
 import { PlaylistCarousel } from "@/components/explore/playlist-carousel";
 import { RecTrackRow } from "@/components/explore/rec-track-row";
 import { SearchResultsView } from "@/components/explore/search-results-view";
@@ -14,6 +13,7 @@ import { useExternalSearch } from "@/hooks/use-external-search";
 import { useRecommendedPlaylists } from "@/hooks/use-recommended-playlists";
 import { useRecommendedTracks } from "@/hooks/use-recommended-tracks";
 import { useContentBottomInset } from "@/lib/player-layout";
+import { useLidarrSheet } from "@/stores/sheet-store";
 import { useTheme } from "@/theme";
 
 export default function ExploreScreen() {

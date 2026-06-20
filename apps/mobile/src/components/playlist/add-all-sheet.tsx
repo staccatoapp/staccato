@@ -14,7 +14,7 @@ interface AddAllSheetProps {
 
 /**
  * "Add all to library" bottom sheet for a recommended playlist. Provided
- * globally via AddAllSheetProvider so it renders above all other overlays.
+ * via the sheet store + GlobalSheetHost so it renders above all other overlays.
  * The CTA is a visual stub — no bulk-request endpoint exists yet.
  */
 export function AddAllSheet({ view, onClose }: AddAllSheetProps) {
