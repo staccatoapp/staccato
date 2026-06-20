@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { PlayerOverlayRoot } from "@/components/player-overlay";
 import { SplashView } from "@/components/splash-view";
+import { StaccatoToastHost } from "@/components/ui/staccato-toast";
 import { SessionProvider, useSession } from "@/lib/session";
 import { AddAllSheetProvider } from "@/providers/add-all-sheet-provider";
 import { LidarrSheetProvider } from "@/providers/lidarr-sheet-provider";
@@ -37,6 +38,8 @@ export default function RootLayout() {
               <AddAllSheetProvider>
                 <RootNavigator />
                 <PlayerOverlayRoot />
+                {/* Mounted last so toasts float above the player overlay. */}
+                <StaccatoToastHost />
               </AddAllSheetProvider>
             </LidarrSheetProvider>
           </PlaybackRoot>

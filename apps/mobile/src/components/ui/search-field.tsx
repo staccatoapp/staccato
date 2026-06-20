@@ -1,6 +1,12 @@
 import { Search, X } from "lucide-react-native";
 import React from "react";
-import { Pressable, TextInput, View } from "react-native";
+import {
+  Pressable,
+  TextInput,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 
 import { useTheme } from "@/theme";
 
@@ -12,6 +18,12 @@ interface SearchFieldProps {
   compact?: boolean;
   autoFocus?: boolean;
   testID?: string;
+  /**
+   * Overrides applied to the container (after the defaults). Use to lift the
+   * field off a surface that already matches `bgRaised` — e.g. inside a sheet,
+   * pass `{ backgroundColor: colors.bgMuted }` for contrast.
+   */
+  containerStyle?: StyleProp<ViewStyle>;
 }
 
 /**
@@ -27,20 +39,24 @@ export function SearchField({
   compact,
   autoFocus,
   testID,
+  containerStyle,
 }: SearchFieldProps) {
   const { colors, typography } = useTheme();
 
   return (
     <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 8,
-        height: compact ? 32 : 36,
-        paddingHorizontal: compact ? 10 : 12,
-        backgroundColor: colors.bgRaised,
-        borderRadius: compact ? 8 : 10,
-      }}
+      style={[
+        {
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+          height: compact ? 32 : 36,
+          paddingHorizontal: compact ? 10 : 12,
+          backgroundColor: colors.bgRaised,
+          borderRadius: compact ? 8 : 10,
+        },
+        containerStyle,
+      ]}
     >
       <Search size={14} color={colors.fgMuted} strokeWidth={2.2} />
       <TextInput

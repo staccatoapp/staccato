@@ -165,6 +165,38 @@ describe("useAuthedMutation", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: NAMESPACED_KEY });
   });
 
+  it("invalidates the extra server-scoped keys from invalidateKeys", async () => {
+    const put = jest.fn().mockResolvedValue({ count: 2 });
+    mockedCreateClient.mockReturnValue(clientWith({ put }));
+    const invalidateSpy = jest.spyOn(queryClient, "invalidateQueries");
+
+    const { result } = renderHook(
+      () =>
+        useAuthedMutation<Thing, { id: string }>(
+          ["thing"],
+          (client, vars) =>
+            (client.put as jest.Mock)("/api/thing", vars) as Promise<Thing>,
+          {
+            invalidateKeys: ({ id }) => [["things"], ["thing-detail", id]],
+          },
+        ),
+      { wrapper },
+    );
+
+    result.current.mutate({ id: "x1" });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    // Primary key still invalidated.
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: NAMESPACED_KEY });
+    // Static and variable-derived extra keys, each server-scoped.
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ["things", SERVER_URL],
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ["thing-detail", "x1", SERVER_URL],
+    });
+  });
+
   it("errors when there is no session", async () => {
     mockUseSession.mockReturnValue({ session: null });
     mockedCreateClient.mockReturnValue(clientWith({}));

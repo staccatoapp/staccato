@@ -20,6 +20,20 @@ jest.mock("@/hooks/use-lyrics", () => ({
   useLyrics: () => ({ data: null }),
 }));
 
+// The now-playing panel mounts the add-to-playlist sheet, which uses
+// react-query data hooks; stub them so the overlay renders without a client.
+jest.mock("@/hooks/use-library-playlists", () => ({
+  useLibraryPlaylists: () => ({
+    items: [],
+    fetchNextPage: jest.fn(),
+    hasNextPage: false,
+    isLoading: false,
+  }),
+}));
+jest.mock("@/hooks/use-add-track-to-playlist", () => ({
+  useAddTrackToPlaylist: () => ({ mutate: jest.fn(), isPending: false }),
+}));
+
 const TRACK: PlaybackTrack = {
   id: "t1",
   title: "Dreams",

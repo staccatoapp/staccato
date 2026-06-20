@@ -167,3 +167,9 @@ Tell the user: the path written, the finding count by severity, the id prefix us
 - **Drifting from the skeleton** — `fix-review-findings` enumerates by these exact structures (stable ids, trailing severity, checklist mapping); a freeform layout breaks the handoff.
 - **Skipping the boilerplate checklist lines** — always include the `check-doc-updates` and verify-gate lines after the per-finding boxes.
 - **Guessing the scope** — when committed and uncommitted work both exist, ask rather than silently picking one.
+
+## Field Notes
+
+- **Confirming the name means state-and-continue, not stop-and-wait.** For a mechanically derived slug, state the filename + prefix and proceed; only prompt when it's genuinely ambiguous (detached HEAD, no clean subject).
+- **Match machinery to diff size.** For a tight diff, tracing hunks directly beats fanning out finder subagents.
+- **Read the contracts a change touches.** Key-prefix mismatches and broken call contracts surface from the callees, not the diff alone.

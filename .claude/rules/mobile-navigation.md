@@ -50,6 +50,12 @@ Per-track Lidarr requests (recommended, not-in-library rows) reuse `AddAlbumShee
 
 Bottom sheets follow a three-tier structure. `BottomSheet` (`components/ui/bottom-sheet.tsx`) is a generic animated primitive (Reanimated `translateY` + backdrop, handle bar, card shell) with no content opinions. `LidarrSheet` (`components/explore/lidarr-sheet.tsx`) is a shared layout base for Lidarr-flavoured sheets: it renders an art-header, info block (`variant: "primary"` → orange banner; `"muted"` → grey block), optional error, CTA, and optional cancel button inside a `BottomSheet`. `AddAlbumSheet` and `AddAllSheet` derive from it by marshalling their own data into its slot props. Both derived sheets are provided via root-level providers so they always render above the mini player overlay.
 
+Not every sheet needs `LidarrSheet` or a provider. `AddToPlaylistSheet` (`components/sheets/add-to-playlist-sheet.tsx`) derives straight from `BottomSheet` (search field, no-op "New Playlist" row, FlatList of `PlaylistListItem`) and is mounted inside `NowPlayingPanel` like `QueueSheet` — local `open` state, not a provider, since only the Now Playing "+" opens it. It lists the user's playlists via `useLibraryPlaylists` (enabled only while open) and appends the current track with `useAddTrackToPlaylist` (`POST /api/playlists/:id/tracks`), closing immediately and confirming via toast.
+
+## Toasts
+
+The app's only toast surface is `components/ui/staccato-toast.tsx`, wrapping `react-native-toast-message` (pure-JS, no native code). Mount `StaccatoToastHost` once — it's the last sibling in `app/_layout.tsx` after `PlayerOverlayRoot`, so toasts float above the full-screen player; positioned `top`, offset below the notch. Trigger via the `staccatoToast.success(msg)` / `.error(msg)` helper only — never call `Toast.show` directly, so every toast keeps one OLED-pill look.
+
 ## Shared TrackRow plays the whole album or playlist
 
 `components/explore/track-row.tsx` is the one track row for explore, search, album, and playlist screens. It takes optional `queueTrackIds` + `queueIndex`: when present on an owned row, tapping replaces the queue with the whole album/playlist starting at that track (`usePlayback().playTracks(ids, startIndex)`); omit them for single-track contexts (explore/search keep single-track playback). External rows stay preview-only via `usePreview`.

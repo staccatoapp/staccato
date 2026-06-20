@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Gradients } from "@staccato/shared";
 import type { PlaybackTrack } from "@staccato/shared";
 
+import { AddToPlaylistSheet } from "@/components/sheets/add-to-playlist-sheet";
 import { StaccatoImage } from "@/components/staccato-image";
 import { useLyrics } from "@/hooks/use-lyrics";
 import { pickGradient } from "@/lib/gradient";
@@ -54,6 +55,7 @@ export function NowPlayingPanel() {
 
   const [view, setView] = useState<"player" | "lyrics">("player");
   const [queueOpen, setQueueOpen] = useState(false);
+  const [addToPlaylistOpen, setAddToPlaylistOpen] = useState(false);
 
   const lyricsQuery = useLyrics(currentTrack?.id);
   const syncedLyrics = lyricsQuery.data?.syncedLyrics ?? null;
@@ -175,9 +177,8 @@ export function NowPlayingPanel() {
             </View>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Add to playlist (coming soon)"
-              accessibilityState={{ disabled: true }}
-              disabled
+              accessibilityLabel="Add to playlist"
+              onPress={() => setAddToPlaylistOpen(true)}
               style={styles.plusButton}
             >
               <Plus
@@ -208,6 +209,12 @@ export function NowPlayingPanel() {
       </GestureDetector>
 
       <QueueSheet open={queueOpen} onClose={() => setQueueOpen(false)} />
+
+      <AddToPlaylistSheet
+        open={addToPlaylistOpen}
+        onClose={() => setAddToPlaylistOpen(false)}
+        trackId={currentTrack.id}
+      />
     </Animated.View>
   );
 }

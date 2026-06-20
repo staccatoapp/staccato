@@ -25,6 +25,20 @@ jest.mock("@/lib/session", () => ({
   }),
 }));
 
+// The add-to-playlist sheet (mounted by the panel) talks to react-query; stub
+// its data hooks so the panel renders without a QueryClient under test.
+jest.mock("@/hooks/use-library-playlists", () => ({
+  useLibraryPlaylists: () => ({
+    items: [],
+    fetchNextPage: jest.fn(),
+    hasNextPage: false,
+    isLoading: false,
+  }),
+}));
+jest.mock("@/hooks/use-add-track-to-playlist", () => ({
+  useAddTrackToPlaylist: () => ({ mutate: jest.fn(), isPending: false }),
+}));
+
 function track(id: string, title: string): PlaybackTrack {
   return {
     id,
@@ -139,5 +153,11 @@ describe("NowPlayingPanel", () => {
     renderPanel();
     fireEvent.press(screen.getByTestId("pill-up-next"));
     expect(screen.getByText("Up next")).toBeTruthy();
+  });
+
+  it("opens the add-to-playlist sheet from the + button", () => {
+    renderPanel();
+    fireEvent.press(screen.getByLabelText("Add to playlist"));
+    expect(screen.getByText("You don't have any playlists yet.")).toBeTruthy();
   });
 });

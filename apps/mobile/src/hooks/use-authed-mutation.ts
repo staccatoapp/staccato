@@ -18,6 +18,15 @@ interface AuthedMutationOptions<TData, TVariables> {
     old: TData | undefined,
     variables: TVariables,
   ) => TData | undefined;
+  /**
+   * Extra query-key prefixes to invalidate once the mutation settles, in
+   * addition to the primary `key`. Each is namespaced with the active server
+   * URL just like the primary key, and `invalidateQueries` matches by prefix.
+   * Use the function form when the keys depend on the mutation variables (e.g.
+   * a per-id detail query). Use this when the surfaces that display the mutated
+   * data are keyed differently from the optimistic-update target.
+   */
+  invalidateKeys?: QueryKey[] | ((variables: TVariables) => QueryKey[]);
 }
 
 /**
@@ -65,8 +74,18 @@ export function useAuthedMutation<TData, TVariables = void>(
           queryClient.setQueryData(namespacedKey, context.previous);
         }
       },
-      onSettled: () => {
-        queryClient.invalidateQueries({ queryKey: namespacedKey }).catch(() => {
+      onSettled: (_data, _error, variables) => {
+        const extra =
+          typeof options?.invalidateKeys === "function"
+            ? options.invalidateKeys(variables)
+            : (options?.invalidateKeys ?? []);
+        const keys: QueryKey[] = [
+          namespacedKey,
+          ...extra.map((k) => [...k, session?.serverUrl]),
+        ];
+        Promise.all(
+          keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+        ).catch(() => {
           /* refetch failures surface via the query itself */
         });
       },
