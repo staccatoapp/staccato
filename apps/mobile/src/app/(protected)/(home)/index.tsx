@@ -4,13 +4,13 @@ import { ScrollView, StyleSheet } from "react-native";
 
 import { Carousel, HeroRec, QuickStartGrid } from "@/components/home";
 import { OfflineHome } from "@/components/offline/offline-home";
+import { type MediaTileItem } from "@/components/ui/media-tile";
 import { useSession } from "@/lib/session";
 import { usePlaylists } from "@/hooks/use-playlists";
 import { useRecentlyPlayed } from "@/hooks/use-recently-played";
 import { useRecommendedPlaylists } from "@/hooks/use-recommended-playlists";
 import {
   type HomeAlbum,
-  type HomeMix,
   type HomePlaylist,
   type HomeRecPlaylist,
 } from "@/lib/home-types";
@@ -49,19 +49,19 @@ function HomeScreenOnline() {
   const { data: recData } = useRecommendedPlaylists();
   const recentlyPlayed = useRecentlyPlayed();
 
-  const playlists: HomePlaylist[] = (playlistsData?.items ?? []).map((p) => ({
+  const playlists: MediaTileItem[] = (playlistsData?.items ?? []).map((p) => ({
     id: p.id,
-    name: p.name,
-    trackCount: p.trackCount,
+    title: p.name,
+    subtitle: `${p.trackCount} tracks`,
     gradientKey: pickGradient(p.id),
     artUrls: p.coverArtUrls,
   }));
 
   const recReady = recData?.status === "ready" ? recData.data : [];
 
-  const mixes: HomeMix[] = recReady.map((p) => ({
+  const mixes: MediaTileItem[] = recReady.map((p) => ({
     id: p.id,
-    name: p.name,
+    title: p.name,
     subtitle: p.description ?? "",
     gradientKey: pickGradient(p.id),
     artUrl: p.coverArtUrl ?? null,

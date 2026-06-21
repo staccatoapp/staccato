@@ -13,14 +13,14 @@ import {
 } from "react-native";
 
 import {
-  AlbumCell,
   ArtistCell,
   LibrarySearchResults,
-  PlaylistCell,
   SortPills,
   UnderlineTabs,
 } from "@/components/library";
+import { MediaTile } from "@/components/ui/media-tile";
 import { SearchField } from "@/components/ui/search-field";
+import { pickGradient } from "@/lib/gradient";
 import { useLibraryAlbums } from "@/hooks/use-library-albums";
 import { useLibraryArtists } from "@/hooks/use-library-artists";
 import { useLibraryPlaylists } from "@/hooks/use-library-playlists";
@@ -129,8 +129,14 @@ export default function LibraryScreen() {
     if (tab === "albums") {
       const album = item as AlbumListItem;
       return (
-        <AlbumCell
-          album={album}
+        <MediaTile
+          item={{
+            id: album.id,
+            title: album.title,
+            subtitle: album.artistName,
+            gradientKey: pickGradient(album.id),
+            artUrl: album.coverArtUrl,
+          }}
           size={columnWidth}
           onPress={() =>
             router.push({
@@ -147,8 +153,14 @@ export default function LibraryScreen() {
     }
     const playlist = item as PlaylistListItem;
     return (
-      <PlaylistCell
-        playlist={playlist}
+      <MediaTile
+        item={{
+          id: playlist.id,
+          title: playlist.name,
+          subtitle: `${playlist.trackCount} tracks`,
+          gradientKey: pickGradient(playlist.id),
+          artUrls: playlist.coverArtUrls,
+        }}
         size={columnWidth}
         onPress={() =>
           router.push({

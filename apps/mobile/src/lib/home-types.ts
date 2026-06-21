@@ -18,16 +18,6 @@ export interface HomePlaylist {
   artUrls: string[];
 }
 
-export interface HomeMix {
-  id: string;
-  name: string;
-  subtitle: string;
-  gradientKey: GradientKey;
-  artUrl: string | null;
-  /** Up to 4 unique track cover arts; 4 render as a mosaic, fewer fall back to `artUrl`. */
-  artUrls?: string[];
-}
-
 export interface HomeRecPlaylist {
   id: string;
   name: string;

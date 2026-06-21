@@ -1,41 +1,36 @@
 import { fireEvent, render, screen } from "@testing-library/react-native";
 import React from "react";
 
-import {
-  type HomeAlbum,
-  type HomeMix,
-  type HomePlaylist,
-} from "@/lib/home-types";
+import { type MediaTileItem } from "@/components/ui/media-tile";
 import { StaccatoThemeProvider } from "@/theme";
 
-import { Carousel, CarouselCard } from "./carousel";
+import { Carousel } from "./carousel";
 
 // Cards render artwork via StaccatoImage, which reads the session.
 jest.mock("@/lib/session", () => ({
   useSession: () => ({ session: null }),
 }));
 
-const album: HomeAlbum = {
+const album: MediaTileItem = {
   id: "a1",
   title: "Blue",
-  artistName: "Joni Mitchell",
-  releaseYear: 1971,
+  subtitle: "Joni Mitchell",
   gradientKey: "sea",
   artUrl: null,
 };
 
-const mix: HomeMix = {
+const mix: MediaTileItem = {
   id: "m1",
-  name: "Discover Weekly",
+  title: "Discover Weekly",
   subtitle: "Updated Mondays",
   gradientKey: "berry",
   artUrl: null,
 };
 
-const playlist: HomePlaylist = {
+const playlist: MediaTileItem = {
   id: "p1",
-  name: "Workout Fuel",
-  trackCount: 31,
+  title: "Workout Fuel",
+  subtitle: "31 tracks",
   gradientKey: "amber",
   artUrls: [],
 };
@@ -74,20 +69,5 @@ describe("Carousel", () => {
     );
     fireEvent.press(screen.getByLabelText("Discover Weekly"));
     expect(onPressItem).toHaveBeenCalledWith(mix);
-  });
-});
-
-describe("CarouselCard", () => {
-  it.each([
-    ["album", album, "Joni Mitchell"],
-    ["mix", mix, "Updated Mondays"],
-    ["playlist", playlist, "31 tracks"],
-  ] as const)("derives the %s subtitle", (_kind, item, subtitle) => {
-    render(
-      <StaccatoThemeProvider>
-        <CarouselCard item={item} />
-      </StaccatoThemeProvider>,
-    );
-    expect(screen.getByText(subtitle)).toBeOnTheScreen();
   });
 });

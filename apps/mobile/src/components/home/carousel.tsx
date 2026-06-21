@@ -1,29 +1,17 @@
 import React from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import {
-  type HomeAlbum,
-  type HomeMix,
-  type HomePlaylist,
-} from "@/lib/home-types";
-import { AlbumArt } from "@/components/home/album-art";
+import { MediaTile, type MediaTileItem } from "@/components/ui/media-tile";
 import { useTheme } from "@/theme";
 
 const CARD_WIDTH = 138;
 const CARD_GAP = 12;
 
-type CarouselItem = HomeAlbum | HomeMix | HomePlaylist;
-
 interface CarouselProps {
   title: string;
-  items: CarouselItem[];
+  items: MediaTileItem[];
   onSeeAll?: () => void;
-  onPressItem?: (item: CarouselItem) => void;
-}
-
-interface CarouselCardProps {
-  item: CarouselItem;
-  onPress?: () => void;
+  onPressItem?: (item: MediaTileItem) => void;
 }
 
 /** Horizontally snap-scrolling section with a title header. */
@@ -74,64 +62,15 @@ export function Carousel({
         ]}
       >
         {items.map((item) => (
-          <CarouselCard
+          <MediaTile
             key={item.id}
             item={item}
+            size={CARD_WIDTH}
             onPress={onPressItem ? () => onPressItem(item) : undefined}
           />
         ))}
       </ScrollView>
     </View>
-  );
-}
-
-function cardTitle(item: CarouselItem): string {
-  return "title" in item ? item.title : item.name;
-}
-
-function cardSubtitle(item: CarouselItem): string {
-  if ("artistName" in item) return item.artistName;
-  if ("subtitle" in item) return item.subtitle;
-  return `${item.trackCount} tracks`;
-}
-
-/** 138pt album-art card with two lines of text. */
-export function CarouselCard({ item, onPress }: CarouselCardProps) {
-  const { colors, radius, typography } = useTheme();
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={cardTitle(item)}
-      onPress={onPress}
-      style={styles.card}
-    >
-      <AlbumArt
-        gradientKey={item.gradientKey}
-        artUrl={"artUrl" in item ? item.artUrl : undefined}
-        artUrls={"artUrls" in item ? item.artUrls : undefined}
-        size={CARD_WIDTH}
-        radius={radius.carouselArt}
-      />
-      <Text
-        style={[
-          styles.cardTitle,
-          { color: colors.fg, fontFamily: typography.fontFamily },
-        ]}
-        numberOfLines={1}
-      >
-        {cardTitle(item)}
-      </Text>
-      <Text
-        style={[
-          styles.cardSubtitle,
-          { color: colors.fgMuted, fontFamily: typography.fontFamily },
-        ]}
-        numberOfLines={1}
-      >
-        {cardSubtitle(item)}
-      </Text>
-    </Pressable>
   );
 }
 
@@ -157,18 +96,5 @@ const styles = StyleSheet.create({
   scrollRow: {
     gap: CARD_GAP,
     paddingBottom: 4,
-  },
-  card: {
-    width: CARD_WIDTH,
-  },
-  cardTitle: {
-    fontSize: 13,
-    fontWeight: "600",
-    letterSpacing: -0.1,
-    marginTop: 8,
-  },
-  cardSubtitle: {
-    fontSize: 12,
-    marginTop: 1,
   },
 });
