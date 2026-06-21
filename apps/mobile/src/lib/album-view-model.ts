@@ -8,27 +8,12 @@ import type { TrackRowTrack } from "@/components/explore/track-row";
 import type { DownloadableCollection } from "@/lib/downloadable";
 
 /**
- * Pure view-model helpers for the album-detail screen. Availability is
- * **album-level** (the API exposes a `pendingTrackCount` for local albums and
- * no per-track ownership for external ones), so the screen surfaces a single
- * chip + a single album-level Lidarr request rather than per-track state.
+ * Pure view-model helpers for the album-detail screen. Album-level availability
+ * (in library / partial / recommended, plus a Lidarr request for external
+ * albums) now lives in the shared {@link "@/lib/availability"} module so every
+ * surface derives it the same way; this file keeps the album-specific display
+ * helpers (totals, eyebrow, track rows, download descriptor).
  */
-export type AlbumAvailability =
-  | { kind: "inLibrary" }
-  | { kind: "partial"; localCount: number; total: number }
-  | { kind: "external" };
-
-export function getAlbumAvailability(
-  detail: UnifiedAlbumDetail,
-): AlbumAvailability {
-  if (detail.source === "external") return { kind: "external" };
-  const total = detail.tracks.length;
-  const pending = detail.album.pendingTrackCount;
-  if (pending > 0) {
-    return { kind: "partial", localCount: Math.max(0, total - pending), total };
-  }
-  return { kind: "inLibrary" };
-}
 
 /** Total runtime in seconds (local durations are seconds, external are ms). */
 export function albumTotalSeconds(detail: UnifiedAlbumDetail): number {

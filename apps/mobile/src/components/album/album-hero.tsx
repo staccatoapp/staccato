@@ -1,23 +1,17 @@
 import { type UnifiedAlbumDetail } from "@staccato/shared";
-import {
-  BadgeCheck,
-  Cloud,
-  ListPlus,
-  Play,
-  Radio,
-  Shuffle,
-} from "lucide-react-native";
+import { ListPlus, Play, Radio, Shuffle } from "lucide-react-native";
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { DownloadButton } from "@/components/downloads/download-button";
 import { AlbumArt } from "@/components/home/album-art";
+import { AvailabilityBadge } from "@/components/ui/availability-badge";
+import { albumEyebrow, albumMetaLabel } from "@/lib/album-view-model";
 import {
-  albumEyebrow,
-  albumMetaLabel,
-  getAlbumAvailability,
-} from "@/lib/album-view-model";
+  albumServerAvailability,
+  useResolvedAvailability,
+} from "@/lib/availability";
 import type { DownloadableCollection } from "@/lib/downloadable";
 import { pickGradient } from "@/lib/gradient";
 import { useTheme } from "@/theme";
@@ -46,7 +40,10 @@ export function AlbumHero({
   const { colors, typography } = useTheme();
   const insets = useSafeAreaInsets();
 
-  const availability = getAlbumAvailability(detail);
+  const availability = useResolvedAvailability(
+    downloadable?.id,
+    albumServerAvailability(detail),
+  );
   const eyebrow = albumEyebrow(detail);
   const external = detail.source === "external";
 
@@ -62,6 +59,7 @@ export function AlbumHero({
             size={ART}
             radius={16}
             glyphSize={62}
+            badge={<AvailabilityBadge state={availability} size="hero" />}
             style={styles.art}
           />
         </View>
@@ -89,10 +87,6 @@ export function AlbumHero({
           </Text>
 
           <View style={styles.metaRow}>
-            <AvailabilityChip
-              availability={availability}
-              onRequest={external ? onRequest : undefined}
-            />
             <Text
               style={[styles.metaText, { fontFamily: typography.fontFamily }]}
             >
@@ -174,44 +168,6 @@ export function AlbumHero({
   );
 }
 
-function AvailabilityChip({
-  availability,
-  onRequest,
-}: {
-  availability: ReturnType<typeof getAlbumAvailability>;
-  onRequest?: () => void;
-}) {
-  const { colors, typography } = useTheme();
-  let icon: React.ReactNode;
-  let label: string;
-  if (availability.kind === "inLibrary") {
-    icon = (
-      <BadgeCheck size={13} color={colors.successText} strokeWidth={2.2} />
-    );
-    label = "In library · Lossless";
-  } else if (availability.kind === "partial") {
-    icon = <Cloud size={13} color="rgba(255,255,255,0.7)" strokeWidth={2} />;
-    label = `${availability.localCount} of ${availability.total} in library`;
-  } else {
-    icon = <Radio size={13} color="rgba(255,255,255,0.85)" strokeWidth={2} />;
-    label = "Found on MusicBrainz";
-  }
-
-  return (
-    <Pressable
-      accessibilityRole={onRequest ? "button" : "text"}
-      onPress={onRequest}
-      disabled={!onRequest}
-      style={styles.chip}
-    >
-      {icon}
-      <Text style={[styles.chipText, { fontFamily: typography.fontFamily }]}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   root: {
     position: "relative",
@@ -256,20 +212,6 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 10,
     marginTop: 16,
-  },
-  chip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 100,
-    backgroundColor: "rgba(255,255,255,0.16)",
-  },
-  chipText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#fff",
   },
   metaText: {
     fontSize: 13,

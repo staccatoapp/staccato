@@ -3,6 +3,11 @@ import React from "react";
 import { Pressable, Text } from "react-native";
 
 import { AlbumArt } from "@/components/home/album-art";
+import { AvailabilityBadge } from "@/components/ui/availability-badge";
+import {
+  useResolvedAvailability,
+  type ServerAvailability,
+} from "@/lib/availability";
 import { useTheme } from "@/theme";
 
 /**
@@ -19,6 +24,12 @@ export interface MediaTileItem {
   artUrl?: string | null;
   /** Up to 4 cover arts; exactly 4 render as a 2x2 mosaic (see AlbumArt). */
   artUrls?: string[];
+  /**
+   * Server-derived availability; when set, an icon badge is overlaid on the
+   * art (further resolved to "downloaded" if the collection is on-device).
+   * Omit for tiles with no library/recommendation context.
+   */
+  availability?: ServerAvailability;
 }
 
 /**
@@ -36,6 +47,10 @@ export function MediaTile({
   onPress?: () => void;
 }) {
   const { colors, radius, typography } = useTheme();
+  const resolved = useResolvedAvailability(
+    item.id,
+    item.availability ?? "inLibrary",
+  );
   return (
     <Pressable
       accessibilityRole="button"
@@ -49,6 +64,11 @@ export function MediaTile({
         artUrls={item.artUrls}
         size={size}
         radius={radius.carouselArt}
+        badge={
+          item.availability ? (
+            <AvailabilityBadge state={resolved} size="tile" />
+          ) : undefined
+        }
       />
       <Text
         numberOfLines={1}

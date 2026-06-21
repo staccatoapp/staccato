@@ -7,7 +7,6 @@ import {
   albumMetaLabel,
   albumTotalSeconds,
   albumTrackRows,
-  getAlbumAvailability,
   playableTrackIds,
 } from "./album-view-model";
 
@@ -113,28 +112,6 @@ function externalDetail(): UnifiedAlbumDetail {
     ],
   } as UnifiedAlbumDetail;
 }
-
-describe("getAlbumAvailability", () => {
-  it("reports an in-library album with no pending tracks", () => {
-    expect(getAlbumAvailability(localDetail())).toEqual({ kind: "inLibrary" });
-  });
-
-  it("reports a partial album with local/total counts", () => {
-    expect(getAlbumAvailability(localDetail({ pendingTrackCount: 1 }))).toEqual(
-      {
-        kind: "partial",
-        localCount: 1,
-        total: 2,
-      },
-    );
-  });
-
-  it("reports an external album", () => {
-    expect(getAlbumAvailability(externalDetail())).toEqual({
-      kind: "external",
-    });
-  });
-});
 
 describe("durations", () => {
   it("sums local track durations in seconds", () => {

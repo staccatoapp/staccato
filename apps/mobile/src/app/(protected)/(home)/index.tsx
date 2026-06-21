@@ -5,6 +5,7 @@ import { ScrollView, StyleSheet } from "react-native";
 import { Carousel, HeroRec, QuickStartGrid } from "@/components/home";
 import { OfflineHome } from "@/components/offline/offline-home";
 import { type MediaTileItem } from "@/components/ui/media-tile";
+import { availabilityFromCounts } from "@/lib/availability";
 import { useSession } from "@/lib/session";
 import { usePlaylists } from "@/hooks/use-playlists";
 import { useRecentlyPlayed } from "@/hooks/use-recently-played";
@@ -55,6 +56,7 @@ function HomeScreenOnline() {
     subtitle: `${p.trackCount} tracks`,
     gradientKey: pickGradient(p.id),
     artUrls: p.coverArtUrls,
+    availability: "inLibrary",
   }));
 
   const recReady = recData?.status === "ready" ? recData.data : [];
@@ -66,6 +68,10 @@ function HomeScreenOnline() {
     gradientKey: pickGradient(p.id),
     artUrl: p.coverArtUrl ?? null,
     artUrls: mosaicArtFromTracks(p.tracks),
+    availability: availabilityFromCounts(
+      p.tracks.filter((t) => t.inLibrary).length,
+      p.trackCount,
+    ),
   }));
 
   const firstRec = recReady[0];

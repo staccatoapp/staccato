@@ -58,4 +58,14 @@ describe("MediaTile", () => {
     expect(screen.getByText("Workout Fuel")).toBeOnTheScreen();
     expect(screen.getAllByTestId("album-art-image")).toHaveLength(4);
   });
+
+  it("overlays an availability badge when the item carries availability", () => {
+    renderTile({ item: { ...album, availability: "inLibrary" } });
+    expect(screen.getByTestId("availability-badge")).toBeOnTheScreen();
+  });
+
+  it("renders no badge when the item has no availability", () => {
+    renderTile({});
+    expect(screen.queryByTestId("availability-badge")).toBeNull();
+  });
 });

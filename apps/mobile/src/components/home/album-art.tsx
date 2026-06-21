@@ -26,6 +26,8 @@ interface AlbumArtProps {
   radius?: number;
   /** Music glyph size; defaults to 28% of the art size. */
   glyphSize?: number;
+  /** Overlay pinned to the bottom-right corner (e.g. an availability badge). */
+  badge?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -43,6 +45,7 @@ export function AlbumArt({
   fill = false,
   radius = 10,
   glyphSize,
+  badge,
   style,
 }: AlbumArtProps) {
   const [from, to] = Gradients[gradientKey];
@@ -120,6 +123,7 @@ export function AlbumArt({
         pointerEvents="none"
         style={[StyleSheet.absoluteFill, styles.highlight]}
       />
+      {badge != null ? <View style={styles.badge}>{badge}</View> : null}
     </View>
   );
 }
@@ -145,5 +149,10 @@ const styles = StyleSheet.create({
   highlight: {
     experimental_backgroundImage:
       "linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0) 40%)",
+  },
+  badge: {
+    position: "absolute",
+    right: 6,
+    bottom: 6,
   },
 });

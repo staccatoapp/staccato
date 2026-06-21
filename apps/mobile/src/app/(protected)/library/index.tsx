@@ -20,6 +20,7 @@ import {
 } from "@/components/library";
 import { MediaTile } from "@/components/ui/media-tile";
 import { SearchField } from "@/components/ui/search-field";
+import { availabilityFromPending } from "@/lib/availability";
 import { pickGradient } from "@/lib/gradient";
 import { useLibraryAlbums } from "@/hooks/use-library-albums";
 import { useLibraryArtists } from "@/hooks/use-library-artists";
@@ -136,6 +137,7 @@ export default function LibraryScreen() {
             subtitle: album.artistName,
             gradientKey: pickGradient(album.id),
             artUrl: album.coverArtUrl,
+            availability: availabilityFromPending(album.pendingTrackCount),
           }}
           size={columnWidth}
           onPress={() =>
@@ -160,6 +162,7 @@ export default function LibraryScreen() {
           subtitle: `${playlist.trackCount} tracks`,
           gradientKey: pickGradient(playlist.id),
           artUrls: playlist.coverArtUrls,
+          availability: "inLibrary",
         }}
         size={columnWidth}
         onPress={() =>

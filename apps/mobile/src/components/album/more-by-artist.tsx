@@ -3,7 +3,9 @@ import React from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AlbumArt } from "@/components/home/album-art";
+import { AvailabilityBadge } from "@/components/ui/availability-badge";
 import { useArtistDetail } from "@/hooks/use-artist-detail";
+import { useResolvedAvailability } from "@/lib/availability";
 import { pickGradient } from "@/lib/gradient";
 import { useTheme } from "@/theme";
 
@@ -59,46 +61,72 @@ export function MoreByArtist({
         {albums.map((album) => {
           const key = itemKey(album);
           return (
-            <Pressable
+            <DiscographyTile
               key={key}
-              accessibilityRole="button"
-              accessibilityLabel={album.title}
-              onPress={() => onOpenAlbum(key)}
-              style={styles.tile}
-            >
-              <AlbumArt
-                gradientKey={pickGradient(key)}
-                artUrl={album.coverArtUrl}
-                size={TILE}
-                radius={10}
-              />
-              <Text
-                numberOfLines={1}
-                style={[
-                  styles.tileTitle,
-                  { color: colors.fg, fontFamily: typography.fontFamily },
-                ]}
-              >
-                {album.title}
-              </Text>
-              {album.releaseYear != null ? (
-                <Text
-                  style={[
-                    styles.tileYear,
-                    {
-                      color: colors.fgMuted,
-                      fontFamily: typography.fontFamily,
-                    },
-                  ]}
-                >
-                  {album.releaseYear}
-                </Text>
-              ) : null}
-            </Pressable>
+              album={album}
+              albumKey={key}
+              onOpen={() => onOpenAlbum(key)}
+            />
           );
         })}
       </ScrollView>
     </View>
+  );
+}
+
+/**
+ * One album tile in the rail. A sub-component so each can resolve its own
+ * availability badge (in-library albums may be downloaded; external ones are
+ * recommended).
+ */
+function DiscographyTile({
+  album,
+  albumKey,
+  onOpen,
+}: {
+  album: ArtistDiscographyItem;
+  albumKey: string;
+  onOpen: () => void;
+}) {
+  const { colors, typography } = useTheme();
+  const availability = useResolvedAvailability(
+    album.inLibrary ? album.id : undefined,
+    album.inLibrary ? "inLibrary" : "recommended",
+  );
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={album.title}
+      onPress={onOpen}
+      style={styles.tile}
+    >
+      <AlbumArt
+        gradientKey={pickGradient(albumKey)}
+        artUrl={album.coverArtUrl}
+        size={TILE}
+        radius={10}
+        badge={<AvailabilityBadge state={availability} size="tile" />}
+      />
+      <Text
+        numberOfLines={1}
+        style={[
+          styles.tileTitle,
+          { color: colors.fg, fontFamily: typography.fontFamily },
+        ]}
+      >
+        {album.title}
+      </Text>
+      {album.releaseYear != null ? (
+        <Text
+          style={[
+            styles.tileYear,
+            { color: colors.fgMuted, fontFamily: typography.fontFamily },
+          ]}
+        >
+          {album.releaseYear}
+        </Text>
+      ) : null}
+    </Pressable>
   );
 }
 

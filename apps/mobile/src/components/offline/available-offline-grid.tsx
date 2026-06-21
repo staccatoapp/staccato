@@ -3,6 +3,7 @@ import React from "react";
 import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 
 import { AlbumArt } from "@/components/home/album-art";
+import { AvailabilityBadge } from "@/components/ui/availability-badge";
 import { pickGradient } from "@/lib/gradient";
 import { type DownloadedCollection } from "@/stores/downloads-store";
 import { useTheme } from "@/theme";
@@ -80,6 +81,7 @@ export function AvailableOfflineGrid({ items }: AvailableOfflineGridProps) {
               size={52}
               radius={radius.quickStartArt}
               glyphSize={20}
+              badge={<AvailabilityBadge state="downloaded" size="tile" />}
             />
             <View style={styles.textBlock}>
               <Text

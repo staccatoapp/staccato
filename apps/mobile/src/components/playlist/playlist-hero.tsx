@@ -1,17 +1,15 @@
-import {
-  BadgeCheck,
-  Cloud,
-  Download,
-  ListPlus,
-  Play,
-  Shuffle,
-} from "lucide-react-native";
+import { Download, ListPlus, Play, Shuffle } from "lucide-react-native";
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { DownloadButton } from "@/components/downloads/download-button";
 import { AlbumArt } from "@/components/home/album-art";
+import { AvailabilityBadge } from "@/components/ui/availability-badge";
+import {
+  availabilityFromCounts,
+  useResolvedAvailability,
+} from "@/lib/availability";
 import type { DownloadableCollection } from "@/lib/downloadable";
 import { pickGradient } from "@/lib/gradient";
 import {
@@ -41,6 +39,10 @@ export function PlaylistHero({
   const { colors, typography } = useTheme();
   const insets = useSafeAreaInsets();
   const recommended = view.mode === "recommended";
+  const availability = useResolvedAvailability(
+    downloadable?.id,
+    availabilityFromCounts(view.localCount, view.total),
+  );
 
   return (
     <View style={styles.root}>
@@ -55,6 +57,7 @@ export function PlaylistHero({
             size={ART}
             radius={16}
             glyphSize={56}
+            badge={<AvailabilityBadge state={availability} size="hero" />}
             style={styles.art}
           />
         </View>
@@ -84,7 +87,6 @@ export function PlaylistHero({
           ) : null}
 
           <View style={styles.metaRow}>
-            <AvailabilityChip view={view} />
             <Text
               style={[styles.metaText, { fontFamily: typography.fontFamily }]}
             >
@@ -165,25 +167,6 @@ export function PlaylistHero({
   );
 }
 
-function AvailabilityChip({ view }: { view: PlaylistView }) {
-  const { colors, typography } = useTheme();
-  const inLibrary = view.mode === "inLibrary";
-  return (
-    <View style={styles.chip}>
-      {inLibrary ? (
-        <BadgeCheck size={13} color={colors.successText} strokeWidth={2.2} />
-      ) : (
-        <Cloud size={13} color="rgba(255,255,255,0.7)" strokeWidth={2} />
-      )}
-      <Text style={[styles.chipText, { fontFamily: typography.fontFamily }]}>
-        {inLibrary
-          ? "In your library"
-          : `${view.localCount} of ${view.total} in library`}
-      </Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   root: {
     position: "relative",
@@ -228,20 +211,6 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 10,
     marginTop: 16,
-  },
-  chip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 100,
-    backgroundColor: "rgba(255,255,255,0.16)",
-  },
-  chipText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#fff",
   },
   metaText: {
     fontSize: 13,

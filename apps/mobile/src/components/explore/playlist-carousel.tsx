@@ -3,6 +3,8 @@ import React from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AlbumArt } from "@/components/home/album-art";
+import { AvailabilityBadge } from "@/components/ui/availability-badge";
+import { availabilityFromCounts } from "@/lib/availability";
 import { pickGradient } from "@/lib/gradient";
 import { mosaicArtFromTracks } from "@/lib/mosaic-art";
 import { useTheme } from "@/theme";
@@ -63,6 +65,10 @@ function PlaylistCard({
   onPress?: () => void;
 }) {
   const { typography } = useTheme();
+  const availability = availabilityFromCounts(
+    playlist.tracks.filter((t) => t.inLibrary).length,
+    playlist.trackCount,
+  );
   return (
     <Pressable
       accessibilityRole="button"
@@ -76,6 +82,7 @@ function PlaylistCard({
         artUrls={mosaicArtFromTracks(playlist.tracks)}
         size={CARD_SIZE}
         radius={12}
+        badge={<AvailabilityBadge state={availability} size="tile" />}
       />
       <View style={styles.overlay} pointerEvents="none">
         <Text style={[styles.source, { fontFamily: typography.fontFamily }]}>
