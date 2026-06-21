@@ -44,7 +44,7 @@ export function useAuthedInfiniteList<T>(
   itemSchema: z.ZodType<T>,
   options?: AuthedInfiniteListOptions,
 ): AuthedInfiniteListResult<T> {
-  const { session } = useSession();
+  const { session, connectionStatus } = useSession();
   const client = useApiClient();
   const pageSize = options?.pageSize ?? 50;
   const responseSchema = useMemo(
@@ -73,7 +73,10 @@ export function useAuthedInfiniteList<T>(
       const loaded = pages.reduce((sum, p) => sum + p.items.length, 0);
       return loaded < lastPage.total ? loaded : undefined;
     },
-    enabled: !!session && (options?.enabled ?? true),
+    // Paused while offline (see useAuthedQuery) — recovery refetches via the
+    // reconnect probe's query invalidation.
+    enabled:
+      !!session && connectionStatus === "online" && (options?.enabled ?? true),
     staleTime: options?.staleTime,
   });
 

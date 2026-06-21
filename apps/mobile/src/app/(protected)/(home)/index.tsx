@@ -3,6 +3,8 @@ import React from "react";
 import { ScrollView, StyleSheet } from "react-native";
 
 import { Carousel, HeroRec, QuickStartGrid } from "@/components/home";
+import { OfflineHome } from "@/components/offline/offline-home";
+import { useSession } from "@/lib/session";
 import { usePlaylists } from "@/hooks/use-playlists";
 import { useRecentlyPlayed } from "@/hooks/use-recently-played";
 import { useRecommendedPlaylists } from "@/hooks/use-recommended-playlists";
@@ -29,6 +31,18 @@ function deriveArtistSummary(tracks: { artistName: string | null }[]): string {
 }
 
 export default function HomeScreen() {
+  const { connectionStatus } = useSession();
+  // The whole app degrades to downloaded-only content while the server is
+  // unreachable; Home swaps to its offline shell. The online body's data hooks
+  // live in a separate component so they don't run (and fire paused requests)
+  // while offline.
+  if (connectionStatus !== "online") {
+    return <OfflineHome />;
+  }
+  return <HomeScreenOnline />;
+}
+
+function HomeScreenOnline() {
   const { colors } = useTheme();
   const bottomInset = useContentBottomInset({ tabBarAutoInset: true });
   const { data: playlistsData } = usePlaylists();

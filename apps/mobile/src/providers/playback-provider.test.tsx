@@ -114,6 +114,7 @@ beforeEach(() => {
   });
   mockUseSession.mockReturnValue({
     session: { serverUrl: "https://music.home.arpa", token: "tok" },
+    connectionStatus: "online",
   });
   get = jest.fn().mockResolvedValue(SESSION);
   put = jest.fn().mockResolvedValue(SESSION);

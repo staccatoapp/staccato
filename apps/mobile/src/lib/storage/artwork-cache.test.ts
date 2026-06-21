@@ -1,25 +1,30 @@
 import { createBlobStore } from "./blob-store";
 
-import { ensureArtworkFile } from "./artwork-cache";
+import { ensureArtworkFile, getArtworkFileUri } from "./artwork-cache";
 
 jest.mock("./blob-store", () => ({
   createBlobStore: jest.fn(() => ({
     ensure: jest.fn(),
+    uri: jest.fn(),
     remove: jest.fn(),
     clear: jest.fn(),
   })),
 }));
 
 // The single blob-store instance artwork-cache created at import time; grab its
-// `ensure` so we can assert how covers are forwarded to it.
-const ensure = jest.mocked(createBlobStore).mock.results[0]!.value
-  .ensure as jest.Mock;
+// `ensure`/`uri` so we can assert how covers are forwarded to it.
+const store = jest.mocked(createBlobStore).mock.results[0]!.value as {
+  ensure: jest.Mock;
+  uri: jest.Mock;
+};
+const ensure = store.ensure;
 
 const SESSION = { serverUrl: "https://music.home.arpa", token: "tok" };
 
 beforeEach(() => {
   ensure.mockReset();
   ensure.mockResolvedValue("file://blobs/cover.jpg");
+  store.uri.mockReset();
 });
 
 describe("ensureArtworkFile", () => {
@@ -69,5 +74,24 @@ describe("ensureArtworkFile", () => {
       await ensureArtworkFile("/metadata/covers/x.jpg", SESSION),
     ).toBeNull();
     expect(warn).toHaveBeenCalled();
+  });
+});
+
+describe("getArtworkFileUri", () => {
+  it("returns the cached uri for a resolved cover, without downloading", async () => {
+    store.uri.mockResolvedValue("file://blobs/cover.jpg");
+
+    expect(await getArtworkFileUri("/metadata/covers/x.jpg", SESSION)).toBe(
+      "file://blobs/cover.jpg",
+    );
+    expect(store.uri).toHaveBeenCalledWith(
+      "https://music.home.arpa/metadata/covers/x.jpg",
+    );
+    expect(ensure).not.toHaveBeenCalled();
+  });
+
+  it("returns null when there is no resolvable cover", async () => {
+    expect(await getArtworkFileUri(null, SESSION)).toBeNull();
+    expect(store.uri).not.toHaveBeenCalled();
   });
 });

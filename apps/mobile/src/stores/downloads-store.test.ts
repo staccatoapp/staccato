@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { renderHook } from "@testing-library/react-native";
 
 import {
   ensureDownloadedArt,
@@ -8,6 +9,7 @@ import {
 
 import {
   COLLECTIONS_KEY,
+  useDownloadedCollections,
   useDownloadsStore,
   type DownloadableCollection,
 } from "./downloads-store";
@@ -47,7 +49,7 @@ function collection(
 
 beforeEach(async () => {
   await AsyncStorage.clear();
-  useDownloadsStore.setState({ collections: {}, trackUris: {} });
+  useDownloadsStore.setState({ collections: {}, trackUris: {}, manifests: {} });
   jest.mocked(ensureTrackDownloaded).mockReset();
   jest.mocked(ensureDownloadedArt).mockReset().mockResolvedValue(null);
   jest.mocked(getDownloadedTrackUri).mockReset();
@@ -111,6 +113,19 @@ describe("download", () => {
       name: "Roadtrip",
       trackIds: ["t1", "t2"],
       snapshot: { mock: true },
+    });
+  });
+
+  it("surfaces the manifest entry in store state after downloading", async () => {
+    jest.mocked(ensureTrackDownloaded).mockResolvedValue("file://x");
+    await useDownloadsStore.getState().download(collection(), SESSION);
+
+    expect(useDownloadsStore.getState().manifests["pl-1"]).toMatchObject({
+      id: "pl-1",
+      kind: "playlist",
+      name: "Roadtrip",
+      coverArtUrls: ["/metadata/covers/a.jpg"],
+      trackIds: ["t1", "t2"],
     });
   });
 
@@ -261,5 +276,79 @@ describe("hydrate", () => {
       completed: 1,
       total: 2,
     });
+  });
+
+  it("surfaces manifest entries in store state on rehydrate", async () => {
+    await AsyncStorage.setItem(
+      COLLECTIONS_KEY,
+      JSON.stringify({
+        "pl-1": {
+          id: "pl-1",
+          kind: "playlist",
+          name: "Roadtrip",
+          coverArtUrls: ["/metadata/covers/a.jpg"],
+          trackIds: ["t1"],
+          snapshot: {},
+          downloadedAt: 7,
+        },
+      }),
+    );
+    jest
+      .mocked(getDownloadedTrackUri)
+      .mockResolvedValue("file://downloads/t1.audio");
+
+    await useDownloadsStore.getState().hydrate();
+
+    expect(useDownloadsStore.getState().manifests["pl-1"]).toMatchObject({
+      id: "pl-1",
+      name: "Roadtrip",
+      trackIds: ["t1"],
+      downloadedAt: 7,
+    });
+  });
+});
+
+describe("useDownloadedCollections", () => {
+  it("returns only fully-downloaded collections, newest first", () => {
+    useDownloadsStore.setState({
+      collections: {
+        "pl-1": { state: "downloaded", completed: 2, total: 2 },
+        "al-2": { state: "partial", completed: 1, total: 3 },
+        "al-3": { state: "downloaded", completed: 4, total: 4 },
+      },
+      manifests: {
+        "pl-1": {
+          id: "pl-1",
+          kind: "playlist",
+          name: "Roadtrip",
+          coverArtUrls: [],
+          trackIds: ["t1", "t2"],
+          snapshot: {},
+          downloadedAt: 100,
+        },
+        "al-2": {
+          id: "al-2",
+          kind: "album",
+          name: "Half Album",
+          coverArtUrls: [],
+          trackIds: ["t1", "t2", "t3"],
+          snapshot: {},
+          downloadedAt: 200,
+        },
+        "al-3": {
+          id: "al-3",
+          kind: "album",
+          name: "Full Album",
+          coverArtUrls: [],
+          trackIds: ["a", "b", "c", "d"],
+          snapshot: {},
+          downloadedAt: 300,
+        },
+      },
+    });
+
+    const { result } = renderHook(() => useDownloadedCollections());
+
+    expect(result.current.map((c) => c.id)).toEqual(["al-3", "pl-1"]);
   });
 });

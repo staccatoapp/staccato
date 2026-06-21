@@ -30,41 +30,44 @@ function mockClient(get: jest.Mock) {
 describe("loadInitialSession", () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it("returns null when no token is stored", async () => {
+  it("is unauthenticated when no token is stored", async () => {
     mockedGetToken.mockResolvedValue(null);
     mockedGetServerUrl.mockResolvedValue("https://music.example.com");
-    expect(await loadInitialSession()).toBeNull();
+    expect(await loadInitialSession()).toEqual({ status: "unauthenticated" });
   });
 
-  it("returns null when no server url is stored", async () => {
+  it("is unauthenticated when no server url is stored", async () => {
     mockedGetToken.mockResolvedValue("tok");
     mockedGetServerUrl.mockResolvedValue(null);
-    expect(await loadInitialSession()).toBeNull();
+    expect(await loadInitialSession()).toEqual({ status: "unauthenticated" });
   });
 
-  it("returns the session when the stored token is accepted", async () => {
+  it("is authenticated with the session when the stored token is accepted", async () => {
     mockedGetToken.mockResolvedValue("tok");
     mockedGetServerUrl.mockResolvedValue("https://music.example.com");
     mockClient(jest.fn().mockResolvedValue({ id: "u1" }));
     expect(await loadInitialSession()).toEqual({
-      serverUrl: "https://music.example.com",
-      token: "tok",
+      status: "authenticated",
+      session: { serverUrl: "https://music.example.com", token: "tok" },
     });
   });
 
-  it("clears the token and returns null on a 401", async () => {
+  it("clears the token and is unauthenticated on a 401", async () => {
     mockedGetToken.mockResolvedValue("tok");
     mockedGetServerUrl.mockResolvedValue("https://music.example.com");
     mockClient(jest.fn().mockRejectedValue(new ApiError(401, "unauthorized")));
-    expect(await loadInitialSession()).toBeNull();
+    expect(await loadInitialSession()).toEqual({ status: "unauthenticated" });
     expect(mockedClearToken).toHaveBeenCalled();
   });
 
-  it("keeps the token but returns null when the server is unreachable", async () => {
+  it("is offline (keeping the token + session) when the server is unreachable", async () => {
     mockedGetToken.mockResolvedValue("tok");
     mockedGetServerUrl.mockResolvedValue("https://music.example.com");
     mockClient(jest.fn().mockRejectedValue(new Error("network down")));
-    expect(await loadInitialSession()).toBeNull();
+    expect(await loadInitialSession()).toEqual({
+      status: "offline",
+      session: { serverUrl: "https://music.example.com", token: "tok" },
+    });
     expect(mockedClearToken).not.toHaveBeenCalled();
   });
 });

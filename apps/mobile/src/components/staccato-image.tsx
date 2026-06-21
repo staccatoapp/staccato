@@ -2,8 +2,7 @@ import { Image, type ImageContentFit } from "expo-image";
 import React, { useState } from "react";
 import type { StyleProp, ImageStyle } from "react-native";
 
-import { resolveImageSource } from "@/lib/image-source";
-import { useSession } from "@/lib/session";
+import { useCachedImageSource } from "@/hooks/use-cached-image-source";
 
 interface StaccatoImageProps {
   /**
@@ -22,8 +21,9 @@ interface StaccatoImageProps {
  * Renders a remote Staccato image, handling the two things a bare `<Image>`
  * can't: absolutising server-relative `/metadata/...` urls against the active
  * session's server and attaching its bearer token (the `/metadata` route is
- * auth-protected). Falls back to `fallback` when the url is absent/unresolvable
- * or the load fails.
+ * auth-protected). Prefers a locally pinned copy via {@link useCachedImageSource}
+ * so downloaded art renders offline. Falls back to `fallback` when the url is
+ * absent/unresolvable or the load fails.
  */
 export function StaccatoImage({
   uri,
@@ -32,8 +32,7 @@ export function StaccatoImage({
   contentFit,
   testID,
 }: StaccatoImageProps) {
-  const { session } = useSession();
-  const source = resolveImageSource(uri, session?.serverUrl, session?.token);
+  const source = useCachedImageSource(uri);
 
   // Track the uri that failed rather than a boolean, so a changed source gets a
   // fresh attempt automatically (no effect needed to reset on uri change).

@@ -28,6 +28,7 @@ beforeEach(() => {
   });
   mockUseSession.mockReturnValue({
     session: { serverUrl: "https://music.home.arpa", token: "tok" },
+    connectionStatus: "online",
   });
 });
 
@@ -73,7 +74,33 @@ describe("useAuthedQuery", () => {
       patch: jest.fn(),
       delete: jest.fn(),
     });
-    mockUseSession.mockReturnValue({ session: null });
+    mockUseSession.mockReturnValue({
+      session: null,
+      connectionStatus: "online",
+    });
+
+    const { result } = renderHook(
+      () => useAuthedQuery(["thing"], "/api/thing", schema),
+      { wrapper },
+    );
+
+    expect(result.current.fetchStatus).toBe("idle");
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  it("stays disabled while offline even with a session", () => {
+    const get = jest.fn();
+    mockedCreateClient.mockReturnValue({
+      get,
+      post: jest.fn(),
+      put: jest.fn(),
+      patch: jest.fn(),
+      delete: jest.fn(),
+    });
+    mockUseSession.mockReturnValue({
+      session: { serverUrl: "https://music.home.arpa", token: "tok" },
+      connectionStatus: "offline",
+    });
 
     const { result } = renderHook(
       () => useAuthedQuery(["thing"], "/api/thing", schema),

@@ -24,7 +24,7 @@ Call-site hooks (`useLidarrSheet`, `useAddAllSheet`) are drop-in replacements fo
 
 ## Stores aren't only for sheets; Providers may read them imperatively
 
-`stores/downloads-store.ts` is a non-sheet store (offline-download status/progress + a `trackUris` map) — plain client state, so a store, not a Provider. A Provider that owns a native resource may still **read** a store without subscribing: `playback-provider` reads `useDownloadsStore.getState().trackUris[id]` inside its track-change effect to prefer a downloaded file, so it never re-renders on a download tick. Use `getState()` (not the hook) for these imperative one-shot reads inside effects/callbacks. See [[mobile-storage]].
+`stores/downloads-store.ts` is a non-sheet store (offline-download status/progress, a `trackUris` map, and a `manifests` map of downloaded-collection metadata) — plain client state, so a store, not a Provider. A Provider that owns a native resource may still **read** a store without subscribing: `playback-provider` reads `useDownloadsStore.getState().trackUris[id]` inside its track-change effect to prefer a downloaded file, so it never re-renders on a download tick. Use `getState()` (not the hook) for these imperative one-shot reads inside effects/callbacks. The store's `useDownloadedCollections()` selector (downloaded entries, newest first) follows the v5 gotcha below — it selects the stable `manifests`/`collections` refs and derives the array in a `useMemo`, never from the selector. See [[mobile-storage]] and [[mobile-offline]].
 
 ## zustand v5 gotcha (load-bearing)
 

@@ -12,6 +12,7 @@ jest.mock("@/lib/api-client", () => {
 jest.mock("@/lib/session", () => ({
   useSession: () => ({
     session: { serverUrl: "https://music.home.arpa", token: "tok" },
+    connectionStatus: "online",
     isLoading: false,
     signIn: jest.fn(),
     signOut: jest.fn(),

@@ -13,31 +13,45 @@ export interface Session {
 }
 
 /**
- * Resolves the stored session on launch: returns a validated session when a
- * stored token is accepted by the stored server, otherwise null. A 401 means
- * the token is dead, so it is cleared; network failures keep the token
- * (connectivity may come back later) but still start unauthenticated.
+ * Outcome of resolving the stored session on launch. The two failure modes are
+ * deliberately distinct: a rejected token (401) is dead and clears, but an
+ * unreachable server keeps the credentials so the app can run **offline** and
+ * reconnect later. `unauthenticated` therefore means "no usable credentials"
+ * (none stored, or the token was cleared), not merely "couldn't verify".
  */
-export async function loadInitialSession(): Promise<Session | null> {
+export type BootstrapResult =
+  | { status: "authenticated"; session: Session }
+  | { status: "offline"; session: Session }
+  | { status: "unauthenticated" };
+
+/**
+ * Resolves the stored session on launch. Returns `authenticated` when a stored
+ * token is accepted by the stored server; `offline` (keeping the token +
+ * session) when the server is unreachable, so connectivity can come back later;
+ * and `unauthenticated` when there are no stored credentials or the token was
+ * rejected (401) and cleared.
+ */
+export async function loadInitialSession(): Promise<BootstrapResult> {
   const [token, serverUrl] = await Promise.all([
     getStoredToken(),
     getStoredServerUrl(),
   ]);
   if (!token || !serverUrl) {
-    return null;
+    return { status: "unauthenticated" };
   }
 
   try {
     const client = createApiClient(serverUrl, token);
     await client.get("/api/auth/me", AuthenticatedUserResponseSchema);
-    return { serverUrl, token };
+    return { status: "authenticated", session: { serverUrl, token } };
   } catch (err) {
     if (err instanceof ApiError && err.status === 401) {
       console.warn("stored session token rejected; clearing it", err);
       await clearStoredToken();
-    } else {
-      console.warn("session check failed; starting unauthenticated", err);
+      return { status: "unauthenticated" };
     }
-    return null;
+    // Network failure / timeout: keep the credentials and start offline.
+    console.warn("session check failed; starting offline", err);
+    return { status: "offline", session: { serverUrl, token } };
   }
 }

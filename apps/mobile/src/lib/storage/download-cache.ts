@@ -58,6 +58,26 @@ export function getDownloadedTrackUri(trackId: string): Promise<string | null> {
 }
 
 /**
+ * The durable `file://` uri for an already-pinned cover, or null if it is not
+ * downloaded. Never fetches — keyed by the same resolved-uri scheme as
+ * {@link ensureDownloadedArt}, so a cover pinned at download time is found here
+ * even after a token refresh (the key excludes the bearer token). Used by
+ * `useCachedImageSource` to render downloaded art offline.
+ */
+export function getDownloadedArtUri(
+  coverArtUrl: string | null | undefined,
+  session: DownloadSession | null | undefined,
+): Promise<string | null> {
+  const source = resolveImageSource(
+    coverArtUrl,
+    session?.serverUrl,
+    session?.token,
+  );
+  if (!source) return Promise.resolve(null);
+  return store.uri(source.uri);
+}
+
+/**
  * Download a downloaded collection's cover art to durable storage so it renders
  * with no network. Same auth/façade rules as the artwork cache (bearer header
  * for server-relative covers, none for absolute façade urls). Returns null on

@@ -29,9 +29,11 @@ jest.mock("@/hooks/use-recently-played", () => ({
   useRecentlyPlayed: () => mockUseRecentlyPlayed(),
 }));
 
-// Artwork renders via StaccatoImage, which reads the session.
+// Artwork renders via StaccatoImage, which reads the session; the Home route
+// also branches on connectionStatus.
+const mockUseSession = jest.fn();
 jest.mock("@/lib/session", () => ({
-  useSession: () => ({ session: null }),
+  useSession: () => mockUseSession(),
 }));
 
 const fixturePlaylistsData: PlaylistListResponse = {
@@ -115,7 +117,14 @@ function renderHome() {
 }
 
 describe("HomeScreen", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseSession.mockReturnValue({
+      session: null,
+      connectionStatus: "online",
+      retryConnection: jest.fn(),
+    });
+  });
 
   it("renders the hero and the Made-for-you / Your-playlists carousels", () => {
     renderHome();
@@ -190,6 +199,27 @@ describe("HomeScreen", () => {
       pathname: "/(protected)/library",
       params: { tab: "playlists" },
     });
+  });
+
+  it("renders the offline home (not the carousels) when the connection is offline", () => {
+    mockUseSession.mockReturnValue({
+      session: null,
+      connectionStatus: "offline",
+      retryConnection: jest.fn(),
+    });
+    mockUsePlaylists.mockReturnValue({ data: fixturePlaylistsData });
+    mockUseRecommendedPlaylists.mockReturnValue({ data: fixtureRecData });
+    mockUseRecentlyPlayed.mockReturnValue([recentAlbum, recentPlaylist]);
+
+    render(
+      <StaccatoThemeProvider>
+        <HomeScreen />
+      </StaccatoThemeProvider>,
+    );
+
+    expect(screen.getByText("You're offline")).toBeOnTheScreen();
+    expect(screen.getByText("Available offline")).toBeOnTheScreen();
+    expect(screen.queryByText("Made for you")).not.toBeOnTheScreen();
   });
 
   it("drops the hero when there is no recommended playlist", () => {

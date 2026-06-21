@@ -49,6 +49,7 @@ beforeEach(() => {
   });
   mockUseSession.mockReturnValue({
     session: { serverUrl: "https://music.home.arpa", token: "tok" },
+    connectionStatus: "online",
   });
 });
 

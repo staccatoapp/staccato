@@ -24,7 +24,7 @@ export function useAuthedQuery<T>(
   schema: z.ZodType<T>,
   options?: AuthedQueryOptions<T>,
 ): UseQueryResult<T> {
-  const { session } = useSession();
+  const { session, connectionStatus } = useSession();
   const client = useApiClient();
   return useQuery<T>({
     ...options,
@@ -35,6 +35,9 @@ export function useAuthedQuery<T>(
       }
       return client.get(path, schema);
     },
-    enabled: !!session && (options?.enabled ?? true),
+    // Paused while offline so the unreachable server isn't hammered; the
+    // reconnect probe invalidates queries on recovery, refetching them.
+    enabled:
+      !!session && connectionStatus === "online" && (options?.enabled ?? true),
   });
 }

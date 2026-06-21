@@ -4,6 +4,7 @@ import {
   ensureDownloadedArt,
   ensureTrackDownloaded,
   extensionForDownload,
+  getDownloadedArtUri,
   getDownloadedTrackUri,
 } from "./download-cache";
 
@@ -77,6 +78,25 @@ describe("getDownloadedTrackUri", () => {
   it("returns null when the track is not downloaded", async () => {
     store.uri.mockResolvedValue(null);
     expect(await getDownloadedTrackUri("trk-1")).toBeNull();
+  });
+});
+
+describe("getDownloadedArtUri", () => {
+  it("returns the pinned art uri for a resolved cover, without downloading", async () => {
+    store.uri.mockResolvedValue("file://downloads/cover.jpg");
+
+    expect(await getDownloadedArtUri("/metadata/covers/x.jpg", SESSION)).toBe(
+      "file://downloads/cover.jpg",
+    );
+    expect(store.uri).toHaveBeenCalledWith(
+      "https://music.home.arpa/metadata/covers/x.jpg",
+    );
+    expect(store.ensure).not.toHaveBeenCalled();
+  });
+
+  it("returns null when there is no resolvable cover", async () => {
+    expect(await getDownloadedArtUri(null, SESSION)).toBeNull();
+    expect(store.uri).not.toHaveBeenCalled();
   });
 });
 

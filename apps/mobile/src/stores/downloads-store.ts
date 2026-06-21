@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useMemo } from "react";
 import { create } from "zustand";
 
 import { type DownloadableCollection } from "@/lib/downloadable";
@@ -26,8 +27,12 @@ export interface CollectionStatus {
   total: number;
 }
 
-/** What we persist per downloaded collection so a relaunch can rehydrate it. */
-interface ManifestEntry {
+/**
+ * What we persist per downloaded collection so a relaunch can rehydrate it —
+ * and what the offline "Available offline" grid renders from. Surfaced on the
+ * store state (see {@link useDownloadedCollections}), not just on disk.
+ */
+export interface DownloadedCollection {
   id: string;
   kind: "playlist" | "album";
   name: string;
@@ -37,13 +42,15 @@ interface ManifestEntry {
   downloadedAt: number;
 }
 
-type Manifest = Record<string, ManifestEntry>;
+type Manifest = Record<string, DownloadedCollection>;
 
 interface DownloadsState {
   /** Per-collection download status, keyed by collection id. */
   collections: Record<string, CollectionStatus>;
   /** trackId → durable `file://` uri, read synchronously by the player. */
   trackUris: Record<string, string>;
+  /** Per-collection metadata (name/kind/covers/tracks), keyed by collection id. */
+  manifests: Manifest;
   /** Pull every owned track + cover art of a collection to the device. */
   download: (
     collection: DownloadableCollection,
@@ -72,7 +79,7 @@ async function readManifest(): Promise<Manifest> {
 // never rejects and can't wedge later writes.
 let manifestWriteQueue: Promise<void> = Promise.resolve();
 
-function writeManifestEntry(entry: ManifestEntry): Promise<void> {
+function writeManifestEntry(entry: DownloadedCollection): Promise<void> {
   manifestWriteQueue = manifestWriteQueue.then(async () => {
     try {
       const manifest = await readManifest();
@@ -91,6 +98,7 @@ function writeManifestEntry(entry: ManifestEntry): Promise<void> {
 export const useDownloadsStore = create<DownloadsState>((set, get) => ({
   collections: {},
   trackUris: {},
+  manifests: {},
 
   async download(collection, session) {
     const existing = get().collections[collection.id]?.state;
@@ -160,7 +168,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => ({
       total,
     });
 
-    await writeManifestEntry({
+    const entry: DownloadedCollection = {
       id: collection.id,
       kind: collection.kind,
       name: collection.name,
@@ -168,7 +176,11 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => ({
       trackIds: collection.tracks.map((t) => t.trackId),
       snapshot: collection.snapshot,
       downloadedAt: Date.now(),
-    });
+    };
+    await writeManifestEntry(entry);
+    // Surface the metadata in state so the offline grid can render it without
+    // re-reading async-storage.
+    set((s) => ({ manifests: { ...s.manifests, [entry.id]: entry } }));
   },
 
   async hydrate() {
@@ -201,6 +213,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => ({
     set((s) => ({
       collections: { ...s.collections, ...collections },
       trackUris: { ...s.trackUris, ...trackUris },
+      manifests: { ...s.manifests, ...manifest },
     }));
   },
 }));
@@ -215,4 +228,23 @@ const IDLE: CollectionStatus = { state: "idle", completed: 0, total: 0 };
  */
 export function useCollectionStatus(id: string): CollectionStatus {
   return useDownloadsStore((s) => s.collections[id]) ?? IDLE;
+}
+
+/**
+ * The fully-downloaded collections, newest first — what the offline "Available
+ * offline" grid renders. Selects the stable `manifests` and `collections` refs
+ * and derives the array in a memo (never returns a fresh array from the
+ * selector — zustand v5 has no snapshot caching, so that would loop). A
+ * collection appears only once every track has landed (`state: "downloaded"`).
+ */
+export function useDownloadedCollections(): DownloadedCollection[] {
+  const manifests = useDownloadsStore((s) => s.manifests);
+  const collections = useDownloadsStore((s) => s.collections);
+  return useMemo(
+    () =>
+      Object.values(manifests)
+        .filter((m) => collections[m.id]?.state === "downloaded")
+        .sort((a, b) => b.downloadedAt - a.downloadedAt),
+    [manifests, collections],
+  );
 }

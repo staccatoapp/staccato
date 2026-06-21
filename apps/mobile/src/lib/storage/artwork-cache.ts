@@ -43,3 +43,22 @@ export async function ensureArtworkFile(
     return null;
   }
 }
+
+/**
+ * The transient-cache `file://` uri for an already-fetched cover, or null if it
+ * is not cached. Never fetches — the second tier (after the durable downloads
+ * store) consulted by `useCachedImageSource`. Keyed by the resolved uri, the
+ * same scheme {@link ensureArtworkFile} writes under.
+ */
+export function getArtworkFileUri(
+  coverArtUrl: string | null | undefined,
+  session: { serverUrl: string; token: string } | null | undefined,
+): Promise<string | null> {
+  const source = resolveImageSource(
+    coverArtUrl,
+    session?.serverUrl,
+    session?.token,
+  );
+  if (!source) return Promise.resolve(null);
+  return store.uri(source.uri);
+}

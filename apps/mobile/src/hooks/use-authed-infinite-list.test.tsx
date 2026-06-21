@@ -10,13 +10,9 @@ jest.mock("@/lib/api-client", () => {
   const actual = jest.requireActual("@/lib/api-client");
   return { ...actual, createApiClient: jest.fn() };
 });
+const mockUseSession = jest.fn();
 jest.mock("@/lib/session", () => ({
-  useSession: () => ({
-    session: { serverUrl: "https://music.home.arpa", token: "tok" },
-    isLoading: false,
-    signIn: jest.fn(),
-    signOut: jest.fn(),
-  }),
+  useSession: () => mockUseSession(),
 }));
 
 const mockedCreateClient = jest.mocked(createApiClient);
@@ -26,6 +22,13 @@ let queryClient: QueryClient;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockUseSession.mockReturnValue({
+    session: { serverUrl: "https://music.home.arpa", token: "tok" },
+    isLoading: false,
+    connectionStatus: "online",
+    signIn: jest.fn(),
+    signOut: jest.fn(),
+  });
   queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
@@ -108,5 +111,32 @@ describe("useAuthedInfiniteList", () => {
       { id: "c" },
     ]);
     expect(result.current.hasNextPage).toBe(false);
+  });
+
+  it("stays disabled while offline even with a session", () => {
+    const get = jest.fn();
+    mockedCreateClient.mockReturnValue({
+      get,
+      post: jest.fn(),
+      put: jest.fn(),
+      patch: jest.fn(),
+      delete: jest.fn(),
+    });
+    mockUseSession.mockReturnValue({
+      session: { serverUrl: "https://music.home.arpa", token: "tok" },
+      isLoading: false,
+      connectionStatus: "offline",
+      signIn: jest.fn(),
+      signOut: jest.fn(),
+    });
+
+    const { result } = renderHook(
+      () =>
+        useAuthedInfiniteList(["albums"], "/api/library/albums", ItemSchema),
+      { wrapper },
+    );
+
+    expect(result.current.fetchStatus).toBe("idle");
+    expect(get).not.toHaveBeenCalled();
   });
 });
