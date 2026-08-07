@@ -456,6 +456,58 @@ describe("POST /:id/tracks — track existence filtering", () => {
     expect(tracks).toHaveLength(1);
     expect(tracks.at(0)?.trackId).toBe(trackId);
   });
+
+  it("returns 204 and inserts all tracks in a single batch when multiple valid IDs are provided", async () => {
+    const trackId1 = seedTrack(artistId, albumId);
+    const trackId2 = seedTrack(artistId, albumId);
+    const trackId3 = seedTrack(artistId, albumId);
+    const app = buildApp(playlistRoutes, userAId);
+    const res = await app.inject({
+      method: "POST",
+      url: `/${playlistId}/tracks`,
+      payload: { trackIds: [trackId1, trackId2, trackId3] },
+    });
+    expect(res.statusCode).toBe(204);
+
+    const listRes = await app.inject({ method: "GET", url: `/${playlistId}` });
+    const tracks = listRes.json().tracks as Array<{
+      trackId: string;
+      position: number;
+    }>;
+    expect(tracks).toHaveLength(3);
+    expect(tracks.map((t) => t.trackId)).toEqual([
+      trackId1,
+      trackId2,
+      trackId3,
+    ]);
+  });
+
+  it("appends batch after existing tracks with correct positions", async () => {
+    const trackId1 = seedTrack(artistId, albumId);
+    const trackId2 = seedTrack(artistId, albumId);
+    const trackId3 = seedTrack(artistId, albumId);
+    const app = buildApp(playlistRoutes, userAId);
+
+    await app.inject({
+      method: "POST",
+      url: `/${playlistId}/tracks`,
+      payload: { trackIds: [trackId1] },
+    });
+    await app.inject({
+      method: "POST",
+      url: `/${playlistId}/tracks`,
+      payload: { trackIds: [trackId2, trackId3] },
+    });
+
+    const listRes = await app.inject({ method: "GET", url: `/${playlistId}` });
+    const tracks = listRes.json().tracks as Array<{ trackId: string }>;
+    expect(tracks).toHaveLength(3);
+    expect(tracks.map((t) => t.trackId)).toEqual([
+      trackId1,
+      trackId2,
+      trackId3,
+    ]);
+  });
 });
 
 describe("GET /:id/suggestions", () => {

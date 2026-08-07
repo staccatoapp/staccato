@@ -211,6 +211,18 @@ export function addTrackToPlaylist(
   db.insert(playlistTracks).values({ playlistId, trackId, position }).run();
 }
 
+export function addTracksToPlaylist(
+  playlistId: string,
+  entries: { trackId: string; position: number }[],
+): void {
+  if (entries.length === 0) return;
+  db.transaction(() => {
+    db.insert(playlistTracks)
+      .values(entries.map((e) => ({ playlistId, ...e })))
+      .run();
+  });
+}
+
 export function getPlaylistTrackEntry(
   entryId: string,
   playlistId: string,
