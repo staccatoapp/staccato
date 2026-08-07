@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
+import { LRUCache } from "lru-cache";
 import { z } from "zod";
 import { MetadataArtistImageSchema } from "@staccato/shared";
 import { mirrorFetch } from "../mirror/client.js";
@@ -38,7 +39,13 @@ export const WikidataEntitySchema = z.object({
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 type CacheValue = { url: string; filename: string } | null;
-const cache = new Map<string, { value: CacheValue; expires: number }>();
+// lru-cache v11 prohibits null values; wrap so the null sentinel is storable.
+export const cache = new LRUCache<string, { value: CacheValue }>({
+  max: 10_000,
+  ttl: CACHE_TTL_MS,
+  ttlResolution: 0,
+  perf: { now: () => Date.now() },
+});
 
 // R8 · artist image. Owns the full 3-hop chain (moved from the server):
 // MB url-rels (from the mirror) → Wikidata QID → Wikimedia Commons P18 filename.
@@ -53,7 +60,7 @@ const artistImageRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const cached = cache.get(mbid);
-    if (cached && cached.expires > Date.now()) {
+    if (cached !== undefined) {
       if (cached.value) return MetadataArtistImageSchema.parse(cached.value);
       return reply.status(404).send({ error: "No image for artist" });
     }
@@ -74,7 +81,7 @@ const artistImageRoutes: FastifyPluginAsync = async (fastify) => {
         "mirror artist url-rels non-ok response",
       );
       if (mbRes.status < 500) {
-        cache.set(mbid, { value: null, expires: Date.now() + CACHE_TTL_MS });
+        cache.set(mbid, { value: null });
       }
       return reply
         .status(mbRes.status < 500 ? 404 : 502)
@@ -93,7 +100,7 @@ const artistImageRoutes: FastifyPluginAsync = async (fastify) => {
     );
     const qid = wikidataRel?.url.resource.split("/wiki/")[1];
     if (!qid) {
-      cache.set(mbid, { value: null, expires: Date.now() + CACHE_TTL_MS });
+      cache.set(mbid, { value: null });
       return reply.status(404).send({ error: "No Wikidata relation" });
     }
 
@@ -114,7 +121,7 @@ const artistImageRoutes: FastifyPluginAsync = async (fastify) => {
         "wikidata entity non-ok response",
       );
       if (wdRes.status < 500) {
-        cache.set(mbid, { value: null, expires: Date.now() + CACHE_TTL_MS });
+        cache.set(mbid, { value: null });
       }
       return reply
         .status(wdRes.status < 500 ? 404 : 502)
@@ -131,7 +138,7 @@ const artistImageRoutes: FastifyPluginAsync = async (fastify) => {
     const filename =
       wdParsed.data.entities[qid]?.claims?.P18?.[0]?.mainsnak?.datavalue?.value;
     if (!filename) {
-      cache.set(mbid, { value: null, expires: Date.now() + CACHE_TTL_MS });
+      cache.set(mbid, { value: null });
       return reply.status(404).send({ error: "No image for artist" });
     }
 
@@ -139,10 +146,7 @@ const artistImageRoutes: FastifyPluginAsync = async (fastify) => {
     const url = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(
       filename,
     )}`;
-    cache.set(mbid, {
-      value: { url, filename },
-      expires: Date.now() + CACHE_TTL_MS,
-    });
+    cache.set(mbid, { value: { url, filename } });
     return MetadataArtistImageSchema.parse({ url, filename });
   });
 };

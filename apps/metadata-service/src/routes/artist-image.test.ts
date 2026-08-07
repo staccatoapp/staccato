@@ -3,6 +3,7 @@ import Fastify from "fastify";
 import artistImageRoutes, {
   ArtistUrlRelsSchema,
   WikidataEntitySchema,
+  cache,
 } from "./artist-image.js";
 import { mirrorFetch } from "../mirror/client.js";
 
@@ -269,5 +270,15 @@ describe("GET /artists/:mbid/image route", () => {
     await app.inject({ method: "GET", url: `/artists/${mbid}/image` });
     expect(vi.mocked(mirrorFetch)).toHaveBeenCalledTimes(2);
     vi.useRealTimers();
+  });
+});
+
+describe("artist-image cache — LRU properties", () => {
+  it("is bounded at 10_000 entries", () => {
+    expect(cache.max).toBe(10_000);
+  });
+
+  it("has a 24-hour TTL", () => {
+    expect(cache.ttl).toBe(24 * 60 * 60 * 1000);
   });
 });

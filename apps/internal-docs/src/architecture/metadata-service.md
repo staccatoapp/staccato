@@ -30,6 +30,26 @@
 > `MetadataXxx` DTOs in `packages/shared/src/types/zod/metadata`). Also `mirror/pickRelease.ts`
 > `pickBestRelease()` and its `TYPE_RANK`.
 
+## In-memory route caches
+
+The cover-art (`cover-art.ts`) and artist-image (`artist-image.ts`) routes maintain module-level
+`LRUCache` instances (from `lru-cache`) to avoid hammering upstream APIs on repeated lookups:
+
+| Cache             | Key                | Value                                        | Capacity       | TTL  |
+| ----------------- | ------------------ | -------------------------------------------- | -------------- | ---- |
+| `cover-art.ts`    | release-group MBID | `{ url: string \| null }`                    | 10 000 entries | 24 h |
+| `artist-image.ts` | artist MBID        | `{ value: CacheValue }` (wrapped, see below) | 10 000 entries | 24 h |
+
+Both caches are created with `ttlResolution: 0` (staleness checked on every access via
+`Date.now()`, no debounce) and a custom `perf: { now: () => Date.now() }` so that
+`vi.useFakeTimers()` works correctly in tests.
+
+**artist-image null-sentinel:** `lru-cache` v11 prohibits `null` values, so the artist-image
+cache wraps its value in `{ value: CacheValue }` where `CacheValue = { url, filename } | null`.
+A `null` inner value means "no image found; skip the 3-hop lookup on re-request."
+
+Error paths (502) are never cached; only definitive 302/404 outcomes are stored.
+
 ## Popularity ranking
 
 > `listenbrainz/popularity.ts` + `search/rank.ts`: how ListenBrainz signals re-rank search

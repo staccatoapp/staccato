@@ -16,6 +16,7 @@
     "@staccato/shared": "workspace:*",
     "dotenv-flow": "^4.1.0",
     "fastify": "^5.8.5",
+    "lru-cache": "^11.0.0",
     "p-queue": "^8.0.1",
     "pino": "^9.5.0",
     "pino-pretty": "^11.2.2",

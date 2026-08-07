@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
+import { LRUCache } from "lru-cache";
 import { z } from "zod";
 import { MIRROR_USER_AGENT } from "../constants.js";
 import { MBID_RE } from "../lib/id-patterns.js";
@@ -12,7 +13,12 @@ const CAA_BASE = "https://coverartarchive.org";
 // here would serialize all instances' requests through one global bottleneck.
 // Global outbound protection is a Phase-5 infra-layer concern.
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
-const cache = new Map<string, { url: string | null; expires: number }>();
+export const cache = new LRUCache<string, { url: string | null }>({
+  max: 10_000,
+  ttl: CACHE_TTL_MS,
+  ttlResolution: 0,
+  perf: { now: () => Date.now() },
+});
 
 // R9 · cover art. Mirrors CAA's front-cover redirect endpoint so one route
 // serves both consumers: the server's download path (reads the redirect
@@ -26,7 +32,7 @@ const coverArtRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const cached = cache.get(mbid);
-    if (cached && cached.expires > Date.now()) {
+    if (cached !== undefined) {
       if (cached.url) return reply.redirect(cached.url, 302);
       return reply.status(404).send({ error: "No cover art" });
     }
@@ -45,7 +51,7 @@ const coverArtRoutes: FastifyPluginAsync = async (fastify) => {
     if (res.status === 302 || res.status === 307) {
       const location = res.headers.get("location");
       if (location) {
-        cache.set(mbid, { url: location, expires: Date.now() + CACHE_TTL_MS });
+        cache.set(mbid, { url: location });
         return reply.redirect(location, 302);
       }
       request.log.warn(
@@ -56,7 +62,7 @@ const coverArtRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     if (res.status === 404) {
-      cache.set(mbid, { url: null, expires: Date.now() + CACHE_TTL_MS });
+      cache.set(mbid, { url: null });
       return reply.status(404).send({ error: "No cover art" });
     }
 
